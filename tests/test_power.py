@@ -124,3 +124,11 @@ def test_sold_out_market_is_named(game):
     pg.evaluate("() => { S.p2.market = 0; S.p2.nextColo = 1e9; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
     run(pg, 1)
     assert pg.inner_text("#limit").startswith("Leased capacity is sold out in this market")
+
+
+def test_halls_line_counts_the_sheds(game):
+    pg = campus(game, county="cheap")          # 50 MW grid
+    pg.evaluate("() => { for (let i = 0; i < 4; i++) S.p2.builds.push({kind: 'hall', done: 0}); }")
+    run(pg, 1)
+    text = pg.inner_text("#halls")
+    assert "4 built: 1 energized, 3 dark (need 150 MW more power)" in text
