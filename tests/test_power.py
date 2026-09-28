@@ -85,7 +85,7 @@ def test_buy_adjacent_land(game):
     pg.click("#buyLand")
     assert pg.evaluate("() => acresFree()") == acres + 200
     assert pg.evaluate("() => S.funds") == pytest.approx(funds - 15e6)
-    assert "$18.8M" in pg.inner_text("#buyLand")          # next parcel costs 25% more
+    assert "$16.5M" in pg.inner_text("#buyLand")          # next parcel costs 10% more
 
 
 def test_big_power_reads_in_gw(game):

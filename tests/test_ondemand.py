@@ -84,3 +84,16 @@ def test_chip_power_levels_off_after_p7(game):
     assert pg.evaluate("() => chip(27).kw") == pytest.approx(1.4 ** 6 * 1.05 ** 21)
     gpus = pg.evaluate("() => { S.chipIdx = 27; return dealSize() / gpuPrice(); }")
     assert gpus > 500                                                           # a strategic investment buys a real cluster (~950 P28s)
+
+
+def test_chip_prices_soften_after_p8(game):
+    pg = campus(game)
+    assert pg.evaluate("() => chip(7).priceMult") == pytest.approx(1.6 ** 7)          # phase 1 unchanged
+    assert pg.evaluate("() => chip(10).priceMult") == pytest.approx(1.6 ** 7 * 1.25 ** 3)
+
+
+def test_phase2_chips_ship_every_eight_minutes(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.nextChip = S.t + 1; }")
+    run(pg, 2)
+    assert pg.evaluate("() => S.nextChip - S.t") == pytest.approx(480 - 1, abs=1)

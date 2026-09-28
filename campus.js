@@ -22,7 +22,7 @@ const POWER = {
   turbine: { name: "gas turbine", mw: 50, cost: 25e6, secs: 60, acres: 0 },
   solar: { name: "solar + batteries", mw: 30, cost: 20e6, secs: 180, acres: 150 },
 };
-const LAND = { acres: 200, cost: 15e6, growth: 1.25 };      // adjacent parcels: each one costs 25% more than the last
+const LAND = { acres: 200, cost: 15e6, growth: 1.1 };       // adjacent parcels: each one costs 10% more than the last
 const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.3;             // each request waits 30% longer: everyone is in the queue
 const BUILD_DONE = {
   hall: () => `Hall ${doneBuilds("hall")} is up. ` +

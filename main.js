@@ -279,7 +279,7 @@ function rentRival() {
 }
 
 function releaseChip() {
-  S.chipIdx += 1; S.nextChip = S.t + CHIP_EVERY;
+  S.chipIdx += 1; S.nextChip = S.t + (S.phase === 2 ? CHIP_EVERY_P2 : CHIP_EVERY);
   const c = newest(), prev = chip(S.chipIdx - 1);
   S.vendorCap *= 1.08; milestone(`Parallax ${c.name}`);
   say(`Parallax announced the ${c.name}: ${c.perf.toFixed(1)}x the speed of a P1, ${kwText(c.kw)} each. Your ${prev.name}s are now \u201clegacy.\u201d`);

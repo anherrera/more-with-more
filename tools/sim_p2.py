@@ -17,8 +17,8 @@ MARKET_START_MW, MARKET_REGROW = 150, 10 / 60
 LEASE_UNIT_MW, LEASE_RACKS, LEASE_SLOT = 20, 240, 35          # a leased data hall at two-phase cooling
 QUEUE_DEPOSIT, QUEUE_GROWTH = 5e6, 1.3
 LATE_FREE, LATE_DEFAULT, OFFER_TTL = 60, 180, 60
-CHIP_EVERY, DEAL_EVERY, DEAL_MW = 300, 90, 20           # Parallax credits: ~20 MW of the newest GPUs
-LAND_ACRES, LAND_COST, LAND_GROWTH = 200, 15e6, 1.25
+CHIP_EVERY, DEAL_EVERY, DEAL_MW = 480, 90, 20           # Parallax credits: ~20 MW of the newest GPUs
+LAND_ACRES, LAND_COST, LAND_GROWTH = 200, 15e6, 1.1
 INTEREST, P2_RATE = 0.0002, 0.25
 ROUNDS2 = [(100, 100e6), (300, 250e6), (700, 600e6)]
 HYPE = 80                                                      # assume the player keeps hype around here with posts
@@ -28,8 +28,8 @@ def chip_kw(g):                  # mirrors globals.js chip(): 1.4x/gen through P
     return 1.4 ** min(g, 6) * 1.05 ** max(0, g - 6)
 
 
-def gpu_cost_per_kw(g):          # volume price $500 x 1.6^g per GPU
-    return 500 * 1.6 ** g / chip_kw(g)
+def gpu_cost_per_kw(g):          # volume price $500 x 1.6^g per GPU through P8, then 1.25^g
+    return 500 * 1.6 ** min(g, 7) * 1.25 ** max(0, g - 7) / chip_kw(g)
 
 
 def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leased_kw=220_000, racks=1845,
