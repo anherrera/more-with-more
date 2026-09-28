@@ -119,3 +119,16 @@ def test_money_and_hype_projects(game):
     hype = pg.evaluate("() => S.hype")
     buy(pg, "rebrand")
     assert pg.evaluate("() => S.hype") == pytest.approx(hype + 30)
+
+
+def test_campus_robots_build_on_their_own(game):
+    pg = campus(game)
+    assert not has(pg, "robots")
+    pg.evaluate("() => { S.p2.round = 2; S.p2.grid = 60; }")
+    assert has(pg, "robots")
+    pg.click("button[data-id='robots']")
+    before = pg.evaluate("() => S.p2.builds.length")
+    run(pg, 30)
+    kinds = pg.evaluate("() => S.p2.builds.slice(%d).map((b) => b.kind)" % before)
+    assert "hall" in kinds and "turbine" in kinds
+    assert "robots" in pg.inner_text("#console").lower()

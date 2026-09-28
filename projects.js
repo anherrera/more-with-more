@@ -79,4 +79,7 @@ const PROJECTS = [
     when: () => (S.p2.round || 0) >= 2, buy: () => { S.hype += 50; } },
   { id: "pledge2", phase: 2, title: "Pledge: water-positive by 2045", cost: 0, desc: "The 2040 pledge, extended. +15 hype.",
     when: () => acresUsed() >= 200, buy: () => { S.hype += 15; } },
+  { id: "robots", phase: 2, title: "Campus expansion robots", cost: 300e6,
+    desc: "They pour concrete, set transformers and never unionize. Halls and turbines build themselves whenever you're short and have cash.",
+    when: () => (S.p2.round || 0) >= 2, buy: () => { S.p2.robotsAt = 0; } },
 ];

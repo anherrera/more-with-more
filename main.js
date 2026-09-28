@@ -494,10 +494,10 @@ function render() {
     : S.hype >= HYPE_TO_RAISE ? "Investors will take a meeting. You can raise."
     : "Investors aren't returning calls. Ship a model or post.";
   const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
-  const gated = !!r && (S.phase === 2 ? backlogMW() < r.backlog : S.gen < r.gen);
+  const gated = !!r && (S.phase === 2 ? !!roundGap(r) : S.gen < r.gen);
   $("raise").hidden = !r || (S.phase === 1 && gated);
   if (r) {
-    $("raise").textContent = S.phase === 2 && gated ? `${r.name} needs ${mwText(r.backlog)} of signed backlog (have ${fmt(backlogMW())})`
+    $("raise").textContent = S.phase === 2 && gated ? `${r.name} needs ${roundGap(r)}`
       : S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
     $("raise").disabled = gated || S.hype < HYPE_TO_RAISE;
   }

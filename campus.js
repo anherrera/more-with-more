@@ -39,13 +39,16 @@ const CUSTOMERS = [
   "A sovereign AI fund", "A lab you have never heard of with $4B", "A chatbot company that is also a hardware company",
 ];
 const ROUNDS2 = [
-  { name: "Series E", backlog: 100, amount: 100e6 }, { name: "Series F", backlog: 300, amount: 250e6 },
-  { name: "Series G", backlog: 700, amount: 600e6 },
+  { name: "Series E", backlog: 100, campus: 150, amount: 100e6 }, { name: "Series F", backlog: 300, campus: 400, amount: 250e6 },
+  { name: "Series G", backlog: 700, campus: 750, amount: 600e6 },
 ];
 const campusRound = () => ROUNDS2[S.p2.round || 0];
+// Investors fund build-outs: a round needs signed backlog AND a campus to show for it. Returns what's missing, or null.
+const roundGap = (r) => backlogMW() < r.backlog ? `${mwText(r.backlog)} of signed backlog (have ${mwText(backlogMW())})`
+  : energizedAt() < r.campus ? `${mwText(r.campus)} of campus (have ${mwText(energizedAt())})` : null;
 function raiseCampus() {
   const r = campusRound();
-  if (!r || backlogMW() < r.backlog || S.hype < HYPE_TO_RAISE) return;
+  if (!r || roundGap(r) || S.hype < HYPE_TO_RAISE) return;
   S.funds += r.amount; S.p2.round = (S.p2.round || 0) + 1; S.hype = Math.max(10, S.hype - 20); milestone(`raised ${r.name}`);
   say(`Closed the ${r.name}: ${money(r.amount)}. The deck said “backlog” eleven times. Most of the backlog is labs funded by Parallax.`);
 }
@@ -237,6 +240,22 @@ function recheckActive() {
   }
 }
 
+// Campus expansion robots: every 10 s, if cash allows, build whichever side (halls or power) is short.
+const ROBOT_EVERY = 10, ROBOT_RESERVE = 50e6;
+function stepRobots() {
+  if (!S.done.robots || S.t < (S.p2.robotsAt || 0)) return;
+  S.p2.robotsAt = S.t + ROBOT_EVERY;
+  const halls = S.p2.builds.filter((b) => b.kind === "hall").length * hallSize();
+  const power = S.p2.grid + (S.p2.queue ? S.p2.queue.mw : 0) + S.p2.builds.filter((b) => b.kind === "turbine").length * turbineMW()
+    + S.p2.builds.filter((b) => b.kind === "solar").length * POWER.solar.mw;
+  const kind = halls <= power ? "hall" : "turbine";
+  if (kind === "hall" && acresFree() < HALL.acres) return;
+  if (S.funds - buildCost(kind) < ROBOT_RESERVE) return;
+  const n = S.p2.builds.length;
+  build(kind);
+  if (S.p2.builds.length > n && !S.p2.robotsSaid) { S.p2.robotsSaid = true; say("The robots started building. Nobody told them to stop, so nobody will."); }
+}
+
 function stepContracts(dt) {
   recheckActive();
   for (const c of [...S.p2.contracts].sort((a, b) => a.start - b.start || a.n - b.n)) {
@@ -322,6 +341,7 @@ function stepCampus(dt) {
   S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
   if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + (60 + Math.random() * 60) * (S.done.sales2 ? 0.7 : 1); }
   stepContracts(dt);
+  stepRobots();
   stepModel();
 }
 
