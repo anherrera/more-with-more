@@ -242,18 +242,28 @@ function recheckActive() {
 
 // Campus expansion robots: every 10 s, if cash allows, build whichever side (halls or power) is short.
 const ROBOT_EVERY = 10, ROBOT_RESERVE = 50e6;
-function stepRobots() {
-  if (!S.done.robots || S.t < (S.p2.robotsAt || 0)) return;
-  S.p2.robotsAt = S.t + ROBOT_EVERY;
+// What the robots would build next, and whether they can: { kind, blocked } where blocked names the reason.
+function robotPlan() {
   const halls = S.p2.builds.filter((b) => b.kind === "hall").length * hallSize();
   const power = S.p2.grid + (S.p2.queue ? S.p2.queue.mw : 0) + S.p2.builds.filter((b) => b.kind === "turbine").length * turbineMW()
     + S.p2.builds.filter((b) => b.kind === "solar").length * POWER.solar.mw;
   const kind = halls <= power ? "hall" : "turbine";
-  if (kind === "hall" && acresFree() < HALL.acres) return;
-  if (S.funds - buildCost(kind) < ROBOT_RESERVE) return;
+  const blocked = kind === "hall" && acresFree() < HALL.acres ? "out of land: buy a parcel"
+    : S.funds - buildCost(kind) < ROBOT_RESERVE ? `waiting for cash (keeps ${money(ROBOT_RESERVE)} in reserve)` : null;
+  return { kind, blocked };
+}
+function stepRobots() {
+  if (!S.done.robots || S.t < (S.p2.robotsAt || 0)) return;
+  S.p2.robotsAt = S.t + ROBOT_EVERY;
+  const { kind, blocked } = robotPlan();
+  if (blocked) return;
   const n = S.p2.builds.length;
   build(kind);
-  if (S.p2.builds.length > n && !S.p2.robotsSaid) { S.p2.robotsSaid = true; say("The robots started building. Nobody told them to stop, so nobody will."); }
+  if (S.p2.builds.length > n) {
+    S.p2.robotBuilt = S.p2.robotBuilt || { hall: 0, turbine: 0 };
+    S.p2.robotBuilt[kind] += 1;
+    if (!S.p2.robotsSaid) { S.p2.robotsSaid = true; say("The robots started building. Nobody told them to stop, so nobody will."); }
+  }
 }
 
 function stepContracts(dt) {
@@ -406,6 +416,12 @@ function renderCampus() {
   $("buyLand").textContent = `Buy the adjacent parcel (+${LAND.acres} acres): ${money(landCost())}`;
   $("buyLand").disabled = S.funds < landCost();
   const pending = p.builds.filter((b) => b.done > S.t).sort((a, b) => a.done - b.done);
+  $("robotLine").hidden = !S.done.robots;
+  if (S.done.robots) {
+    const rb = p.robotBuilt || { hall: 0, turbine: 0 }, plan = robotPlan();
+    $("robotLine").textContent = `Robots: built ${rb.hall} hall${rb.hall === 1 ? "" : "s"} and ${rb.turbine} turbine${rb.turbine === 1 ? "" : "s"} \u00b7 ` +
+      (plan.blocked || `next: a ${plan.kind} in ${Math.max(0, Math.ceil((p.robotsAt || 0) - S.t))}s`);
+  }
   $("underway").textContent = pending.length
     ? "Under construction: " + pending.map((b) => `${b.kind} ${time(b.done - S.t)}`).join(", ") : "";
   renderContracts();

@@ -132,3 +132,15 @@ def test_campus_robots_build_on_their_own(game):
     kinds = pg.evaluate("() => S.p2.builds.slice(%d).map((b) => b.kind)" % before)
     assert "hall" in kinds and "turbine" in kinds
     assert "robots" in pg.inner_text("#console").lower()
+
+
+def test_robots_say_what_they_are_doing(game):
+    pg = campus(game)
+    assert not pg.is_visible("#robotLine")
+    pg.evaluate("() => { S.p2.round = 2; S.p2.grid = 60; render(); }")
+    pg.click("button[data-id='robots']")
+    run(pg, 25)
+    line = pg.inner_text("#robotLine")
+    assert line.startswith("Robots: built") and "hall" in line and "turbine" in line and "next:" in line
+    pg.evaluate("() => { S.funds = 1e6; render(); }")
+    assert "waiting for cash" in pg.inner_text("#robotLine")
