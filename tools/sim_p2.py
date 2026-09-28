@@ -20,7 +20,8 @@ LATE_FREE, LATE_DEFAULT, OFFER_TTL = 60, 180, 60
 CHIP_EVERY, DEAL_EVERY, DEAL_MW = 480, 90, 20           # Parallax credits: ~20 MW of the newest GPUs
 LAND_ACRES, LAND_COST, LAND_GROWTH = 200, 15e6, 1.1
 INTEREST, P2_RATE = 0.0002, 0.25
-ROUNDS2 = [(100, 100e6), (300, 250e6), (700, 600e6)]
+ROUNDS2 = [(100, 150, 100e6), (300, 400, 250e6), (700, 750, 600e6)]   # (backlog MW, campus MW, amount)
+BUILD_GROWTH, GOAL_MW = 1.03, 1000
 HYPE = 80                                                      # assume the player keeps hype around here with posts
 
 
@@ -38,7 +39,7 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
     c = COUNTIES[county]
     S = dict(t=0, funds=funds + c["cash"], credits=0.0, fleet={chip: float(fleet_kw)}, chip=chip, next_chip=CHIP_EVERY,
              leased=float(leased_kw), racks=racks, market=float(MARKET_START_MW), grid=c["grid"], queue=None, qn=0,
-             builds=[], land=0, offers=[], contracts=[], next_offer=90, next_deal=0, next_draw=0, debt=debt, round=0,
+             builds=[], land=0, props=set(), pending_grid=[], goal_at=None, offers=[], contracts=[], next_offer=90, next_deal=0, next_draw=0, debt=debt, round=0,
              n=0, defaults=0, idle=0, idle_log=[], acted_log=[])
 
     done = lambda kind, at: sum(1 for b in S["builds"] if b[0] == kind and b[1] <= at)
@@ -50,6 +51,7 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
     rent_index = lambda: (1 + S["racks"] / 4) ** 0.9
     lease_cost = lambda: LEASE_RACKS * LEASE_SLOT * rent_index()
     live = lambda k: k["status"] in ("waiting", "late")
+    bcost = lambda kind: (HALL if kind == "hall" else TURBINE)["cost"] * BUILD_GROWTH ** sum(1 for b in S["builds"] if b[0] == kind)
 
     def free_by_gen():
         free = dict(S["fleet"])
@@ -117,8 +119,16 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
                     if late > LATE_FREE: S["funds"] -= 0.5 * k["fee"]
                     if late >= LATE_DEFAULT: k["status"] = "defaulted"; S["funds"] -= k["upfront"]; S["defaults"] += 1
         # player: money in
-        if S["round"] < len(ROUNDS2) and backlog() >= ROUNDS2[S["round"]][0]:
-            S["funds"] += ROUNDS2[S["round"]][1]; S["round"] += 1; acted = True
+        if S["round"] < len(ROUNDS2) and backlog() >= ROUNDS2[S["round"]][0] and campus_kw(t) / 1000 >= ROUNDS2[S["round"]][1]:
+            S["funds"] += ROUNDS2[S["round"]][2]; S["round"] += 1; acted = True
+        # the model's proposals the greedy player approves when affordable (lobbyist, rezone, nuclear, utility)
+        P = S["props"]
+        if "lobbyist" not in P and S["qn"] + (1 if S["queue"] else 0) > 0 and S["funds"] >= 50e6: S["funds"] -= 50e6; P.add("lobbyist")
+        if "nuclear" not in P and campus_kw(t) >= 200_000 and S["funds"] >= 600e6: S["funds"] -= 600e6; P.add("nuclear"); S["pending_grid"].append((600, t + 240))
+        if "utility" not in P and "nuclear" in P and S["funds"] >= 1.5e9:
+            S["funds"] -= 1.5e9; P.add("utility"); S["grid"] += 1500
+        for mw, at in [g for g in S["pending_grid"] if g[1] <= t]: S["grid"] += mw; S["pending_grid"].remove((mw, at))
+        if S["goal_at"] is None and campus_kw(t) >= GOAL_MW * 1000: S["goal_at"] = t
         if draws and t >= S["next_draw"]:
             amt = HYPE / 100 * max(backlog(), 10) * 300000; S["funds"] += amt; S["debt"] += amt; S["next_draw"] = t + 60; acted = True
         # player: sign what it can deliver with money in hand (the game's forecast plus a space check)
@@ -140,8 +150,11 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
             acted |= buy_gpus(short)
         # player: keep space ahead of backlog; campus when the leased market runs dry
         need_space = backlog() + 50 - (sum(free_by_gen().values()) / 1000 + room_mw(t + 120))
+        if need_space <= 0 and campus_kw(t) < GOAL_MW * 1000 and S["funds"] > 150e6:   # chase the 1 GW goal with spare cash
+            need_space = 1
         if need_space > 0:
-            if S["market"] >= LEASE_UNIT_MW: acted |= lease_one()
+            if S["market"] >= LEASE_UNIT_MW and campus_kw(t) >= GOAL_MW * 1000: acted |= lease_one()
+            elif S["market"] >= LEASE_UNIT_MW and room_mw(t) < 5 and not S["funds"] > 150e6: acted |= lease_one()
             else:
                 halls_mw = sum(1 for b in S["builds"] if b[0] == "hall") * HALL["mw"]
                 power_mw = S["grid"] + (S["queue"][0] if S["queue"] else 0) + sum(1 for b in S["builds"] if b[0] == "turbine") * TURBINE["mw"]
@@ -149,10 +162,10 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
                 land_cost = LAND_COST * LAND_GROWTH ** S["land"]
                 if halls_mw <= power_mw and acres_free < HALL["acres"] and S["funds"] >= land_cost:
                     S["funds"] -= land_cost; S["land"] += 1; acted = True
-                elif halls_mw <= power_mw and acres_free >= HALL["acres"] and S["funds"] >= HALL["cost"]:
-                    S["funds"] -= HALL["cost"]; S["builds"].append(("hall", t + HALL["secs"])); acted = True
-                elif S["funds"] >= TURBINE["cost"]:
-                    S["funds"] -= TURBINE["cost"]; S["builds"].append(("turbine", t + TURBINE["secs"])); acted = True
+                elif halls_mw <= power_mw and acres_free >= HALL["acres"] and S["funds"] >= bcost("hall"):
+                    S["funds"] -= bcost("hall"); S["builds"].append(("hall", t + HALL["secs"])); acted = True
+                elif S["funds"] >= bcost("turbine"):
+                    S["funds"] -= bcost("turbine"); S["builds"].append(("turbine", t + TURBINE["secs"])); acted = True
         if S["queue"] is None and S["market"] < 60 and S["funds"] >= QUEUE_DEPOSIT + 20e6:
             S["funds"] -= QUEUE_DEPOSIT; S["queue"] = (c["qmw"], t + c["qsecs"] * QUEUE_GROWTH ** S["qn"]); acted = True
         # player: spare cash above a reserve goes into GPUs for on-demand
@@ -174,7 +187,8 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
         for r in rows:
             print(f"{r['min']:>4} {r['fleet']:>8.0f} {r['leased']:>8.0f} {r['campus']:>8.0f} {r['delivered']:>9.0f} {r['backlog']:>7.0f} "
                   f"{r['od']:>13,.0f} {r['funds']:>14,.0f} {r['market']:>6.0f} {r['rounds']:>3}")
-        print(f"defaults={S['defaults']} idle stretches >90s: {S['idle_log'] or 'none'}")
+        goal = f"{S['goal_at'] // 60}:{S['goal_at'] % 60:02d}" if S["goal_at"] else "not reached"
+        print(f"defaults={S['defaults']} idle stretches >90s: {S['idle_log'] or 'none'}  1 GW campus at: {goal}  proposals: {sorted(S['props'])}")
     return rows, S
 
 
