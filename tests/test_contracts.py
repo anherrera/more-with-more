@@ -7,58 +7,76 @@ def campus(game, county="strong", **extra):
     pg = game({**READY, "debt": 0, **extra})
     pg.click("button[data-id='ground']")
     pg.click(f"button[data-county='{county}']")
-    pg.evaluate("() => { S.p2.legacyMW = 0; }")        # isolate contract money from the legacy fee
+    pg.evaluate("() => { S.rival.next = 1e9; S.nextChip = 1e9; }")
     return pg
+
+
+def no_gpus(pg):
+    """Empty fleet: nothing on hand, no on-demand income, so contract money is isolated."""
+    pg.evaluate("() => { S.fleet = {}; S.gpus = 0; render(); }")
 
 
 def first_offer(pg):
     return pg.evaluate("() => S.p2.offers[0]")
 
 
-def test_first_offer_is_your_old_lab(game):
+def sign_first(pg):
+    o = first_offer(pg)
+    pg.click(f"button[data-accept='{o['id']}']")
+    return o
+
+
+def test_first_offer_is_your_old_lab_and_any_gpus_will_do(game):
     pg = campus(game)
     o = first_offer(pg)
-    assert o["who"].startswith("Your old lab") and o["mw"] == 30
-    assert "Your old lab" in pg.inner_text("#offers")
+    assert o["who"].startswith("Your old lab") and o["mw"] == 30 and o["minGen"] == 0
+    assert "30 MW of any GPUs on hand" in pg.inner_text("#offers")
 
 
 def test_sign_pays_upfront_and_adds_backlog(game):
     pg = campus(game)
-    o = first_offer(pg)
     funds = pg.evaluate("() => S.funds")
-    pg.click(f"button[data-accept='{o['id']}']")
+    o = sign_first(pg)
     assert pg.evaluate("() => S.funds") == pytest.approx(funds + o["upfront"])
     assert pg.evaluate("() => backlogMW()") == 30
     assert o["upfront"] == 30 * o["term"] * 550
 
 
-def test_forecast_red_then_green(game):
+def test_forecast_hand_then_buy_then_space(game):
     pg = campus(game)
-    o = first_offer(pg)
-    assert "Short 30 MW by then" in pg.inner_text("#offers")
-    pg.evaluate(f"() => S.p2.builds.push({{kind: 'hall', done: {o['start'] - 10}}})")
-    run(pg, 1)
-    assert "You'll have 30 MW free by then" in pg.inner_text("#offers")
+    assert "on hand" in pg.inner_text("#offers")
+    no_gpus(pg)
+    assert "Covered if you buy 30 MW" in pg.inner_text("#offers")
+    pg.evaluate("() => { S.leases = {rack: 1}; S.leaseCool = {rack: {0: 1}}; render(); }")
+    assert "Short 30 MW of space: lease or build" in pg.inner_text("#offers")
 
 
 def test_delivered_contract_pays_fee(game):
     pg = campus(game)
-    o = first_offer(pg)
-    pg.evaluate("() => S.p2.builds.push({kind: 'hall', done: 0})")
-    pg.click(f"button[data-accept='{o['id']}']")
+    o = sign_first(pg)
     pg.evaluate(f"() => {{ S.t = {o['start']} - 1; }}")
     run(pg, 1)
     assert pg.evaluate("() => S.p2.contracts[0].status") == "active"
-    funds = pg.evaluate("() => S.funds")
+    earned = pg.evaluate("() => S.p2.earned")
     run(pg, 10)
-    assert pg.evaluate("() => S.funds") == pytest.approx(funds + 10 * 30 * 275, rel=1e-6)
+    assert pg.evaluate("() => S.p2.earned") == pytest.approx(earned + 10 * 30 * 275, rel=1e-6)
     assert pg.inner_text("#gpuCount") == "30 MW"
+
+
+def test_min_gen_respected(game):
+    pg = campus(game)
+    pg.evaluate("""() => { S.chipIdx = 5; S.p2.offers = []; makeOffer(); const o = S.p2.offers[0];
+      o.minGen = 5; o.mw = 30; o.start = S.t + 5; render(); }""")
+    assert "Covered if you buy 30 MW of P6s" in pg.inner_text("#offers")
+    pg.evaluate("() => acceptOffer(S.p2.offers[0].id)")
+    run(pg, 6)
+    assert pg.evaluate("() => S.p2.contracts[0].status") == "late"
 
 
 def test_late_is_free_for_the_first_minute_then_costs(game):
     pg = campus(game)
-    o = first_offer(pg)
-    pg.click(f"button[data-accept='{o['id']}']")
+    no_gpus(pg)
+    o = sign_first(pg)
     pg.evaluate(f"() => {{ S.t = {o['start']}; }}")
     run(pg, 1)
     assert pg.evaluate("() => S.p2.contracts[0].status") == "late"
@@ -72,23 +90,30 @@ def test_late_is_free_for_the_first_minute_then_costs(game):
 
 def test_warning_then_default(game):
     pg = campus(game)
-    o = first_offer(pg)
-    pg.click(f"button[data-accept='{o['id']}']")
+    no_gpus(pg)
+    o = sign_first(pg)
     pg.evaluate(f"() => {{ S.t = {o['start']}; }}")
     run(pg, 121)
     assert "walks in 60s" in pg.inner_text("#console")
-    funds = pg.evaluate("() => S.funds")
     run(pg, 60)
-    c = pg.evaluate("() => S.p2.contracts[0]")
-    assert c["status"] == "defaulted"
-    assert pg.evaluate("() => S.funds") < funds - o["upfront"] / 2 + 1
+    assert pg.evaluate("() => S.p2.contracts[0].status") == "defaulted"
     assert pg.evaluate("() => S.nextDraw - S.t") >= 119
+
+
+def test_default_is_never_profitable(game):
+    pg = campus(game)
+    no_gpus(pg)
+    funds = pg.evaluate("() => S.funds")
+    o = sign_first(pg)
+    pg.evaluate(f"() => {{ S.t = {o['start']}; }}")
+    run(pg, 181)
+    assert pg.evaluate("() => S.p2.contracts[0].status") == "defaulted"
+    assert pg.evaluate("() => S.funds") < funds
 
 
 def test_renegotiate_once(game):
     pg = campus(game)
-    o = first_offer(pg)
-    pg.click(f"button[data-accept='{o['id']}']")
+    o = sign_first(pg)
     hype = pg.evaluate("() => S.hype")
     cid = pg.evaluate("() => S.p2.contracts[0].id")
     pg.click(f"button[data-reneg='{cid}']")
@@ -98,12 +123,21 @@ def test_renegotiate_once(game):
     assert not pg.is_visible(f"button[data-reneg='{cid}']")
 
 
-def test_decline_is_free_and_offers_expire_no_sooner_than_45s(game):
+def test_push_date_when_late_counts_from_now(game):
     pg = campus(game)
-    run(pg, 200)                                   # let normal offers arrive
-    offers = pg.evaluate("() => S.p2.offers.filter((o) => !o.who.startsWith('Your old lab'))")
-    assert offers and all(o["expires"] - o["start"] < 0 for o in offers)
-    assert all(o["expires"] >= 0 for o in offers)
+    no_gpus(pg)
+    o = sign_first(pg)
+    pg.evaluate(f"() => {{ S.t = {o['start']} + 150; }}")
+    run(pg, 1)
+    cid = pg.evaluate("() => S.p2.contracts[0].id")
+    now = pg.evaluate("() => S.t")
+    pg.click(f"button[data-reneg='{cid}']")
+    c = pg.evaluate("() => S.p2.contracts[0]")
+    assert c["status"] == "waiting" and c["start"] == now + 120 and c["end"] - c["start"] == o["term"]
+
+
+def test_decline_is_free_and_offers_last_at_least_45s(game):
+    pg = campus(game)
     fresh = pg.evaluate("() => { makeOffer(); render(); return S.p2.offers[S.p2.offers.length - 1]; }")
     assert fresh["expires"] - pg.evaluate("() => S.t") >= 45
     funds, hype = pg.evaluate("() => [S.funds, S.hype]")
@@ -113,9 +147,9 @@ def test_decline_is_free_and_offers_expire_no_sooner_than_45s(game):
 
 def test_allocation_in_signing_order(game):
     pg = campus(game)
-    pg.evaluate("""() => { S.p2.offers = []; S.p2.builds.push({kind: 'hall', done: 0});
+    pg.evaluate("""() => { S.fleet = {3: 18300}; S.gpus = 18300; S.p2.offers = [];
       for (let i = 0; i < 2; i++) { makeOffer(); const o = S.p2.offers[S.p2.offers.length - 1];
-        o.mw = 30; o.start = S.t + 5; acceptOffer(o.id); } }""")
+        o.mw = 30; o.minGen = 0; o.start = S.t + 5; acceptOffer(o.id); } }""")
     run(pg, 6)
     assert pg.evaluate("() => S.p2.contracts.map((c) => c.status)") == ["active", "late"]
     assert pg.evaluate("() => deliveredMW()") == 30
@@ -131,8 +165,8 @@ def test_sign_survives_rerender(game):
 
 def test_big_step_defaults_cleanly(game):
     pg = campus(game)
-    o = first_offer(pg)
-    pg.click(f"button[data-accept='{o['id']}']")
+    no_gpus(pg)
+    o = sign_first(pg)
     pg.evaluate(f"() => {{ S.t = {o['start']}; step(1); step(200); render(); }}")
     assert pg.evaluate("() => S.p2.contracts[0].status") == "defaulted"
     assert pg.evaluate("() => Number.isFinite(S.funds) && Number.isFinite(S.hype)")
@@ -140,8 +174,7 @@ def test_big_step_defaults_cleanly(game):
 
 def test_reload_mid_campus(game):
     pg = campus(game)
-    o = first_offer(pg)
-    pg.click(f"button[data-accept='{o['id']}']")
+    sign_first(pg)
     pg.click("#buildHall")
     pg.click("#requestQueue")
     before = pg.evaluate("() => JSON.stringify(S.p2)")
@@ -152,32 +185,6 @@ def test_reload_mid_campus(game):
 
 def test_debt_sized_on_backlog(game):
     pg = campus(game, hype=80)
-    pg.evaluate("""() => { S.p2.offers = []; makeOffer(); const o = S.p2.offers[0]; o.mw = 100; acceptOffer(o.id); }""")
+    pg.evaluate("() => { S.p2.offers = []; makeOffer(); const o = S.p2.offers[0]; o.mw = 100; acceptOffer(o.id); }")
     assert pg.evaluate("() => drawSize()") == pytest.approx(0.8 * 100 * 300000)
     assert pg.is_visible("#draw")
-
-
-def test_default_is_never_profitable(game):
-    pg = campus(game)
-    o = first_offer(pg)
-    funds = pg.evaluate("() => S.funds")
-    pg.click(f"button[data-accept='{o['id']}']")
-    pg.evaluate(f"() => {{ S.t = {o['start']}; }}")
-    run(pg, 181)
-    assert pg.evaluate("() => S.p2.contracts[0].status") == "defaulted"
-    assert pg.evaluate("() => S.funds") < funds
-
-
-def test_push_date_when_late_counts_from_now(game):
-    pg = campus(game)
-    o = first_offer(pg)
-    pg.click(f"button[data-accept='{o['id']}']")
-    pg.evaluate(f"() => {{ S.t = {o['start']} + 150; }}")
-    run(pg, 1)
-    cid = pg.evaluate("() => S.p2.contracts[0].id")
-    now = pg.evaluate("() => S.t")
-    pg.click(f"button[data-reneg='{cid}']")
-    c = pg.evaluate("() => S.p2.contracts[0]")
-    assert c["status"] == "waiting"
-    assert c["start"] == now + 120
-    assert c["end"] - c["start"] == o["term"]

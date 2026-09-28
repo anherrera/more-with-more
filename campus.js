@@ -100,27 +100,35 @@ function campusLimit() {
 const live = (c) => c.status !== "done" && c.status !== "defaulted";
 const deliveredMW = () => S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.mw, 0);
 const backlogMW = () => S.p2.contracts.filter((c) => c.status === "waiting" || c.status === "late").reduce((a, c) => a + c.mw, 0);
-const committedAt = (at, skip) => S.p2.contracts
-  .filter((c) => live(c) && c.id !== skip && c.start <= at && at < c.end).reduce((a, c) => a + c.mw, 0);
+const genName = (g) => (g <= 0 ? "any GPUs" : `${chip(g).name}+ GPUs`);
+const eligibleFreeMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g >= minGen ? kw : 0), 0) / 1000;
+const roomMWAt = (at) => Math.max(0, (leasedKW() + campusKWAt(at) - usedKW()) / 1000);
+const pendingBefore = (o) => S.p2.contracts
+  .filter((c) => (c.status === "waiting" || c.status === "late") && c.id !== o.id && c.start < o.start + o.term).reduce((a, c) => a + c.mw, 0);
 
-// Will this much capacity be free for the whole term? Checked at the start and wherever another contract begins.
+// Can you deliver this? From GPUs on hand, by buying GPUs into space you'll have, or not without more space.
 function forecast(o) {
-  const end = o.start + o.term;
-  const points = [o.start, ...S.p2.contracts.filter((c) => live(c) && c.id !== o.id && c.start > o.start && c.start < end).map((c) => c.start)];
-  const spare = Math.min(...points.map((at) => energizedAt(at) - committedAt(at, o.id)));
-  const short = Math.max(0, o.mw - spare);
-  const why = hallMWAt(o.start) <= powerAt(o.start) ? "build halls" : "add power";
-  return { ok: short === 0, short, why };
+  const eligible = eligibleFreeMW(o.minGen), pending = pendingBefore(o), onHand = eligible - pending;
+  if (onHand >= o.mw) return { ok: true, kind: "hand", text: `✓ ${fmt(o.mw)} MW of ${genName(o.minGen)} on hand.` };
+  const buy = o.mw - Math.max(0, onHand);
+  const room = roomMWAt(o.start) - Math.max(0, pending - eligible);
+  if (room >= buy) {
+    return { ok: true, kind: "buy", buy, text: `✓ Covered if you buy ${fmt(buy)} MW of ${newest().name}s ` +
+      `(≈${money(buy * 1000 / newest().kw * gpuPrice())}); you have the space.` };
+  }
+  const short = buy - Math.max(0, room);
+  return { ok: false, kind: "space", short, text: `Short ${fmt(short)} MW of space: lease or build.` };
 }
 
 function makeOffer(first = false) {
   const n = ++S.p2.offerN;
-  const scale = Math.max(20, 0.35 * (energizedAt(S.t + 300) + 40));
+  const scale = Math.max(20, 0.3 * (usedKW() / 1000 + 40));
+  const minGen = first ? 0 : Math.max(0, S.chipIdx - (Math.random() < 0.4 ? 1 : 0));   // labs want current chips
   const mw = first ? 30 : Math.max(10, Math.round(scale * (0.6 + Math.random() * 0.8) / 10) * 10);
   const startsIn = first ? 300 : 240 + Math.floor(Math.random() * 180);
   const term = 480 + Math.floor(Math.random() * 420);
   const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
-  S.p2.offers.push({ id: `o${n}`, n, who, mw, start: S.t + startsIn, term,
+  S.p2.offers.push({ id: `o${n}`, n, who, mw, minGen, start: S.t + startsIn, term,
     upfront: mw * term * UPFRONT_RATE, fee: mw * FEE_RATE, expires: S.t + (first ? 280 : OFFER_TTL) });
   track("contract", { ev: "offer", mw });
 }
@@ -131,7 +139,7 @@ function acceptOffer(id) {
   const o = S.p2.offers.splice(i, 1)[0];
   const n = ++S.p2.contractN;
   S.funds += o.upfront;
-  S.p2.contracts.push({ id: `c${n}`, n, who: o.who, mw: o.mw, start: o.start, end: o.start + o.term,
+  S.p2.contracts.push({ id: `c${n}`, n, who: o.who, mw: o.mw, minGen: o.minGen, start: o.start, end: o.start + o.term,
     fee: o.fee, upfront: o.upfront, status: "waiting", reneg: false, warned: false });
   track("contract", { ev: "accept", mw: o.mw, upfront: Math.round(o.upfront) });
   say(`Signed ${o.who.split(" (")[0]}: ${fmt(o.mw)} MW starting in ${time(o.start - S.t)}. ${money(o.upfront)} up front. ` +
@@ -162,8 +170,9 @@ function stepContracts(dt) {
       continue;
     }
     if ((c.status !== "waiting" && c.status !== "late") || S.t < c.start) continue;
-    const free = energizedAt() - deliveredMW();
+    const free = eligibleFreeMW(c.minGen || 0);
     if (free >= c.mw) {
+      c.activeAt = S.t;
       track("contract", { ev: "start", mw: c.mw, late: Math.round(S.t - c.start) });
       say(c.status === "late" ? `Finally delivered ${fmt(c.mw)} MW to ${c.who.split(" (")[0]}. They pretend it was on time.` : `Delivered ${fmt(c.mw)} MW to ${c.who.split(" (")[0]}. The meter is running.`);
       c.status = "active";
@@ -172,7 +181,7 @@ function stepContracts(dt) {
     const late = S.t - c.start;
     if (c.status === "waiting") {
       c.status = "late"; track("contract", { ev: "late", mw: c.mw });
-      say(`${c.who.split(" (")[0]} wanted ${fmt(c.mw)} MW today and you are short ${fmt(c.mw - Math.max(0, free))} MW (${forecast(c).why}). The first minute is on the house.`);
+      say(`${c.who.split(" (")[0]} wanted ${fmt(c.mw)} MW today and you are short ${fmt(c.mw - Math.max(0, free))} MW of ${genName(c.minGen || 0)} (${roomMWAt(S.t) > 0 ? "buy GPUs" : "lease or build space"}). The first minute is on the house.`);
     }
     if (late > LATE_FREE) { S.funds -= 0.5 * c.fee * dt; S.hype = Math.max(5, S.hype - 0.05 * dt); }
     if (!c.warned && late >= LATE_DEFAULT - 60) { c.warned = true; say(`${c.who.split(" (")[0]} walks in 60s unless you deliver ${fmt(c.mw)} MW or push the date.`); }
@@ -283,7 +292,7 @@ function renderContracts() {
   $("countLabel").textContent = "Delivered";
   $("gpuCount").textContent = `${fmt(deliveredMW())} MW`;
   $("backlog").textContent = `${fmt(backlogMW())} MW`;
-  $("delivered").textContent = `${fmt(deliveredMW())} of ${fmt(energizedAt())} MW`;
+  $("delivered").textContent = `${fmt(deliveredMW())} of ${fmt(usedKW() / 1000)} MW of GPUs`;
   $("p2rev").textContent = `${money(campusRevenue())}/s (${money(onDemandRevenue())}/s of it on-demand)`;
   // Rebuild rows only when the set changes, so a click never lands on a button that was just replaced.
   const oKey = p.offers.map((o) => o.id).join(",");
@@ -300,11 +309,10 @@ function renderContracts() {
   for (const d of $("offers").querySelectorAll("[data-offer]")) {
     const o = p.offers.find((x) => x.id === d.dataset.offer); if (!o) continue;
     const f = forecast(o);
-    d.querySelector(".what").textContent = `${o.who}: ${fmt(o.mw)} MW for ${time(o.term)}, starts in ${time(o.start - S.t)}. ${money(o.fee)}/s while delivered.`;
+    d.querySelector(".what").textContent = `${o.who}: ${fmt(o.mw)} MW of ${genName(o.minGen)} for ${time(o.term)}, starts in ${time(o.start - S.t)}. ${money(o.fee)}/s while delivered.`;
     const fc = d.querySelector(".fc");
     fc.className = "line sub fc " + (f.ok ? "good" : "bad");
-    fc.textContent = (f.ok ? `✓ You'll have ${fmt(o.mw)} MW free by then.` : `Short ${fmt(f.short)} MW by then: ${f.why}.`) +
-      ` Offer good for ${Math.ceil(o.expires - S.t)}s.`;
+    fc.textContent = `${f.text} Offer good for ${Math.ceil(o.expires - S.t)}s.`;
     d.querySelector("[data-accept]").textContent = `Sign: ${money(o.upfront)} up front`;
   }
   const shown = p.contracts.filter((c) => c.status !== "done" && c.status !== "defaulted");
@@ -330,7 +338,8 @@ function renderContracts() {
     } else {
       const f = forecast(c);
       st.className = "line st " + (f.ok ? "" : "bad");
-      st.textContent = `${who}: ${fmt(c.mw)} MW, starts in ${time(c.start - S.t)}. ` + (f.ok ? "✓ covered" : `Short ${fmt(f.short)} MW: ${f.why}`);
+      st.textContent = `${who}: ${fmt(c.mw)} MW, starts in ${time(c.start - S.t)}. ` +
+        (f.kind === "hand" ? "✓ covered" : f.ok ? `✓ buy ${fmt(f.buy)} MW of GPUs` : f.text);
     }
   }
 }
