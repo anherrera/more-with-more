@@ -17,7 +17,8 @@ MARKET_START_MW, MARKET_REGROW = 150, 10 / 60
 LEASE_UNIT_MW, LEASE_RACKS, LEASE_SLOT = 20, 240, 35          # a leased data hall at two-phase cooling
 QUEUE_DEPOSIT, QUEUE_GROWTH = 5e6, 1.3
 LATE_FREE, LATE_DEFAULT, OFFER_TTL = 60, 180, 60
-CHIP_EVERY, DEAL_EVERY, DEAL = 300, 90, 20e6
+CHIP_EVERY, DEAL_EVERY, DEAL_MW = 300, 90, 20           # Parallax credits: ~20 MW of the newest GPUs
+LAND_ACRES, LAND_COST, LAND_GROWTH = 200, 15e6, 1.25
 INTEREST, P2_RATE = 0.0002, 0.25
 ROUNDS2 = [(100, 100e6), (300, 250e6), (700, 600e6)]
 HYPE = 80                                                      # assume the player keeps hype around here with posts
@@ -33,7 +34,7 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
     c = COUNTIES[county]
     S = dict(t=0, funds=funds + c["cash"], credits=0.0, fleet={chip: float(fleet_kw)}, chip=chip, next_chip=CHIP_EVERY,
              leased=float(leased_kw), racks=racks, market=float(MARKET_START_MW), grid=c["grid"], queue=None, qn=0,
-             builds=[], offers=[], contracts=[], next_offer=90, next_deal=0, next_draw=0, debt=debt, round=0,
+             builds=[], land=0, offers=[], contracts=[], next_offer=90, next_deal=0, next_draw=0, debt=debt, round=0,
              n=0, defaults=0, idle=0, idle_log=[], acted_log=[])
 
     done = lambda kind, at: sum(1 for b in S["builds"] if b[0] == kind and b[1] <= at)
@@ -97,7 +98,7 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
         if S["queue"] and t >= S["queue"][1]: S["grid"] += S["queue"][0]; S["queue"] = None; S["qn"] += 1
         S["market"] += MARKET_REGROW
         S["funds"] += on_demand() - S["debt"] * INTEREST * P2_RATE
-        if t >= S["next_deal"]: S["credits"] += DEAL; S["next_deal"] = t + DEAL_EVERY
+        if t >= S["next_deal"]: S["credits"] += DEAL_MW * 1000 * gpu_cost_per_kw(S["chip"]); S["next_deal"] = t + DEAL_EVERY
         S["offers"] = [o for o in S["offers"] if o["expires"] > t and o["start"] > t]
         if t >= S["next_offer"] and len(S["offers"]) < 3: offer(); S["next_offer"] = t + 60 + rnd.random() * 60
         for k in sorted(S["contracts"], key=lambda k: (k["start"], k["n"])):
@@ -140,7 +141,11 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
             else:
                 halls_mw = sum(1 for b in S["builds"] if b[0] == "hall") * HALL["mw"]
                 power_mw = S["grid"] + (S["queue"][0] if S["queue"] else 0) + sum(1 for b in S["builds"] if b[0] == "turbine") * TURBINE["mw"]
-                if halls_mw <= power_mw and S["funds"] >= HALL["cost"]:
+                acres_free = c["acres"] + S["land"] * LAND_ACRES - sum(1 for b in S["builds"] if b[0] == "hall") * HALL["acres"]
+                land_cost = LAND_COST * LAND_GROWTH ** S["land"]
+                if halls_mw <= power_mw and acres_free < HALL["acres"] and S["funds"] >= land_cost:
+                    S["funds"] -= land_cost; S["land"] += 1; acted = True
+                elif halls_mw <= power_mw and acres_free >= HALL["acres"] and S["funds"] >= HALL["cost"]:
                     S["funds"] -= HALL["cost"]; S["builds"].append(("hall", t + HALL["secs"])); acted = True
                 elif S["funds"] >= TURBINE["cost"]:
                     S["funds"] -= TURBINE["cost"]; S["builds"].append(("turbine", t + TURBINE["secs"])); acted = True
