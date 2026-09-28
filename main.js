@@ -160,12 +160,13 @@ function sellSpot() {
 // Phase 2: GPUs under contract can't be traded in; only the free part of a cohort can go.
 const tradeCount = (c) => Math.min(S.fleet[c] || 0, S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
 const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && tradeCount(c) > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
-const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * 0.25;
+const tradeRate = () => (S.done.refurb ? 0.4 : 0.25);   // your own refurb shop pays better
+const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * tradeRate();
 function tradeIn(gen) {
   const c = gen ?? oldestOld(); if (c === null || c === undefined || c >= S.chipIdx) return;
   const n = Math.min(tradeCount(c), Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0)));
   if (n <= 0) return;
-  const val = n * basePrice() * chip(c).priceMult * 0.25;
+  const val = n * basePrice() * chip(c).priceMult * tradeRate();
   S.fleet[c] -= n; if (S.fleet[c] <= 0) delete S.fleet[c]; S.gpus -= n; S.credits += val; S.vendorCap += val * 25;
   track("tradein", { chip: chip(c).name, n, val: Math.round(val) });
   say(`Traded in ${n.toLocaleString("en-US")} ${chip(c).name}s for ${money(val)} in Parallax credits. Parallax will refurbish them and sell them to someone else.`);
