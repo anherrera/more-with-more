@@ -103,3 +103,15 @@ def test_old_save_gets_a_model(game):
                "builds": [], "offers": [], "contracts": [], "nextOffer": 1e9, "offerN": 0, "contractN": 0, "earned": 0}})
     run(pg, 1)
     assert pg.evaluate("() => S.p2.model.autonomy") == 0
+
+
+def test_unaffordable_proposal_steps_aside(game):
+    pg = campus(game)
+    pg.evaluate("""() => { const m = S.p2.model; m.done.nuclear = true; m.done.lobbyist = true; S.funds = 1e6; S.p2.queueN = 1;
+      S.p2.builds.push({kind: 'hall', done: 1e9}); for (let i = 0; i < 74; i++) S.p2.builds.push({kind: 'hall', done: 1e9}); }""")
+    run(pg, 1)
+    assert pg.evaluate("() => S.p2.model.current") == "rezone"      # first eligible (land is gone), unaffordable
+    run(pg, 61)
+    m = pg.evaluate("() => S.p2.model")
+    assert m["current"] == "utility" and m["rejected"] == {}           # rezone parked, not rejected; next one offered
+    assert "It can wait" in pg.inner_text("#console")

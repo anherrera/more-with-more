@@ -50,3 +50,11 @@ def test_spot_market_sits_in_the_middle_column(game):
     col = pg.evaluate("() => { const cols = [...document.querySelectorAll('.cols > .col')].filter((c) => c.offsetParent); "
                       "return cols.findIndex((c) => c.contains(document.getElementById('spotBox'))); }")
     assert col == 1
+
+
+def test_projects_list_never_moves_what_is_below_it(game):
+    pg = game(MID)
+    top = lambda: pg.evaluate("() => document.querySelector('#projects').nextElementSibling?.getBoundingClientRect().top ?? document.querySelector('#projects').parentElement.nextElementSibling.getBoundingClientRect().top")
+    before = top()
+    pg.evaluate("() => { for (const p of PROJECTS) p._when = p.when; for (const p of PROJECTS) p.when = () => true; S.done = {}; render(); }")
+    assert top() == before

@@ -71,7 +71,7 @@
   .rack { width: 6px; height: 22px; background: var(--rack); position: relative; }
   .rack > i { position: absolute; inset: auto 0 0 0; background: var(--accent); }
   .more { font-size: 12px; color: var(--muted); margin-left: 4px; }
-  #projects { display: grid; gap: 6px; }
+  #projects { display: grid; gap: 6px; align-content: start; height: 18em; overflow-y: auto; padding-right: 4px; }   /* fixed height: new projects never shove the panels below */
   #projects button { width: 100%; padding: 4px 8px; }
   #projects .t { display: block; }
   #projects .c { display: block; font-size: 12px; color: var(--muted); }

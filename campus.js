@@ -462,6 +462,20 @@ function nextMove() {
   }
   const good = S.p2.offers.find((o) => forecast(o).ok);
   if (good) return `Sign ${first(good.who)}'s offer: ${forecast(good).text.replace("\u2713 ", "")}`;
+  // The goal, counting what's already under construction and queued.
+  if (S.p2.model && S.p2.model.endedAt == null && energizedAt() < GOAL_MW) {
+    const halls = Math.ceil(Math.max(0, GOAL_MW - hallMWAt(Infinity)) / hallSize());
+    const power = Math.max(0, GOAL_MW - powerAt(Infinity));
+    const turbines = Math.ceil(power / turbineMW());
+    const nextCost = halls > 0 ? buildCost("hall") : buildCost("turbine");
+    if ((halls > 0 || turbines > 0) && S.funds >= nextCost) {
+      const cost = halls * buildCost("hall") + turbines * buildCost("turbine");
+      const what = [halls > 0 && `${halls} more hall${halls > 1 ? "s" : ""}`, turbines > 0 && `${mwText(power)} more power`].filter(Boolean).join(" and ");
+      return `Goal: ${what} reach the 1 GW goal (\u2248${money(cost)}). Build them under Campus.`;
+    }
+  }
+  const project = PROJECTS.filter((p) => p.phase === 2 && !S.done[p.id] && p.when() && S.funds >= p.cost).sort((a, b) => a.cost - b.cost)[0];
+  if (project) return `Buy the \u201c${project.title}\u201d project (${project.cost ? money(project.cost) : "free"}): ${project.desc}`;
   const room = roomMWAt(S.t);
   if (room < 5) {
     const oldGens = Object.keys(S.fleet).map(Number).some((g) => !contractReady(g) && tradeCount(g) > 0);

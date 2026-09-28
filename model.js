@@ -68,6 +68,14 @@ function stepModel() {
     say(`The campus reached ${mwText(energizedAt())}. The model: “${FINAL.pitch}”`);
   }
   if (m.final) { if (m.final.at != null && S.t >= m.final.at) endCampus(true); return; }
+  // A proposal you can't afford for a minute steps aside (not a rejection) so the next one can come up.
+  if (m.current && S.funds < proposalCost(m.current)) {
+    if (m.poorSince == null) m.poorSince = S.t;
+    else if (S.t - m.poorSince >= 60) {
+      m.next[m.current] = S.t + 120; m.current = null; m.poorSince = null;
+      say("The model: \u201cIt can wait. It is good at waiting.\u201d");
+    }
+  } else m.poorSince = null;
   if (!m.current) {
     const p = PROPOSALS.find((x) => !m.done[x.id] && S.t >= (m.next[x.id] || 0) && x.when());
     if (p) { m.current = p.id; track("proposal", { ev: "offer", id: p.id }); say(`The model has a proposal: ${p.title.toLowerCase()}.`); }
