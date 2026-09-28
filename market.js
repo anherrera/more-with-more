@@ -55,6 +55,7 @@ function ringTheBell() {
   S.p2.ipo = { at: S.t, px0: px, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false };
   c.shares += fresh; S.funds += fresh * px;
   milestone("IPO"); track("ipo", { proceeds: Math.round(fresh * px) });
+  confetti();
   say(`You rang the bell. MORE priced at ${money(px)}, below the range. The bankers call that “leaving room for the pop.” The pop is for their other clients.`);
 }
 
@@ -122,4 +123,32 @@ const publicRaise = () => (isPublic() ? followOn() : ringTheBell());
 
 function wireMarket() {
   $("secondary").addEventListener("click", () => { sellSecondary(); render(); });
+}
+
+// Ring the bell: a few seconds of confetti in the page's own colors. Skipped for reduced motion.
+function confetti() {
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const cv = document.createElement("canvas");
+  cv.id = "confetti";
+  Object.assign(cv.style, { position: "fixed", inset: "0", width: "100vw", height: "100vh", pointerEvents: "none", zIndex: 10 });
+  cv.width = innerWidth; cv.height = innerHeight;
+  document.body.appendChild(cv);
+  const g = cv.getContext("2d"), css = getComputedStyle(document.documentElement);
+  const colors = ["--accent", "--good", "--ink", "--con-prompt"].map((v) => css.getPropertyValue(v).trim());
+  const bits = Array.from({ length: 160 }, () => ({
+    x: innerWidth / 2 + (Math.random() - 0.5) * innerWidth * 0.3, y: innerHeight * 0.35,
+    vx: (Math.random() - 0.5) * 14, vy: -6 - Math.random() * 12, s: 4 + Math.random() * 6,
+    r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: colors[Math.floor(Math.random() * colors.length)],
+  }));
+  const t0 = performance.now();
+  (function frame(now) {
+    const k = (now - t0) / 1000;
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.globalAlpha = Math.max(0, 1 - Math.max(0, k - 2.2));
+    for (const b of bits) {
+      b.vy += 0.35; b.x += b.vx; b.y += b.vy; b.vx *= 0.99; b.r += b.vr;
+      g.save(); g.translate(b.x, b.y); g.rotate(b.r); g.fillStyle = b.c; g.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2); g.restore();
+    }
+    if (k < 3.2) requestAnimationFrame(frame); else cv.remove();
+  })(t0);
 }

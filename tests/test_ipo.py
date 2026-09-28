@@ -95,3 +95,19 @@ def test_ending_reports_personal_liquidity(game):
     pg.evaluate("() => { S.cap.liquidity = 5e8; S.p2.model.endedAt = S.t; render(); }")
     stats = pg.inner_text("#ending2Stats")
     assert "You personally cleared $500M" in stats and "You own" in stats
+
+
+def test_ipo_throws_confetti(game):
+    pg = public_ready(game)
+    ipo(pg)
+    assert pg.query_selector("#confetti") is not None
+    pg.wait_for_timeout(3600)
+    assert pg.query_selector("#confetti") is None                  # cleans up after itself
+
+
+def test_no_confetti_with_reduced_motion(game, page):
+    page.emulate_media(reduced_motion="reduce")
+    pg = public_ready(game)
+    ipo(pg)
+    assert pg.query_selector("#confetti") is None
+    assert pg.evaluate("() => S.p2.ipo !== null")
