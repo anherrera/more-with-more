@@ -20,6 +20,7 @@ const POWER = {
   turbine: { name: "gas turbine", mw: 50, cost: 25e6, secs: 60, acres: 0 },
   solar: { name: "solar + batteries", mw: 30, cost: 20e6, secs: 180, acres: 150 },
 };
+const LAND = { acres: 200, cost: 15e6, growth: 1.25 };      // adjacent parcels: each one costs 25% more than the last
 const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.3;             // each request waits 30% longer: everyone is in the queue
 const BUILD_DONE = {
   hall: () => `Hall ${doneBuilds("hall")} is up. ` +
@@ -80,7 +81,15 @@ const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) 
 const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
 const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + (b.kind === "hall" ? HALL.acres : POWER[b.kind].acres), 0);
-const acresFree = () => countyOf().acres - acresUsed();
+const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres - acresUsed();
+const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0);
+function buyLand() {
+  if (!S.p2.county || S.funds < landCost()) return;
+  S.funds -= landCost(); S.p2.landN = (S.p2.landN || 0) + 1;
+  track("land", { n: S.p2.landN });
+  say(S.p2.landN === 1 ? "Bought the adjacent parcel. The farmer said it had been in the family for four generations. The check cleared in one."
+    : `Bought another ${LAND.acres} acres. The county assessor has started waving at you.`);
+}
 const queueSecs = () => countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN);
 
 function build(kind) {
@@ -98,14 +107,14 @@ function requestQueue() {
   S.funds -= QUEUE_DEPOSIT;
   S.p2.queue = { mw: countyOf().queueMW, done: S.t + queueSecs() };
   track("power", { ev: "queue", mw: S.p2.queue.mw });
-  say(`Joined the interconnection queue for ${fmt(S.p2.queue.mw)} MW. Estimated wait: ${time(queueSecs())}. The utility says estimates are “non-binding.”`);
+  say(`Joined the interconnection queue for ${mwText(S.p2.queue.mw)}. Estimated wait: ${time(queueSecs())}. The utility says estimates are “non-binding.”`);
 }
 
 function campusLimit() {
   const halls = hallMWAt(), pw = powerAt();
-  if (acresFree() < HALL.acres && halls <= pw) return "land: no room for another hall";
-  if (halls > pw) return `power: ${fmt(halls - pw)} MW of halls are very expensive sheds. Add turbines, solar or grid`;
-  if (halls < pw) return `halls: ${fmt(pw - halls)} MW of power is waiting for a building`;
+  if (acresFree() < HALL.acres && halls <= pw) return "land: buy the adjacent parcel";
+  if (halls > pw) return `power: ${mwText(halls - pw)} of halls are very expensive sheds. Add turbines, solar or grid`;
+  if (halls < pw) return `halls: ${mwText(pw - halls)} of power is waiting for a building`;
   return "both: build halls and power together";
 }
 
@@ -130,18 +139,18 @@ const pendingBefore = (o) => S.p2.contracts
 // Can you deliver this? From GPUs on hand, by buying GPUs into space you'll have, or not without more space.
 function forecast(o) {
   const eligible = eligibleFreeMW(o.minGen), pending = pendingBefore(o), onHand = eligible - pending;
-  if (onHand >= o.mw) return { ok: true, kind: "hand", text: `✓ ${fmt(o.mw)} MW of ${genName(o.minGen)} on hand.` };
+  if (onHand >= o.mw) return { ok: true, kind: "hand", text: `✓ ${mwText(o.mw)} of ${genName(o.minGen)} on hand.` };
   const buy = o.mw - Math.max(0, onHand);
   const room = roomMWAt(o.start) - Math.max(0, pending - eligible);
   if (room >= buy) {
-    return { ok: true, kind: "buy", buy, text: `✓ Covered if you buy ${fmt(buy)} MW of ${newest().name}s ` +
+    return { ok: true, kind: "buy", buy, text: `✓ Covered if you buy ${mwText(buy)} of ${newest().name}s ` +
       `(≈${money(buy * 1000 / newest().kw * gpuPrice())}); you have the space.` };
   }
   const short = buy - Math.max(0, room), trade = tradeableMW(o.minGen);
   if (trade >= short) {
-    return { ok: true, kind: "trade", buy, text: `\u2713 Trade in older chips to free ${fmt(short)} MW, then buy ${fmt(buy)} MW of ${newest().name}s.` };
+    return { ok: true, kind: "trade", buy, text: `\u2713 Trade in older chips to free ${mwText(short)}, then buy ${mwText(buy)} of ${newest().name}s.` };
   }
-  return { ok: false, kind: "space", short, text: `Short ${fmt(short - trade)} MW of space: lease or build${trade > 0 ? ", or trade in older chips" : ""}.` };
+  return { ok: false, kind: "space", short, text: `Short ${mwText(short - trade)} of space: lease or build${trade > 0 ? ", or trade in older chips" : ""}.` };
 }
 
 function makeOffer(first = false) {
@@ -167,7 +176,7 @@ function acceptOffer(id) {
   S.p2.contracts.push({ id: `c${n}`, n, who: o.who, mw: o.mw, minGen: o.minGen, start: o.start, end: o.start + o.term,
     fee: o.fee, upfront: o.upfront, status: "waiting", reneg: false, warned: false });
   track("contract", { ev: "accept", mw: o.mw, upfront: Math.round(o.upfront) });
-  say(`Signed ${o.who.split(" (")[0]}: ${fmt(o.mw)} MW starting in ${time(o.start - S.t)}. ${money(o.upfront)} up front. ` +
+  say(`Signed ${o.who.split(" (")[0]}: ${mwText(o.mw)} starting in ${time(o.start - S.t)}. ${money(o.upfront)} up front. ` +
     (forecast({ ...o, id: `c${n}` }).ok ? "You have the capacity." : "You do not have the capacity yet. Nobody asked."));
 }
 
@@ -191,7 +200,7 @@ function stepContracts(dt) {
   for (const c of [...S.p2.contracts].sort((a, b) => a.start - b.start || a.n - b.n)) {
     if (c.status === "active") {
       S.funds += c.fee * dt; S.p2.earned += c.fee * dt;
-      if (S.t >= c.end) { c.status = "done"; track("contract", { ev: "end", mw: c.mw }); say(`${c.who.split(" (")[0]}'s term ended. ${fmt(c.mw)} MW is free again.`); }
+      if (S.t >= c.end) { c.status = "done"; track("contract", { ev: "end", mw: c.mw }); say(`${c.who.split(" (")[0]}'s term ended. ${mwText(c.mw)} is free again.`); }
       continue;
     }
     if ((c.status !== "waiting" && c.status !== "late") || S.t < c.start) continue;
@@ -199,17 +208,17 @@ function stepContracts(dt) {
     if (free >= c.mw) {
       c.activeAt = S.t;
       track("contract", { ev: "start", mw: c.mw, late: Math.round(S.t - c.start) });
-      say(c.status === "late" ? `Finally delivered ${fmt(c.mw)} MW to ${c.who.split(" (")[0]}. They pretend it was on time.` : `Delivered ${fmt(c.mw)} MW to ${c.who.split(" (")[0]}. The meter is running.`);
+      say(c.status === "late" ? `Finally delivered ${mwText(c.mw)} to ${c.who.split(" (")[0]}. They pretend it was on time.` : `Delivered ${mwText(c.mw)} to ${c.who.split(" (")[0]}. The meter is running.`);
       c.status = "active";
       continue;
     }
     const late = S.t - c.start;
     if (c.status === "waiting") {
       c.status = "late"; track("contract", { ev: "late", mw: c.mw });
-      say(`${c.who.split(" (")[0]} wanted ${fmt(c.mw)} MW today and you are short ${fmt(c.mw - Math.max(0, free))} MW of ${genName(c.minGen || 0)} (${roomMWAt(S.t) > 0 ? "buy GPUs" : tradeableMW(c.minGen || 0) > 0 ? "trade in older chips, then buy" : "lease or build space"}). The first minute is on the house.`);
+      say(`${c.who.split(" (")[0]} wanted ${mwText(c.mw)} today and you are short ${mwText(c.mw - Math.max(0, free))} of ${genName(c.minGen || 0)} (${roomMWAt(S.t) > 0 ? "buy GPUs" : tradeableMW(c.minGen || 0) > 0 ? "trade in older chips, then buy" : "lease or build space"}). The first minute is on the house.`);
     }
     if (late > LATE_FREE) { S.funds -= 0.5 * c.fee * dt; S.hype = Math.max(5, S.hype - 0.05 * dt); }
-    if (!c.warned && late >= LATE_DEFAULT - 60) { c.warned = true; say(`${c.who.split(" (")[0]} walks in 60s unless you deliver ${fmt(c.mw)} MW or push the date.`); }
+    if (!c.warned && late >= LATE_DEFAULT - 60) { c.warned = true; say(`${c.who.split(" (")[0]} walks in 60s unless you deliver ${mwText(c.mw)} or push the date.`); }
     if (late >= LATE_DEFAULT) {
       c.status = "defaulted"; c.end = S.t;
       // Full clawback: walking away never pays.
@@ -222,7 +231,7 @@ function stepContracts(dt) {
 }
 
 const campusDrawSize = () => (S.hype / 100) * Math.max(backlogMW(), 10) * 300000;   // lenders size on signed backlog
-const campusDealSize = () => 20e6;   // Parallax credits: GPUs only
+const campusDealSize = () => 20000 / newest().kw * gpuPrice();   // Parallax credits: about 20 MW of the newest GPUs
 
 // Saves from before chip generations mattered: default missing fields.
 function migrateCampus() {
@@ -235,7 +244,7 @@ function startCampus() {
   S.phase = 2; S.p2 = freshP2();
   milestone("phase 2: the campus");
   say("We are an infrastructure company now.");
-  say(`Your ${fmt(usedKW() / 1000)} MW of GPUs stay in the space you already lease. Whatever isn't under contract sells on-demand. The model has opinions about which county is next.`);
+  say(`Your ${mwText(usedKW() / 1000)} of GPUs stay in the space you already lease. Whatever isn't under contract sells on-demand. The model has opinions about which county is next.`);
   if (S.debt > 0) say(`Lenders love infrastructure. Your ${money(S.debt)} was refinanced as project finance at a quarter of the rate.`);
 }
 
@@ -259,7 +268,7 @@ function stepCampus(dt) {
   if (q && S.t >= q.done) {
     S.p2.grid += q.mw; S.p2.queue = null; S.p2.queueN += 1;
     track("power", { ev: "grid", mw: q.mw });
-    say(`The utility energized ${fmt(q.mw)} MW more. The queue is longer now. Everyone is in it.`);
+    say(`The utility energized ${mwText(q.mw)} more. The queue is longer now. Everyone is in it.`);
   }
   for (const b of S.p2.builds) {
     if (!b.announced && S.t >= b.done) { b.announced = true; track("build", { ev: "done", kind: b.kind }); say(BUILD_DONE[b.kind]()); }
@@ -278,7 +287,7 @@ const campusSnap = () => ({ county: S.p2.county, fleetMW: Math.round(usedKW() / 
 
 function renderCampus() {
   const p = S.p2;
-  if (!p.county) { $("countLabel").textContent = "Fleet"; $("gpuCount").textContent = `${fmt(usedKW() / 1000)} MW`; }
+  if (!p.county) { $("countLabel").textContent = "Fleet"; $("gpuCount").textContent = `${mwText(usedKW() / 1000)}`; }
   $("countyBox").hidden = !!p.county;
   $("campusBox").hidden = $("contractsBox").hidden = !p.county;
   if (!p.county) {
@@ -295,11 +304,11 @@ function renderCampus() {
   }
   const pw = powerAt(), hallMW = hallMWAt();
   $("countyName").textContent = countyOf().name;
-  $("halls").textContent = `${doneBuilds("hall")} built, ${fmt(energizedAt())} MW energized` +
-    (hallMW > pw ? `, ${fmt(hallMW - pw)} MW dark` : "");
-  $("p2power").textContent = `${fmt(pw)} MW (grid ${fmt(gridAt())}, ${doneBuilds("turbine")} turbines, ${doneBuilds("solar")} solar)`;
+  $("halls").textContent = `${doneBuilds("hall")} built, ${mwText(energizedAt())} energized` +
+    (hallMW > pw ? `, ${mwText(hallMW - pw)} dark` : "");
+  $("p2power").textContent = `${mwText(pw)} (grid ${fmt(gridAt())}, ${doneBuilds("turbine")} turbines, ${doneBuilds("solar")} solar)`;
   $("land").textContent = `${acresFree().toLocaleString("en-US")} of ${countyOf().acres.toLocaleString("en-US")} acres free`;
-  $("p2cap").textContent = `${fmt(leasedKW() / 1000)} MW leased + ${fmt(energizedAt())} MW campus; ${fmt(usedKW() / 1000)} MW of GPUs racked, room for ${fmt(Math.max(0, capKW() - usedKW()) / 1000)} MW more`;
+  $("p2cap").textContent = `${mwText(leasedKW() / 1000)} leased + ${mwText(energizedAt())} campus; ${mwText(usedKW() / 1000)} of GPUs racked, room for ${mwText(Math.max(0, capKW() - usedKW()) / 1000)} more`;
   $("p2limit").textContent = campusLimit();
   $("buildHall").textContent = `Build a hall (${HALL.mw} MW, ${HALL.acres} acres, ${time(HALL.secs)}): ${money(HALL.cost)}`;
   $("buildHall").disabled = S.funds < HALL.cost || acresFree() < HALL.acres;
@@ -308,9 +317,11 @@ function renderCampus() {
   $("buildSolar").textContent = `Solar + batteries (+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}): ${money(POWER.solar.cost)}`;
   $("buildSolar").disabled = S.funds < POWER.solar.cost || acresFree() < POWER.solar.acres;
   $("requestQueue").textContent = p.queue
-    ? `Interconnection queue: +${fmt(p.queue.mw)} MW in ${time(p.queue.done - S.t)}`
-    : `Join the interconnection queue (+${fmt(countyOf().queueMW)} MW in ~${time(queueSecs())}): ${money(QUEUE_DEPOSIT)} deposit`;
+    ? `Interconnection queue: +${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`
+    : `Join the interconnection queue (+${mwText(countyOf().queueMW)} in ~${time(queueSecs())}): ${money(QUEUE_DEPOSIT)} deposit`;
   $("requestQueue").disabled = !!p.queue || S.funds < QUEUE_DEPOSIT;
+  $("buyLand").textContent = `Buy the adjacent parcel (+${LAND.acres} acres): ${money(landCost())}`;
+  $("buyLand").disabled = S.funds < landCost();
   const pending = p.builds.filter((b) => b.done > S.t).sort((a, b) => a.done - b.done);
   $("underway").textContent = pending.length
     ? "Under construction: " + pending.map((b) => `${b.kind} ${time(b.done - S.t)}`).join(", ") : "";
@@ -321,9 +332,9 @@ let lastOfferKey = null, lastContractKey = null;
 function renderContracts() {
   const p = S.p2;
   $("countLabel").textContent = "Delivered";
-  $("gpuCount").textContent = `${fmt(deliveredMW())} MW`;
-  $("backlog").textContent = `${fmt(backlogMW())} MW`;
-  $("delivered").textContent = `${fmt(deliveredMW())} of ${fmt(usedKW() / 1000)} MW of GPUs`;
+  $("gpuCount").textContent = `${mwText(deliveredMW())}`;
+  $("backlog").textContent = `${mwText(backlogMW())}`;
+  $("delivered").textContent = `${fmt(deliveredMW())} of ${mwText(usedKW() / 1000)} of GPUs`;
   $("p2rev").textContent = `${money(campusRevenue())}/s (${money(onDemandRevenue())}/s of it on-demand)`;
   // Rebuild rows only when the set changes, so a click never lands on a button that was just replaced.
   const oKey = p.offers.map((o) => o.id).join(",");
@@ -340,7 +351,7 @@ function renderContracts() {
   for (const d of $("offers").querySelectorAll("[data-offer]")) {
     const o = p.offers.find((x) => x.id === d.dataset.offer); if (!o) continue;
     const f = forecast(o);
-    d.querySelector(".what").textContent = `${o.who}: ${fmt(o.mw)} MW of ${genName(o.minGen)} for ${time(o.term)}, starts in ${time(o.start - S.t)}. ${money(o.fee)}/s while delivered.`;
+    d.querySelector(".what").textContent = `${o.who}: ${mwText(o.mw)} of ${genName(o.minGen)} for ${time(o.term)}, starts in ${time(o.start - S.t)}. ${money(o.fee)}/s while delivered.`;
     const fc = d.querySelector(".fc");
     fc.className = "line sub fc " + (f.ok ? "good" : "bad");
     fc.textContent = `${f.text} Offer good for ${Math.ceil(o.expires - S.t)}s.`;
@@ -361,16 +372,16 @@ function renderContracts() {
   for (const d of $("contracts").querySelectorAll("[data-contract]")) {
     const c = p.contracts.find((x) => x.id === d.dataset.contract); if (!c) continue;
     const st = d.querySelector(".st"), who = c.who.split(" (")[0], late = S.t - c.start;
-    if (c.status === "active") { st.className = "line st good"; st.textContent = `${who}: ${fmt(c.mw)} MW delivered, ${money(c.fee)}/s, ends in ${time(c.end - S.t)}`; }
+    if (c.status === "active") { st.className = "line st good"; st.textContent = `${who}: ${mwText(c.mw)} delivered, ${money(c.fee)}/s, ends in ${time(c.end - S.t)}`; }
     else if (c.status === "late") {
       st.className = "line st bad";
-      st.textContent = `LATE ${time(late)}: ${who}, ${fmt(c.mw)} MW. ` +
+      st.textContent = `LATE ${time(late)}: ${who}, ${mwText(c.mw)}. ` +
         (late < LATE_FREE ? "Free for now." : `Paying penalties. Walks in ${time(Math.max(0, LATE_DEFAULT - late))}.`);
     } else {
       const f = forecast(c);
       st.className = "line st " + (f.ok ? "" : "bad");
-      st.textContent = `${who}: ${fmt(c.mw)} MW, starts in ${time(c.start - S.t)}. ` +
-        (f.kind === "hand" ? "✓ covered" : f.ok ? `✓ buy ${fmt(f.buy)} MW of GPUs` : f.text);
+      st.textContent = `${who}: ${mwText(c.mw)}, starts in ${time(c.start - S.t)}. ` +
+        (f.kind === "hand" ? "✓ covered" : f.ok ? `✓ buy ${mwText(f.buy)} of GPUs` : f.text);
     }
   }
 }
@@ -384,6 +395,7 @@ function wireCampus() {
   $("buildTurbine").addEventListener("click", () => { build("turbine"); render(); });
   $("buildSolar").addEventListener("click", () => { build("solar"); render(); });
   $("requestQueue").addEventListener("click", () => { requestQueue(); render(); });
+  $("buyLand").addEventListener("click", () => { buyLand(); render(); });
   $("offers").addEventListener("click", (e) => {
     const a = e.target.closest("button[data-accept]"), d = e.target.closest("button[data-decline]");
     if (a) { acceptOffer(a.dataset.accept); render(); } else if (d) { declineOffer(d.dataset.decline); render(); }

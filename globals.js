@@ -100,6 +100,9 @@ function fmt(x) {
   return x.toFixed(x < 10 ? 2 : x < 100 ? 1 : 0) + u[i];
 }
 const money = (x) => "$" + fmt(x);
+// Power: kW, then MW, then GW (no "1.47K MW").
+const mwText = (mw) => (Math.abs(mw) >= 1000 ? `${fmt(mw / 1000)} GW` : `${fmt(mw)} MW`);
+const kwText = (kw) => (Math.abs(kw) >= 1000 ? mwText(kw / 1000) : `${fmt(kw)} kW`);
 // Full digits, Paperclips style: $1,234,567.89 (falls back to short form past the quadrillions)
 const moneyFull = (x) => Math.abs(x) >= 1e15 ? money(x)
   : (x < 0 ? "-$" : "$") + Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

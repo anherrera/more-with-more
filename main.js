@@ -35,7 +35,7 @@ function retrofit() {
     if (moved) { lc[S.cooling] = (lc[S.cooling] || 0) + moved; S.leaseCool[t.id] = lc; }
   });
   track("retrofit", { cost: Math.round(plan.cost), kw: Math.round(plan.kw), units: plan.units });
-  say(`Retrofitted ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name} while they were running. +${fmt(plan.kw)} kW. Nobody died. The contractor was surprised too.`);
+  say(`Retrofitted ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name} while they were running. +${kwText(plan.kw)}. Nobody died. The contractor was surprised too.`);
 }
 const totalRacks = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0);
 const highestType = () => { let h = 0; TYPES.forEach((_, i) => { if (owned(i) > 0) h = i; }); return h; };
@@ -281,7 +281,7 @@ function releaseChip() {
   S.chipIdx += 1; S.nextChip = S.t + CHIP_EVERY;
   const c = newest(), prev = chip(S.chipIdx - 1);
   S.vendorCap *= 1.08; milestone(`Parallax ${c.name}`);
-  say(`Parallax announced the ${c.name}: ${c.perf.toFixed(1)}x the speed of a P1, ${c.kw.toFixed(1)} kW each. Your ${prev.name}s are now \u201clegacy.\u201d`);
+  say(`Parallax announced the ${c.name}: ${c.perf.toFixed(1)}x the speed of a P1, ${kwText(c.kw)} each. Your ${prev.name}s are now \u201clegacy.\u201d`);
 }
 
 function swapFailed() {
@@ -454,8 +454,8 @@ function render() {
   $("hypeNum").textContent = Math.round(S.hype);
   {
     const nr = S.phase === 2 ? campusRound() : ROUNDS[S.round], notes = [];
-    if (S.phase === 2) notes.push(nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${fmt(nr.backlog)} MW backlog` : "all rounds raised");
-    else if (!nr) notes.push(S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${fmt(GROUND_KW / 1000)} MW, then break ground` : "all rounds raised; next: break ground");
+    if (S.phase === 2) notes.push(nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${mwText(nr.backlog)} backlog` : "all rounds raised");
+    else if (!nr) notes.push(S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${mwText(GROUND_KW / 1000)}, then break ground` : "all rounds raised; next: break ground");
     else if (S.gen < nr.gen) notes.push(`${nr.name} needs Gen ${nr.gen}`);
     else notes.push(`${nr.name} at ${HYPE_TO_RAISE}`);
     if (facilityOpen()) notes.push(`debt at ${DRAW_HYPE}`);
@@ -496,7 +496,7 @@ function render() {
   const gated = !!r && (S.phase === 2 ? backlogMW() < r.backlog : S.gen < r.gen);
   $("raise").hidden = !r || (S.phase === 1 && gated);
   if (r) {
-    $("raise").textContent = S.phase === 2 && gated ? `${r.name} needs ${fmt(r.backlog)} MW of signed backlog (have ${fmt(backlogMW())})`
+    $("raise").textContent = S.phase === 2 && gated ? `${r.name} needs ${mwText(r.backlog)} of signed backlog (have ${fmt(backlogMW())})`
       : S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
     $("raise").disabled = gated || S.hype < HYPE_TO_RAISE;
   }
@@ -544,7 +544,7 @@ function renderPhase1() {
     .map((c) => `${chip(c).name} ${S.fleet[c].toLocaleString("en-US")}`).join(", ");
   $("gpus").textContent = `${S.gpus.toLocaleString("en-US")}${mix && Object.keys(S.fleet).length > 1 ? ` (${mix})` : ""}, room for ${roomNewest().toLocaleString("en-US")} more`;
   const nc = newest();
-  $("chipLine").textContent = `${nc.name}: ${nc.perf.toFixed(1)}x speed, ${nc.kw.toFixed(1)} kW` + (S.t < S.nextChip ? ` \u00b7 next in ${time(S.nextChip - S.t)}` : "");
+  $("chipLine").textContent = `${nc.name}: ${nc.perf.toFixed(1)}x speed, ${kwText(nc.kw)}` + (S.t < S.nextChip ? ` \u00b7 next in ${time(S.nextChip - S.t)}` : "");
   const oc = oldestOld();
   $("tradein").hidden = oc === null;
   $("tradeNote").hidden = oc === null;
@@ -620,7 +620,7 @@ function renderPhase1() {
   $("power").className = used >= cap - 0.5 ? "bad" : "";
   $("powerMeter").firstElementChild.style.width = Math.min(100, 100 * used / Math.max(cap, 1)) + "%";
   $("powerMeter").className = "meter" + (used >= cap - 0.5 ? " bad" : "");
-  $("power").textContent = `${fmt(used)} / ${fmt(cap)} kW`;
+  $("power").textContent = `${kwText(used)} / ${kwText(cap)}`;
   renderLeases();
   renderRacks(totalRacks(), used / Math.max(cap, 1));
   const hi = highestType(), capped = TYPES[hi].racks * cool.kw > TYPES[hi].powerKW * S.powerBoost;
@@ -638,7 +638,7 @@ function renderPhase1() {
     $("retrofit").hidden = plan.kw <= 0;
     if (plan.kw > 0) {
       $("retrofit").disabled = S.funds < plan.cost;
-      $("retrofit").textContent = `Retrofit ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name}: +${fmt(plan.kw)} kW, ${money(plan.cost)}`;
+      $("retrofit").textContent = `Retrofit ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name}: +${kwText(plan.kw)}, ${money(plan.cost)}`;
     }
   }
 }
@@ -662,7 +662,7 @@ function drawSpot() {
 let lastRackKey = "", lastProjectKey = null, lastLogLen = -1, lastLogTail = null, lastLeaseKey = null;
 function renderLeases() {
   $("rent").textContent = rentIndex().toFixed(1);
-  $("marketLeft").textContent = S.phase === 2 && S.p2 ? ` \u00b7 landlords have ${fmt(Math.max(0, S.p2.market))} MW left in this market` : "";
+  $("marketLeft").textContent = S.phase === 2 && S.p2 ? ` \u00b7 landlords have ${mwText(Math.max(0, S.p2.market))} left in this market` : "";
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
   const key = vis.join(",");
   if (key !== lastLeaseKey) {
@@ -672,9 +672,10 @@ function renderLeases() {
   }
   for (const b of $("leases").querySelectorAll("button[data-lease]")) {
     const i = Number(b.dataset.lease), t = TYPES[i];
-    b.textContent = `Lease ${owned(i) ? "another" : "a"} ${t.one} (${t.racks.toLocaleString("en-US")} rack${t.racks > 1 ? "s" : ""}, ${fmt(unitKW(i))} kW): ${money(leaseCost(i))} \u00b7 ${money(leaseCost(i) / unitKW(i))}/kW`;
+    b.textContent = `Lease ${owned(i) ? "another" : "a"} ${t.one} (${t.racks.toLocaleString("en-US")} rack${t.racks > 1 ? "s" : ""}, ${kwText(unitKW(i))}): ${money(leaseCost(i))} \u00b7 ${money(leaseCost(i) / unitKW(i))}/kW`;
     b.disabled = S.funds < leaseCost(i) || (S.phase === 2 && !marketHas(i));
-    b.title = S.phase === 2 && !marketHas(i) ? `Not enough MW left in this market for one (${fmt(unitKW(i) / 1000)} MW needed)` : "";
+    b.title = S.phase === 2 && !marketHas(i) ? `Not enough MW left in this market for one (${mwText(unitKW(i) / 1000)} needed)` : "";
+    if (S.phase === 2 && !marketHas(i)) b.textContent += ` \u00b7 not enough left in this market: needs ${mwText(unitKW(i) / 1000)}, ${mwText(Math.max(0, S.p2.market))} left`;
   }
 }
 function buyProject(id) {

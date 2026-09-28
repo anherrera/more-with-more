@@ -69,3 +69,10 @@ def test_newer_chips_rent_for_more(game):
     assert pg.evaluate("() => onDemandRevenue()") == pytest.approx(mw * OD * (1.6 / 1.4))
     offer = pg.evaluate("() => { S.p2.offers = []; makeOffer(); return S.p2.offers[0]; }")
     assert offer["fee"] == pytest.approx(offer["mw"] * 275 * (1.6 / 1.4) ** (offer["minGen"] - 3))
+
+
+def test_parallax_deals_keep_pace_with_the_treadmill(game):
+    pg = campus(game)
+    for idx in (3, 12):
+        mw = pg.evaluate(f"() => {{ S.chipIdx = {idx}; return dealSize() / gpuPrice() * newest().kw / 1000; }}")
+        assert mw == pytest.approx(20, rel=0.05)

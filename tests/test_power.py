@@ -99,3 +99,20 @@ def test_sold_out_market_is_named(game):
     run(pg, 1)
     assert pg.inner_text("#limit").startswith("Leased capacity is sold out in this market")
     assert "not enough mw left" in pg.get_attribute("#leases button[data-lease='3']", "title").lower()
+
+
+def test_buy_adjacent_land(game):
+    pg = campus(game, county="strong")
+    acres, funds = pg.evaluate("() => [acresFree(), S.funds]")
+    pg.click("#buyLand")
+    assert pg.evaluate("() => acresFree()") == acres + 200
+    assert pg.evaluate("() => S.funds") == pytest.approx(funds - 15e6)
+    assert "$18.8M" in pg.inner_text("#buyLand")          # next parcel costs 25% more
+
+
+def test_big_power_reads_in_gw(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.p2.offers = []; makeOffer(); const o = S.p2.offers[0]; o.mw = 2650; render(); }")
+    assert "2.65 GW" in pg.inner_text("#offers")
+    assert "K MW" not in pg.inner_text("body")
+    assert "K kW" not in pg.inner_text("body")
