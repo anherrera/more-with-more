@@ -72,33 +72,11 @@ def test_hall_does_not_take_credits(game):
     assert pg.evaluate("() => S.credits") == 10e6
 
 
-def test_leased_market_is_finite_and_regrows(game):
-    pg = campus(game)
-    pg.evaluate("() => { S.p2.market = 25; }")
-    run(pg, 1)
-    hall_btn = "#leases button[data-lease='3']"            # data hall: 240 racks, 20 MW at this cooling
-    assert pg.is_enabled(hall_btn)
-    pg.click(hall_btn)
-    assert pg.evaluate("() => S.p2.market") == pytest.approx(25 + 10 / 60 - 20, abs=0.01)
-    assert not pg.is_enabled(hall_btn)
-    assert "left in this market" in pg.inner_text("#facilitiesBox")
-    run(pg, 90)
-    assert pg.is_enabled(hall_btn)
-
-
 def test_chips_keep_shipping_in_phase2(game):
     pg = campus(game)
     pg.evaluate("() => { S.nextChip = S.t + 1; }")
     run(pg, 2)
     assert pg.evaluate("() => S.chipIdx") == 4
-
-
-def test_sold_out_market_is_named(game):
-    pg = campus(game)
-    pg.evaluate("() => { S.p2.market = 0; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
-    run(pg, 1)
-    assert pg.inner_text("#limit").startswith("Leased capacity is sold out in this market")
-    assert "not enough mw left" in pg.get_attribute("#leases button[data-lease='3']", "title").lower()
 
 
 def test_buy_adjacent_land(game):
@@ -116,3 +94,33 @@ def test_big_power_reads_in_gw(game):
     assert "2.65 GW" in pg.inner_text("#offers")
     assert "K MW" not in pg.inner_text("body")
     assert "K kW" not in pg.inner_text("body")
+
+
+def test_colo_leases_in_20mw_blocks(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.p2.market = 150; render(); }")
+    leased, funds = pg.evaluate("() => [leasedKW(), S.funds]")
+    cost = pg.evaluate("() => coloCost()")
+    pg.click("#leaseColo")
+    assert pg.evaluate("() => leasedKW()") == pytest.approx(leased + 20000)
+    assert pg.evaluate("() => [S.p2.market, S.funds]") == pytest.approx([130, funds - cost])
+    assert not pg.is_visible("#leases")                     # rack/cage/row buttons are a phase 1 thing
+
+
+def test_colo_market_opens_in_chunks_not_a_trickle(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.p2.market = 10; S.p2.nextColo = S.t + 100; render(); }")
+    assert pg.is_disabled("#leaseColo") and "sold out" in pg.inner_text("#leaseColo")
+    run(pg, 60)
+    assert pg.evaluate("() => S.p2.market") == 10               # no trickle, so the button doesn't flicker
+    run(pg, 41)
+    assert pg.evaluate("() => S.p2.market") >= 50
+    assert "A new colo opened" in pg.inner_text("#console")
+    assert pg.is_enabled("#leaseColo")
+
+
+def test_sold_out_market_is_named(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.p2.market = 0; S.p2.nextColo = 1e9; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
+    run(pg, 1)
+    assert pg.inner_text("#limit").startswith("Leased capacity is sold out in this market")

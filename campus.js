@@ -12,7 +12,9 @@ const COUNTIES = [
     pitch: "$20M in tax incentives up front. The town already has a Facebook group about you.",
     gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6 },
 ];
-const MARKET_START_MW = 150, MARKET_REGROW = 10 / 60;   // leasable MW left in this market; new colos open slowly
+const MARKET_START_MW = 150, MARKET_CAP_MW = 300;       // leasable colo MW in this market
+const COLO_MW = 20, COLO_RACKS = 240, COLO_SLOT = 35;   // you lease colo in 20 MW blocks (a data hall's worth)
+const COLO_EVERY = [120, 180], COLO_OPENS = [40, 80];   // a new colo opens every 2-3 minutes with 40-80 MW
 const OD_RATE = 300, OD_DECAY = 0.7, OD_FLOOR = 0.15, OD_UTIL = 0.8;   // on-demand $/MW/s for the newest chip; older gens earn less but stay busy
 const P2_RATE = 0.25;     // phase 1 debt is refinanced as project finance at a quarter of the facility's rate
 const HALL = { mw: 50, acres: 20, cost: 10e6, secs: 90 };   // a powered shell: GPUs are bought separately and racked in it
@@ -49,7 +51,7 @@ function raiseCampus() {
 }
 
 const freshP2 = () => ({
-  county: null, market: MARKET_START_MW, round: 0, grid: 0, queue: null, queueN: 0, builds: [],
+  county: null, market: MARKET_START_MW, nextColo: null, colo: 0, coloN: 0, round: 0, grid: 0, queue: null, queueN: 0, builds: [],
   offers: [], contracts: [], nextOffer: 0, offerN: 0, contractN: 0, earned: 0,
 });
 const countyOf = () => COUNTIES.find((c) => c.id === S.p2.county);
@@ -59,8 +61,20 @@ const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * POWER.tur
 const hallMWAt = (at = S.t) => doneBuilds("hall", at) * HALL.mw;
 const energizedAt = (at = S.t) => Math.min(hallMWAt(at), powerAt(at));
 const campusKWAt = (at = S.t) => (S.p2 && S.p2.county ? energizedAt(at) * 1000 : 0);
-const marketHas = (i) => unitKW(i) / 1000 <= S.p2.market;
-function takeFromMarket(i) { S.p2.market -= unitKW(i) / 1000; }
+const coloCost = () => COLO_RACKS * COLO_SLOT * rentIndex();
+function leaseColo() {
+  if (!S.p2 || S.p2.market < COLO_MW || S.funds < coloCost()) return;
+  S.funds -= coloCost(); S.p2.market -= COLO_MW; S.p2.colo = (S.p2.colo || 0) + COLO_MW * 1000; S.p2.coloN = (S.p2.coloN || 0) + 1;
+  track("lease", { ev: "colo", mw: COLO_MW });
+  say(`Leased ${mwText(COLO_MW)} of colo space. The landlord asked what you were building. You said \u201cthe future.\u201d`);
+}
+function openColo() {
+  const mw = Math.min(MARKET_CAP_MW - S.p2.market, COLO_OPENS[0] + Math.floor(Math.random() * ((COLO_OPENS[1] - COLO_OPENS[0]) / 10 + 1)) * 10);
+  S.p2.nextColo = S.t + COLO_EVERY[0] + Math.random() * (COLO_EVERY[1] - COLO_EVERY[0]);
+  if (mw <= 0) return;
+  S.p2.market += mw; track("lease", { ev: "open", mw });
+  say(`A new colo opened across town: ${mwText(mw)} available at ${money(coloCost() / (COLO_MW * 1000))}/kW. PivotCloud is already on the phone.`);
+}
 // Which GPUs are under contract: active contracts take MW from the oldest generation they accept, in activation order.
 function freeKWByGen() {
   const free = {};
@@ -273,7 +287,8 @@ function stepCampus(dt) {
   for (const b of S.p2.builds) {
     if (!b.announced && S.t >= b.done) { b.announced = true; track("build", { ev: "done", kind: b.kind }); say(BUILD_DONE[b.kind]()); }
   }
-  S.p2.market += MARKET_REGROW * dt;
+  if (S.p2.nextColo == null) S.p2.nextColo = S.t + COLO_EVERY[0];
+  if (S.t >= S.p2.nextColo) openColo();
   S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
   if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + 60 + Math.random() * 60; }
   stepContracts(dt);
@@ -286,8 +301,13 @@ const campusSnap = () => ({ county: S.p2.county, fleetMW: Math.round(usedKW() / 
   late: S.p2.contracts.filter((c) => c.status === "late").length, earned: Math.round(S.p2.earned) });
 
 function renderCampus() {
-  renderFleet();
   const p = S.p2;
+  $("coloLine").textContent = `Colo market: ${mwText(Math.max(0, p.market))} available` +
+    (p.nextColo ? ` \u00b7 next colo opens in ~${time(Math.max(0, p.nextColo - S.t))}` : "");
+  $("leaseColo").textContent = p.market >= COLO_MW ? `Lease ${mwText(COLO_MW)} of colo space: ${money(coloCost())} (${money(coloCost() / (COLO_MW * 1000))}/kW)`
+    : `Colo sold out: next one opens in ~${time(Math.max(0, (p.nextColo || S.t) - S.t))}`;
+  $("leaseColo").disabled = p.market < COLO_MW || S.funds < coloCost();
+  renderFleet();
   if (!p.county) { $("countLabel").textContent = "Fleet"; $("gpuCount").textContent = `${mwText(usedKW() / 1000)}`; }
   $("countyBox").hidden = !!p.county;
   $("campusBox").hidden = $("contractsBox").hidden = !p.county;
@@ -432,6 +452,7 @@ function wireCampus() {
   $("buildSolar").addEventListener("click", () => { build("solar"); render(); });
   $("requestQueue").addEventListener("click", () => { requestQueue(); render(); });
   $("buyLand").addEventListener("click", () => { buyLand(); render(); });
+  $("leaseColo").addEventListener("click", () => { leaseColo(); render(); });
   $("offers").addEventListener("click", (e) => {
     const a = e.target.closest("button[data-accept]"), d = e.target.closest("button[data-decline]");
     if (a) { acceptOffer(a.dataset.accept); render(); } else if (d) { declineOffer(d.dataset.decline); render(); }

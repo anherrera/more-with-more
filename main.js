@@ -10,7 +10,8 @@ const owned = (i) => S.leases[TYPES[i].id] || 0;
 // the standard for NEW leases; older space stays sparse until you pay to retrofit it.
 const unitKW = (i, level = S.cooling) => Math.min(TYPES[i].racks * COOLING[level].kw, TYPES[i].powerKW * S.powerBoost);
 const coolOf = (i) => S.leaseCool[TYPES[i].id] || {};
-const leasedKW = () => TYPES.reduce((a, _, i) => a + Object.entries(coolOf(i)).reduce((b, [lv, n]) => b + n * unitKW(i, +lv), 0), 0);
+const leasedKW = () => TYPES.reduce((a, _, i) => a + Object.entries(coolOf(i)).reduce((b, [lv, n]) => b + n * unitKW(i, +lv), 0), 0)
+  + (S.p2 ? S.p2.colo || 0 : 0);                                     // phase 2 colo blocks
 const capKW = () => leasedKW() + (S.phase === 2 ? campusKWAt() : 0);   // phase 2: plus energized campus halls
 const RETROFIT = 1.0;                   // retrofit costs what new space costs per kW gained, but adds no racks and no rent
 const retrofitPlan = () => {
@@ -39,7 +40,7 @@ function retrofit() {
 }
 const totalRacks = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0);
 const highestType = () => { let h = 0; TYPES.forEach((_, i) => { if (owned(i) > 0) h = i; }); return h; };
-const racksLeased = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0);
+const racksLeased = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0) + (S.p2 ? (S.p2.coloN || 0) * COLO_RACKS : 0);
 const rentIndex = () => Math.pow(1 + racksLeased() / RENT_K, RENT_EXP);
 const leaseCost = (i) => TYPES[i].racks * TYPES[i].slot * rentIndex();
 const leaseVisible = (i) => i === 0 || owned(i) > 0 || owned(i - 1) > 0;
@@ -333,9 +334,8 @@ function buy(k) {
 }
 function lease(i) {
   const t = TYPES[i], c = leaseCost(i);
-  if (!t || !leaseVisible(i) || S.funds < c || (S.phase === 2 && !marketHas(i))) return;
+  if (!t || !leaseVisible(i) || S.funds < c || S.phase === 2) return;   // phase 2 leases colo blocks instead
   S.funds -= c; S.leases[t.id] = owned(i) + 1; S.tier = highestType();
-  if (S.phase === 2) takeFromMarket(i);
   { const lc = coolOf(i); lc[S.cooling] = (lc[S.cooling] || 0) + 1; S.leaseCool[t.id] = lc; }
   milestone(`lease: ${t.one} #${owned(i)}`);
   say(owned(i) === 1 ? `Signed the lease: your first ${t.one}.` : `Leased another ${t.one}. You have ${owned(i)} ${t.many}.`);
@@ -502,7 +502,8 @@ function render() {
   }
 
   for (const id of ["p1biz", "trainingBox", "answer"]) $(id).hidden = S.phase !== 1;
-  $("colDeals").hidden = $("fleetBox").hidden = S.phase !== 2;
+  $("colDeals").hidden = $("fleetBox").hidden = $("coloBox").hidden = S.phase !== 2;
+  $("leases").hidden = S.phase === 2;
   renderPhase1();                                   // compute and leased space work in both phases
   if (S.phase === 1) $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true;
   else renderCampus();
@@ -628,7 +629,7 @@ function renderPhase1() {
   const free = roomNewest();
   $("limit").textContent = free >= 1
     ? (S.funds + S.credits >= gpuPrice() ? `nothing yet: room for ${free.toLocaleString("en-US")} more ${newest().name}s` : `money: room for ${free.toLocaleString("en-US")} more ${newest().name}s`)
-    : S.phase === 2 && S.p2 && S.p2.market < 1                  // a rack or two left is not capacity
+    : S.phase === 2 && S.p2 && S.p2.market < COLO_MW
     ? "Leased capacity is sold out in this market: build on your campus, or trade in older chips"
     : capped
     ? "landlord power caps: lease more space" + (S.done.substation ? "" : " (or pay for the substation)")
@@ -663,7 +664,6 @@ function drawSpot() {
 let lastRackKey = "", lastProjectKey = null, lastLogLen = -1, lastLogTail = null, lastLeaseKey = null;
 function renderLeases() {
   $("rent").textContent = rentIndex().toFixed(1);
-  $("marketLeft").textContent = S.phase === 2 && S.p2 ? ` \u00b7 landlords have ${mwText(Math.max(0, S.p2.market))} left in this market` : "";
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
   const key = vis.join(",");
   if (key !== lastLeaseKey) {
@@ -674,9 +674,7 @@ function renderLeases() {
   for (const b of $("leases").querySelectorAll("button[data-lease]")) {
     const i = Number(b.dataset.lease), t = TYPES[i];
     b.textContent = `Lease ${owned(i) ? "another" : "a"} ${t.one} (${t.racks.toLocaleString("en-US")} rack${t.racks > 1 ? "s" : ""}, ${kwText(unitKW(i))}): ${money(leaseCost(i))} \u00b7 ${money(leaseCost(i) / unitKW(i))}/kW`;
-    b.disabled = S.funds < leaseCost(i) || (S.phase === 2 && !marketHas(i));
-    b.title = S.phase === 2 && !marketHas(i) ? `Not enough MW left in this market for one (${mwText(unitKW(i) / 1000)} needed)` : "";
-    if (S.phase === 2 && !marketHas(i)) b.textContent += ` \u00b7 not enough left in this market: needs ${mwText(unitKW(i) / 1000)}, ${mwText(Math.max(0, S.p2.market))} left`;
+    b.disabled = S.funds < leaseCost(i);
   }
 }
 function buyProject(id) {
