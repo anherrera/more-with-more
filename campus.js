@@ -25,6 +25,14 @@ const BUILD_DONE = {
   turbine: () => "A gas turbine came online. The neighbors can hear it.",
   solar: () => "The solar farm is live. It works about a third of the time; the batteries cover the rest, mostly.",
 };
+const UPFRONT_RATE = 1500;   // $ per MW-second of the term, paid when you sign
+const FEE_RATE = 300;        // $ per MW per second while delivered
+const OFFER_TTL = 60;        // offers wait at least this long before walking (spec: never under 45 s)
+const LATE_FREE = 60, LATE_DEFAULT = 180, RENEGOTIATE_SECS = 120, RENEGOTIATE_HYPE = 5;
+const CUSTOMERS = [
+  "Your old lab (Parallax is paying)", "A lab funded by Parallax", "PivotCloud, subleasing to its own customers",
+  "A sovereign AI fund", "A lab you have never heard of with $4B", "A chatbot company that is also a hardware company",
+];
 
 const freshP2 = () => ({
   county: null, legacyMW: 0, grid: 0, queue: null, queueN: 0, builds: [],
@@ -68,6 +76,97 @@ function campusLimit() {
   return "both: build halls and power together";
 }
 
+const live = (c) => c.status !== "done" && c.status !== "defaulted";
+const deliveredMW = () => S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.mw, 0);
+const backlogMW = () => S.p2.contracts.filter((c) => c.status === "waiting" || c.status === "late").reduce((a, c) => a + c.mw, 0);
+const committedAt = (at, skip) => S.p2.contracts
+  .filter((c) => live(c) && c.id !== skip && c.start <= at && at < c.end).reduce((a, c) => a + c.mw, 0);
+
+// Will this much capacity be free for the whole term? Checked at the start and wherever another contract begins.
+function forecast(o) {
+  const end = o.start + o.term;
+  const points = [o.start, ...S.p2.contracts.filter((c) => live(c) && c.id !== o.id && c.start > o.start && c.start < end).map((c) => c.start)];
+  const spare = Math.min(...points.map((at) => energizedAt(at) - committedAt(at, o.id)));
+  const short = Math.max(0, o.mw - spare);
+  const why = hallMWAt(o.start) <= powerAt(o.start) ? "build halls" : "add power";
+  return { ok: short === 0, short, why };
+}
+
+function makeOffer(first = false) {
+  const n = ++S.p2.offerN;
+  const scale = Math.max(20, 0.35 * (energizedAt(S.t + 300) + 40));
+  const mw = first ? 30 : Math.max(10, Math.round(scale * (0.6 + Math.random() * 0.8) / 10) * 10);
+  const startsIn = first ? 300 : 240 + Math.floor(Math.random() * 180);
+  const term = 480 + Math.floor(Math.random() * 420);
+  const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
+  S.p2.offers.push({ id: `o${n}`, n, who, mw, start: S.t + startsIn, term,
+    upfront: mw * term * UPFRONT_RATE, fee: mw * FEE_RATE, expires: S.t + (first ? 280 : OFFER_TTL) });
+  track("contract", { ev: "offer", mw });
+}
+
+function acceptOffer(id) {
+  const i = S.p2.offers.findIndex((o) => o.id === id);
+  if (i < 0) return;
+  const o = S.p2.offers.splice(i, 1)[0];
+  const n = ++S.p2.contractN;
+  S.funds += o.upfront;
+  S.p2.contracts.push({ id: `c${n}`, n, who: o.who, mw: o.mw, start: o.start, end: o.start + o.term,
+    fee: o.fee, upfront: o.upfront, status: "waiting", reneg: false, warned: false });
+  track("contract", { ev: "accept", mw: o.mw, upfront: Math.round(o.upfront) });
+  say(`Signed ${o.who.split(" (")[0]}: ${fmt(o.mw)} MW starting in ${time(o.start - S.t)}. ${money(o.upfront)} up front. ` +
+    (forecast({ ...o, id: `c${n}` }).ok ? "You have the capacity." : "You do not have the capacity yet. Nobody asked."));
+}
+
+function declineOffer(id) {
+  S.p2.offers = S.p2.offers.filter((o) => o.id !== id);
+  track("contract", { ev: "decline" });
+}
+
+function renegotiate(id) {
+  const c = S.p2.contracts.find((x) => x.id === id);
+  if (!c || c.reneg || (c.status !== "waiting" && c.status !== "late")) return;
+  c.start += RENEGOTIATE_SECS; c.end += RENEGOTIATE_SECS; c.reneg = true; c.warned = false;
+  if (c.status === "late") c.status = "waiting";
+  S.hype = Math.max(5, S.hype - RENEGOTIATE_HYPE);
+  track("contract", { ev: "renegotiate", mw: c.mw });
+  say(`Pushed ${c.who.split(" (")[0]} back ${time(RENEGOTIATE_SECS)}. The customer agrees. Investors notice.`);
+}
+
+function stepContracts(dt) {
+  for (const c of [...S.p2.contracts].sort((a, b) => a.start - b.start || a.n - b.n)) {
+    if (c.status === "active") {
+      S.funds += c.fee * dt; S.p2.earned += c.fee * dt;
+      if (S.t >= c.end) { c.status = "done"; track("contract", { ev: "end", mw: c.mw }); say(`${c.who.split(" (")[0]}'s term ended. ${fmt(c.mw)} MW is free again.`); }
+      continue;
+    }
+    if ((c.status !== "waiting" && c.status !== "late") || S.t < c.start) continue;
+    const free = energizedAt() - deliveredMW();
+    if (free >= c.mw) {
+      track("contract", { ev: "start", mw: c.mw, late: Math.round(S.t - c.start) });
+      say(c.status === "late" ? `Finally delivered ${fmt(c.mw)} MW to ${c.who.split(" (")[0]}. They pretend it was on time.` : `Delivered ${fmt(c.mw)} MW to ${c.who.split(" (")[0]}. The meter is running.`);
+      c.status = "active";
+      continue;
+    }
+    const late = S.t - c.start;
+    if (c.status === "waiting") {
+      c.status = "late"; track("contract", { ev: "late", mw: c.mw });
+      say(`${c.who.split(" (")[0]} wanted ${fmt(c.mw)} MW today and you are short ${fmt(c.mw - Math.max(0, free))} MW (${forecast(c).why}). The first minute is on the house.`);
+    }
+    if (late > LATE_FREE) { S.funds -= 0.5 * c.fee * dt; S.hype = Math.max(5, S.hype - 0.05 * dt); }
+    if (!c.warned && late >= LATE_DEFAULT - 60) { c.warned = true; say(`${c.who.split(" (")[0]} walks in 60s unless you deliver ${fmt(c.mw)} MW or push the date.`); }
+    if (late >= LATE_DEFAULT) {
+      c.status = "defaulted"; c.end = S.t;
+      S.funds -= 0.5 * c.upfront; S.hype = Math.max(5, S.hype - 20); S.nextDraw = Math.max(S.nextDraw, S.t + 120);
+      track("contract", { ev: "default", mw: c.mw });
+      say(`${c.who.split(" (")[0]} walked. They clawed back ${money(0.5 * c.upfront)}, told everyone, and the lenders froze your draws.`);
+    }
+  }
+  S.p2.contracts = S.p2.contracts.filter((c) => live(c) || S.t - c.end < 60);
+}
+
+const campusDrawSize = () => (S.hype / 100) * Math.max(backlogMW(), 10) * 300000;   // lenders size on signed backlog
+const campusDealSize = () => HALL.cost * 0.5;                                        // Parallax credits: half a hall of GPUs
+
 function startCampus() {
   if (S.phase === 2) return;
   S.phase = 2; S.p2 = freshP2(); S.p2.legacyMW = Math.round(usedKW() / 1000);
@@ -80,11 +179,14 @@ function chooseCounty(id) {
   const c = COUNTIES.find((x) => x.id === id);
   if (!c || S.p2.county) return;
   S.p2.county = c.id; S.p2.grid = c.gridMW; S.funds += c.cash;
+  makeOffer(true); S.p2.nextOffer = S.t + 90;
   milestone(`county: ${c.name}`); track("county", { id: c.id });
   say(`Bought land in the ${c.name.toLowerCase()} county. The model: “The river is underutilized.”`);
+  say("Your old lab spun out. It wants 30 MW in five minutes. Parallax is paying for it, which means Parallax is paying you.");
 }
 
-const campusRevenue = () => (S.p2 && S.p2.county ? S.p2.legacyMW * LEGACY_FEE : 0);
+const campusRevenue = () => (S.p2 && S.p2.county
+  ? S.p2.legacyMW * LEGACY_FEE + S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) : 0);
 
 function stepCampus(dt) {
   if (!S.p2.county) return;
@@ -98,18 +200,22 @@ function stepCampus(dt) {
     if (!b.announced && S.t >= b.done) { b.announced = true; track("build", { ev: "done", kind: b.kind }); say(BUILD_DONE[b.kind]()); }
   }
   S.funds += S.p2.legacyMW * LEGACY_FEE * dt;
+  S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
+  if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + 60 + Math.random() * 60; }
+  stepContracts(dt);
 }
 
 const campusSnap = () => ({ county: S.p2.county, legacyMW: S.p2.legacyMW, grid: S.p2.grid, queue: !!S.p2.queue,
   halls: doneBuilds("hall"), turbines: doneBuilds("turbine"), solar: doneBuilds("solar"),
-  energizedMW: energizedAt(), acresFree: acresFree() });
+  energizedMW: energizedAt(), acresFree: acresFree(),
+  deliveredMW: deliveredMW(), backlogMW: backlogMW(), offers: S.p2.offers.length,
+  late: S.p2.contracts.filter((c) => c.status === "late").length, earned: Math.round(S.p2.earned) });
 
 function renderCampus() {
   const p = S.p2;
-  $("countLabel").textContent = "Legacy colo";
-  $("gpuCount").textContent = `${fmt(p.legacyMW)} MW`;
+  if (!p.county) { $("countLabel").textContent = "Legacy colo"; $("gpuCount").textContent = `${fmt(p.legacyMW)} MW`; }
   $("countyBox").hidden = !!p.county;
-  $("campusBox").hidden = !p.county;
+  $("campusBox").hidden = $("contractsBox").hidden = !p.county;
   if (!p.county) {
     if (!$("counties").childElementCount) {
       for (const c of COUNTIES) {
@@ -143,6 +249,65 @@ function renderCampus() {
   const pending = p.builds.filter((b) => b.done > S.t).sort((a, b) => a.done - b.done);
   $("underway").textContent = pending.length
     ? "Under construction: " + pending.map((b) => `${b.kind} ${time(b.done - S.t)}`).join(", ") : "";
+  renderContracts();
+}
+
+let lastOfferKey = null, lastContractKey = null;
+function renderContracts() {
+  const p = S.p2;
+  $("countLabel").textContent = "Delivered";
+  $("gpuCount").textContent = `${fmt(deliveredMW())} MW`;
+  $("backlog").textContent = `${fmt(backlogMW())} MW`;
+  $("delivered").textContent = `${fmt(deliveredMW())} of ${fmt(energizedAt())} MW`;
+  $("p2rev").textContent = `${money(campusRevenue())}/s`;
+  // Rebuild rows only when the set changes, so a click never lands on a button that was just replaced.
+  const oKey = p.offers.map((o) => o.id).join(",");
+  if (oKey !== lastOfferKey) {
+    lastOfferKey = oKey;
+    $("offers").innerHTML = p.offers.length ? "" : `<div class="empty">No offers right now. They come every minute or two.</div>`;
+    for (const o of p.offers) {
+      const d = document.createElement("div"); d.className = "deal"; d.dataset.offer = o.id;
+      d.innerHTML = `<div class="line what"></div><div class="line sub fc"></div><div class="btns">` +
+        `<button type="button" class="primary" data-accept="${o.id}"></button><button type="button" data-decline="${o.id}">Pass</button></div>`;
+      $("offers").appendChild(d);
+    }
+  }
+  for (const d of $("offers").querySelectorAll("[data-offer]")) {
+    const o = p.offers.find((x) => x.id === d.dataset.offer); if (!o) continue;
+    const f = forecast(o);
+    d.querySelector(".what").textContent = `${o.who}: ${fmt(o.mw)} MW for ${time(o.term)}, starts in ${time(o.start - S.t)}. ${money(o.fee)}/s while delivered.`;
+    const fc = d.querySelector(".fc");
+    fc.className = "line sub fc " + (f.ok ? "good" : "bad");
+    fc.textContent = (f.ok ? `✓ You'll have ${fmt(o.mw)} MW free by then.` : `Short ${fmt(f.short)} MW by then: ${f.why}.`) +
+      ` Offer good for ${Math.ceil(o.expires - S.t)}s.`;
+    d.querySelector("[data-accept]").textContent = `Sign: ${money(o.upfront)} up front`;
+  }
+  const shown = p.contracts.filter((c) => c.status !== "done" && c.status !== "defaulted");
+  const cKey = shown.map((c) => `${c.id}:${c.status}:${c.reneg}`).join(",");
+  if (cKey !== lastContractKey) {
+    lastContractKey = cKey;
+    $("contracts").innerHTML = shown.length ? "" : `<div class="empty">Nothing signed.</div>`;
+    for (const c of shown) {
+      const d = document.createElement("div"); d.className = "deal"; d.dataset.contract = c.id;
+      d.innerHTML = `<div class="line st"></div>` + (!c.reneg && c.status !== "active"
+        ? `<div class="btns"><button type="button" data-reneg="${c.id}">Push the date ${time(RENEGOTIATE_SECS)} (−${RENEGOTIATE_HYPE} hype)</button></div>` : "");
+      $("contracts").appendChild(d);
+    }
+  }
+  for (const d of $("contracts").querySelectorAll("[data-contract]")) {
+    const c = p.contracts.find((x) => x.id === d.dataset.contract); if (!c) continue;
+    const st = d.querySelector(".st"), who = c.who.split(" (")[0], late = S.t - c.start;
+    if (c.status === "active") { st.className = "line st good"; st.textContent = `${who}: ${fmt(c.mw)} MW delivered, ${money(c.fee)}/s, ends in ${time(c.end - S.t)}`; }
+    else if (c.status === "late") {
+      st.className = "line st bad";
+      st.textContent = `LATE ${time(late)}: ${who}, ${fmt(c.mw)} MW. ` +
+        (late < LATE_FREE ? "Free for now." : `Paying penalties. Walks in ${time(Math.max(0, LATE_DEFAULT - late))}.`);
+    } else {
+      const f = forecast(c);
+      st.className = "line st " + (f.ok ? "" : "bad");
+      st.textContent = `${who}: ${fmt(c.mw)} MW, starts in ${time(c.start - S.t)}. ` + (f.ok ? "✓ covered" : `Short ${fmt(f.short)} MW: ${f.why}`);
+    }
+  }
 }
 
 function wireCampus() {
@@ -154,4 +319,12 @@ function wireCampus() {
   $("buildTurbine").addEventListener("click", () => { build("turbine"); render(); });
   $("buildSolar").addEventListener("click", () => { build("solar"); render(); });
   $("requestQueue").addEventListener("click", () => { requestQueue(); render(); });
+  $("offers").addEventListener("click", (e) => {
+    const a = e.target.closest("button[data-accept]"), d = e.target.closest("button[data-decline]");
+    if (a) { acceptOffer(a.dataset.accept); render(); } else if (d) { declineOffer(d.dataset.decline); render(); }
+  });
+  $("contracts").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-reneg]");
+    if (b) { renegotiate(b.dataset.reneg); render(); }
+  });
 }

@@ -82,7 +82,7 @@ function endPhase() {
 // ---------- actions ----------
 function answer() { answerClicks++; if (S.queue >= 1) { S.queue -= 1; S.served += 1; S.funds += S.price; } }
 // Parallax invests in you; the money can only buy Parallax GPUs; Parallax books it as revenue.
-const dealSize = () => 800 * Math.pow(5, S.gen) * (1 + S.deals * 0.15);
+const dealSize = () => S.phase === 2 ? campusDealSize() : 800 * Math.pow(5, S.gen) * (1 + S.deals * 0.15);
 const dealReady = () => S.gen >= 1 && S.t >= S.nextDeal;
 function takeDeal() {
   if (!dealReady()) return;
@@ -293,8 +293,8 @@ function rollback() {
 
 // A debt facility secured by your GPUs, sized by hype. Opens once you lease a data hall.
 const DRAW_HYPE = 60, INTEREST = 0.0002;                  // per second on outstanding debt (~1.2%/min)
-const drawSize = () => (S.hype / 100) * 3 * Math.pow(5, S.gen) * 1000;
-const facilityOpen = () => S.tier >= 3;
+const drawSize = () => S.phase === 2 ? campusDrawSize() : (S.hype / 100) * 3 * Math.pow(5, S.gen) * 1000;
+const facilityOpen = () => S.phase === 2 || S.tier >= 3;
 const drawReady = () => facilityOpen() && S.hype >= DRAW_HYPE && S.t >= S.nextDraw;
 function draw() {
   if (!drawReady()) return;
@@ -421,6 +421,7 @@ function render() {
   $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>`;
   $("creditsRow").hidden = S.gen < 1;
   $("credits").textContent = moneyFull(S.credits);
+  $("creditsNote").textContent = S.phase === 1 ? "(GPUs only)" : "(pays for halls' GPUs)";
   $("deal").hidden = S.gen < 1;
   $("deal").disabled = !dealReady();
   $("deal").textContent = dealReady() ? `Take Parallax's strategic investment: ${money(dealSize())} in credits` : `Parallax will call back in ${time(S.nextDeal - S.t)}`;
@@ -489,7 +490,7 @@ function render() {
   }
 
   for (const id of ["p1biz", "computeBox", "trainingBox", "facilitiesBox"]) $(id).hidden = S.phase !== 1;
-  if (S.phase === 1) { renderPhase1(); $("countyBox").hidden = $("campusBox").hidden = true; }
+  if (S.phase === 1) { renderPhase1(); $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true; }
   else renderCampus();
 
   // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.

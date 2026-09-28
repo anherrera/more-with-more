@@ -80,6 +80,8 @@
   .choices button { width: 100%; padding: 4px 8px; }
   .choices .t { display: block; }
   .choices .c { display: block; font-size: 12px; color: var(--muted); }
+  .deal { border-left: 2px solid var(--rule); padding-left: 8px; margin: 6px 0; }
+  .deal .line.good { color: var(--good); } .deal .line.bad { color: var(--bad); }
   .empty { color: var(--muted); font-size: 13px; }
   .ending { border: 2px solid var(--accent); padding: 10px 12px; margin-bottom: 18px; }
   .ending p { font-size: 20px; font-style: italic; margin: 0 0 6px; }
@@ -103,7 +105,7 @@
       <div>
         <h3>Business</h3>
         <div class="line">Funds: <span id="funds">$0</span></div>
-        <div class="line" id="creditsRow" hidden>Parallax credits: <span id="credits">$0</span> <span class="sub">(GPUs only)</span></div>
+        <div class="line" id="creditsRow" hidden>Parallax credits: <span id="credits">$0</span> <span class="sub" id="creditsNote">(GPUs only)</span></div>
         <div id="p1biz">
         <div class="line">Price per query: <span id="price">$0.25</span></div>
         <div class="btns"><button id="priceDown" type="button">lower</button><button id="priceUp" type="button">raise</button></div>
@@ -137,6 +139,15 @@
       <div id="countyBox" hidden>
         <h3>Pick a county</h3>
         <div class="choices" id="counties"></div>
+      </div>
+      <div id="contractsBox" hidden>
+        <h3>Contracts</h3>
+        <div class="line">Backlog: <span id="backlog">0 MW</span> &middot; Delivered: <span id="delivered">0 MW</span></div>
+        <div class="line">Revenue: <span id="p2rev">$0/s</span></div>
+        <div class="line sub">Offers (declining is free)</div>
+        <div id="offers"></div>
+        <div class="line sub">Signed</div>
+        <div id="contracts"></div>
       </div>
       <div id="computeBox">
         <h3>Compute</h3>
