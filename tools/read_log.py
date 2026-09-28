@@ -80,6 +80,18 @@ def summarize(run):
     auto = max((e.get("autoSwaps", 0) for e in ev if e["a"] == "snap"), default=0)
     if swaps or auto:
         print(f"== GPU swaps: {len(swaps)} by hand ({sum(s['n'] for s in swaps)} GPUs), {auto} GPUs by Remote hands")
+    p2 = [e for e in ev if e["a"] in ("county", "build", "power", "contract")]
+    if p2:
+        print("\n== phase 2")
+        print("  contracts:", dict(Counter(e.get("ev") for e in ev if e["a"] == "contract")))
+        print("  builds started:", dict(Counter(e.get("kind") for e in ev if e["a"] == "build" and e.get("ev") == "start")))
+        print("  grid:", dict(Counter(e.get("ev") for e in ev if e["a"] == "power")))
+        campus = [e for e in ev if e["a"] == "snap" and e.get("p2")]
+        if campus:
+            print("  time   energized delivered backlog late        funds")
+            for s in campus[:: max(1, len(campus) // 20)]:
+                c = s["p2"]
+                print(f"  {mmss(s['t']):>6} {c.get('energizedMW', 0):>9} {c.get('deliveredMW', 0):>9} {c.get('backlogMW', 0):>7} {c.get('late', 0):>4} {s['funds']:>12,}")
 
     snaps = [e for e in ev if e["a"] == "snap"]
     if snaps:

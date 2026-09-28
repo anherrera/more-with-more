@@ -25,8 +25,8 @@ const BUILD_DONE = {
   turbine: () => "A gas turbine came online. The neighbors can hear it.",
   solar: () => "The solar farm is live. It works about a third of the time; the batteries cover the rest, mostly.",
 };
-const UPFRONT_RATE = 1500;   // $ per MW-second of the term, paid when you sign
-const FEE_RATE = 300;        // $ per MW per second while delivered
+const UPFRONT_RATE = 550;    // $ per MW-second of the term, paid when you sign
+const FEE_RATE = 275;        // $ per MW per second while delivered
 const OFFER_TTL = 60;        // offers wait at least this long before walking (spec: never under 45 s)
 const LATE_FREE = 60, LATE_DEFAULT = 180, RENEGOTIATE_SECS = 120, RENEGOTIATE_HYPE = 5;
 const CUSTOMERS = [

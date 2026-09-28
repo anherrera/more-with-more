@@ -29,7 +29,7 @@ def test_sign_pays_upfront_and_adds_backlog(game):
     pg.click(f"button[data-accept='{o['id']}']")
     assert pg.evaluate("() => S.funds") == pytest.approx(funds + o["upfront"])
     assert pg.evaluate("() => backlogMW()") == 30
-    assert o["upfront"] == 30 * o["term"] * 1500
+    assert o["upfront"] == 30 * o["term"] * 550
 
 
 def test_forecast_red_then_green(game):
@@ -51,7 +51,7 @@ def test_delivered_contract_pays_fee(game):
     assert pg.evaluate("() => S.p2.contracts[0].status") == "active"
     funds = pg.evaluate("() => S.funds")
     run(pg, 10)
-    assert pg.evaluate("() => S.funds") == pytest.approx(funds + 10 * 30 * 300, rel=1e-6)
+    assert pg.evaluate("() => S.funds") == pytest.approx(funds + 10 * 30 * 275, rel=1e-6)
     assert pg.inner_text("#gpuCount") == "30 MW"
 
 
