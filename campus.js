@@ -106,12 +106,17 @@ function buyLand() {
 }
 const queueSecs = () => countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN);
 
+// Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered.
+const BUILD_GROWTH = 1.03;
+const buildCost = (kind) => (kind === "hall" ? HALL : POWER[kind]).cost * Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length);
+
 function build(kind) {
   const spec = kind === "hall" ? HALL : POWER[kind];
-  if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < spec.cost) return;
-  S.funds -= spec.cost;
+  const cost = buildCost(kind);
+  if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost) return;
+  S.funds -= cost;
   S.p2.builds.push({ kind, done: S.t + spec.secs });
-  track("build", { ev: "start", kind, cost: Math.round(spec.cost) });
+  track("build", { ev: "start", kind, cost: Math.round(cost) });
   say(kind === "hall" ? `Broke ground on hall ${S.p2.builds.filter((b) => b.kind === "hall").length}. Ready in ${time(spec.secs)}.`
     : `Ordered ${spec.name === "gas turbine" ? "a gas turbine" : "a solar farm with batteries"}. Online in ${time(spec.secs)}.`);
 }
@@ -210,7 +215,27 @@ function renegotiate(id) {
   say(`Pushed ${c.who.split(" (")[0]} back ${time(RENEGOTIATE_SECS)}. The customer agrees. Investors notice.`);
 }
 
+// If GPUs under an active contract disappear (trade-ins, re-rated chips), the contract goes late again with a fresh clock.
+function recheckActive() {
+  const free = {};
+  for (const [g, n] of Object.entries(S.fleet)) if (n > 0) free[g] = n * chip(+g).kw;
+  const active = S.p2.contracts.filter((k) => k.status === "active").sort((a, b) => (a.activeAt || 0) - (b.activeAt || 0) || a.n - b.n);
+  for (const c of active) {
+    let need = c.mw * 1000;
+    for (const g of Object.keys(free).map(Number).sort((a, b) => a - b)) {
+      if (g < (c.minGen || 0) || need <= 0) continue;
+      const take = Math.min(need, free[g]); free[g] -= take; need -= take;
+    }
+    if (need > 1) {
+      c.status = "late"; c.start = S.t; c.warned = false;
+      track("contract", { ev: "lost", mw: c.mw });
+      say(`Lost GPUs under ${c.who.split(" (")[0]}'s contract: ${mwText(need / 1000)} short. The clock restarts; the first minute is on the house.`);
+    }
+  }
+}
+
 function stepContracts(dt) {
+  recheckActive();
   for (const c of [...S.p2.contracts].sort((a, b) => a.start - b.start || a.n - b.n)) {
     if (c.status === "active") {
       S.funds += c.fee * dt; S.p2.earned += c.fee * dt;
@@ -339,12 +364,12 @@ function renderCampus() {
   }
   $("p2cap").textContent = `${mwText(leasedKW() / 1000)} leased + ${mwText(energizedAt())} campus; ${mwText(usedKW() / 1000)} of GPUs racked, room for ${mwText(Math.max(0, capKW() - usedKW()) / 1000)} more`;
   $("p2limit").textContent = campusLimit();
-  $("buildHall").textContent = `Build a hall (${HALL.mw} MW, ${HALL.acres} acres, ${time(HALL.secs)}): ${money(HALL.cost)}`;
-  $("buildHall").disabled = S.funds < HALL.cost || acresFree() < HALL.acres;
-  $("buildTurbine").textContent = `Gas turbine (+${POWER.turbine.mw} MW, ${time(POWER.turbine.secs)}): ${money(POWER.turbine.cost)}`;
-  $("buildTurbine").disabled = S.funds < POWER.turbine.cost;
-  $("buildSolar").textContent = `Solar + batteries (+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}): ${money(POWER.solar.cost)}`;
-  $("buildSolar").disabled = S.funds < POWER.solar.cost || acresFree() < POWER.solar.acres;
+  $("buildHall").textContent = `Build a hall (${HALL.mw} MW, ${HALL.acres} acres, ${time(HALL.secs)}): ${money(buildCost("hall"))}`;
+  $("buildHall").disabled = S.funds < buildCost("hall") || acresFree() < HALL.acres;
+  $("buildTurbine").textContent = `Gas turbine (+${POWER.turbine.mw} MW, ${time(POWER.turbine.secs)}): ${money(buildCost("turbine"))}`;
+  $("buildTurbine").disabled = S.funds < buildCost("turbine");
+  $("buildSolar").textContent = `Solar + batteries (+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}): ${money(buildCost("solar"))}`;
+  $("buildSolar").disabled = S.funds < buildCost("solar") || acresFree() < POWER.solar.acres;
   $("requestQueue").textContent = p.queue
     ? `Interconnection queue: +${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`
     : `Join the interconnection queue (+${mwText(countyOf().queueMW)} in ~${time(queueSecs())}): ${money(QUEUE_DEPOSIT)} deposit`;
