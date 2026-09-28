@@ -54,10 +54,12 @@ before any phase 2 code is written.
 ## Handoff
 
 Breaking ground calls `startCampus()`:
-- `S.phase = 2`. Compute, Training and Facilities panels hide; Investors and the console stay. New
-  panels: **Contracts**, **Campus** (power, water, land), **Community**, **The Model**.
-- The phase 1 fleet stays in its leased space as **legacy colo**: a fixed block of delivered MW (the
-  phase 1 `usedKW()` at breaking ground) that earns a steady fee. It does not grow.
+- `S.phase = 2`. Training and the query business hide (the model is no longer trained); Compute
+  (buy GPUs, chips, trade-ins) and Facilities (leased space) **stay**, because an infra company still
+  buys GPUs and leases space. Investors and the console stay. New panels: **Contracts**, **Campus**
+  (power, water, land), later **Community** and **The Model**.
+- The phase 1 fleet and its leased space carry over unchanged. Those GPUs are your first inventory:
+  whatever isn't under contract is sold **on-demand** (and on **spot**).
 - Your old lab spins out as **your first tenant**: the first contract offer is from it, pre-funded by
   Parallax ("paying you with money that came from Parallax").
 - County choice (one decision, three options with trade-offs), shown before anything else:
@@ -69,12 +71,33 @@ Breaking ground calls `startCampus()`:
 
 ## Core loop: sell capacity, then build it
 
+### Capacity: GPUs in space (revised 2026-09-27 after the user described the real business)
+
+Capacity is **GPUs deployed somewhere**. There are two kinds of somewhere:
+1. **Leased space** in someone else's data center: phase 1's Facilities panel, now at scale. Fast
+   (power and cooling included). In phase 2 the market is **finite**: landlords have a limited number
+   of MW to lease, regrowing slowly as new colos open, and market rent keeps rising. When it's gone:
+   "Leased capacity is sold out in this market."
+2. **Your own site** (the campus, like the Kansas City build): land, power, grid queue, turbines,
+   halls. Slow, cheaper per MW once up, and the only way past what landlords will lease you. A campus
+   hall is a powered shell; GPUs are bought separately and racked in it.
+
+GPUs are always a **separate purchase** from space (Parallax, the Compute panel), in both phases.
+Parallax keeps shipping new chips in phase 2.
+
+**Old GPUs get cheaper, not idle.** Uncontracted GPUs earn on-demand revenue at a rate that drops
+with each newer generation (×0.7 per generation behind, with a floor), while utilization stays high:
+older chips stay busy with inference and smaller jobs. A free project, "Extend the depreciation
+schedule to 6 years", raises reported earnings and hype while changing nothing about the hardware.
+
 ### Contracts (the money)
 Offers arrive every 60 to 120 s. Each: `MW`, `startsIn` (seconds), `term` (seconds), `upfront` ($),
 `fee` ($/s while delivered), and the customer (a lab, a Parallax-funded lab, PivotCloud subleasing,
 a sovereign).
 - **Accept**: `upfront` paid now; contract added to **backlog**. You can sell capacity you haven't built.
-- At `startsIn = 0` the contract **starts**: it claims its MW from energized capacity. If short, it's
+- Each offer names a **minimum chip generation** (the newest, or one behind): labs want current GPUs.
+  Contracts are served from GPUs of that generation or newer, wherever they are racked.
+- At `startsIn = 0` the contract **starts**: it claims its MW from eligible GPUs. If short, it's
   **late** and a warning names the shortfall ("Short 30 MW: power"). Costs escalate slowly (see
   "Keep deadlines low-stress" below): first only the lost fee, then a penalty per second and hype,
   and only after a long grace period a **default** (clawback of part of the upfront, a big hype hit,
@@ -85,8 +108,9 @@ a sovereign).
 - **Backlog** = total MW signed but not yet delivered. It sizes the debt facility.
 
 **Keep deadlines low-stress** (a design rule, not a tuning knob):
-- Every offer shows a **delivery forecast** at its start date: "You'll have 40 MW free by then ✓" or
-  "Short 20 MW: needs a hall and power". Signing only green offers means never being late.
+- Every offer shows a **delivery forecast**: "✓ 40 MW of P5+ on hand", "✓ covered if you buy 20 MW of
+  P6 (≈$15M); you have the space", or "Short 20 MW of space: lease or build". Signing only green offers
+  means never being late.
 - **Late is mild at first**: for the first 60 s late, the only cost is the fee not being paid. No
   penalty, no hype hit.
 - **Renegotiate once** per contract: push the start date back (e.g. +2 min) for a small hype cost
@@ -106,7 +130,9 @@ Capacity is built as **halls**, 50 MW each. A hall costs money, takes build time
   cooling uses more water per MW until the model proposes dry cooling.
 
 ### Money
-- Contracts' upfront cash and fees are the main income. Legacy colo pays a trickle.
+- Contracts' upfront cash and fees are the main income; on-demand and spot sales of uncontracted
+  GPUs are the rest.
+- **Raises continue** in phase 2 (Series E onward), gated on backlog and hype.
 - **Debt** is sized on backlog, not hype ("GPU-backed securities"), with phase 1's leverage-based
   margin calls still in force.
 - Hype still gates raises and debt draws and still has froth, reality checks and PivotCloud.
