@@ -388,9 +388,38 @@ function renderFleet() {
   }
 }
 
+// The single most useful thing to do right now, in plain words.
+function nextMove() {
+  const first = (who) => who.split(" (")[0];
+  const cap = (x) => x[0].toUpperCase() + x.slice(1);
+  const late = S.p2.contracts.find((c) => c.status === "late");
+  const soon = S.p2.contracts.filter((c) => c.status === "waiting" && c.start - S.t < 120).sort((a, b) => a.start - b.start)
+    .find((c) => forecast(c).kind !== "hand");
+  const target = late || soon;
+  if (target) {
+    const need = Math.max(0, target.mw - eligibleFreeMW(target.minGen || 0));
+    const how = roomMWAt(S.t) >= need ? `buy ${mwText(need)} of ${newest().name}s under Compute`
+      : tradeableMW(target.minGen || 0) > 0 ? "trade in old chips under Fleet, then buy new ones"
+      : S.p2.market >= COLO_MW ? "lease colo, then buy GPUs" : "build halls and power, or push the date";
+    return `${late ? "Late" : "Due soon"}: ${first(target.who)} needs ${mwText(need)} more of ${genName(target.minGen || 0)}. ${cap(how)}.`;
+  }
+  const good = S.p2.offers.find((o) => forecast(o).ok);
+  if (good) return `Sign ${first(good.who)}'s offer: ${forecast(good).text.replace("\u2713 ", "")}`;
+  const room = roomMWAt(S.t);
+  if (room < 5) {
+    const oldGens = Object.keys(S.fleet).map(Number).some((g) => !contractReady(g) && tradeCount(g) > 0);
+    if (oldGens) return "Space is full. Trade in old chips under Fleet to make room for new ones, or keep them earning on-demand and add space.";
+    if (S.p2.market >= COLO_MW) return "Space is full. Lease colo, or build campus halls with power, to grow.";
+    return "Space is full and colo is sold out. Build halls and power on your campus.";
+  }
+  if (S.funds + S.credits > gpuPrice() * 10) return `You have room for ${mwText(room)}. Buy GPUs: they earn on-demand until a contract needs them.`;
+  return "Wait for offers. Post to keep hype up: raises and debt draws need it.";
+}
+
 let lastOfferKey = null, lastContractKey = null;
 function renderContracts() {
   const p = S.p2;
+  $("nextMove").textContent = `Next: ${nextMove()}`;
   $("countLabel").textContent = "Delivered";
   $("gpuCount").textContent = `${mwText(deliveredMW())}`;
   $("backlog").textContent = `${mwText(backlogMW())}`;
