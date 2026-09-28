@@ -15,7 +15,7 @@ def test_mid_game_panels(game):
     assert len(pg.query_selector_all("#leases button")) == 5
     assert pg.inner_text("#cooling") == "Two-phase immersion, 200 kW/rack for new leases"
     assert "next: Gen 7, then break ground" in pg.inner_text("#hypeNote")
-    ground = pg.query_selector("button[data-id='ground']")
+    ground = pg.locator("button[data-id='ground']")
     assert "Still need to: train Gen 7" in ground.inner_text()
     assert not ground.is_enabled()
 
@@ -28,7 +28,7 @@ def test_buy_ten(game):
 
 def test_ground_ready(game):
     pg = game(READY, test=False)
-    ground = pg.query_selector("button[data-id='ground']")
+    ground = pg.locator("button[data-id='ground']")
     assert "Ready." in ground.inner_text()
     assert ground.is_enabled()
 
