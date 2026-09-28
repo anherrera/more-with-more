@@ -60,3 +60,12 @@ def test_depreciation_project(game):
     hype = pg.evaluate("() => S.hype")
     pg.click("button[data-id='depr6']")
     assert pg.evaluate("() => S.hype") == pytest.approx(hype + 20)
+
+
+def test_newer_chips_rent_for_more(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.chipIdx = 4; S.fleet = {4: 10000}; S.gpus = 10000; }")
+    mw = fleet_mw(pg)
+    assert pg.evaluate("() => onDemandRevenue()") == pytest.approx(mw * OD * (1.6 / 1.4))
+    offer = pg.evaluate("() => { S.p2.offers = []; makeOffer(); return S.p2.offers[0]; }")
+    assert offer["fee"] == pytest.approx(offer["mw"] * 275 * (1.6 / 1.4) ** (offer["minGen"] - 3))

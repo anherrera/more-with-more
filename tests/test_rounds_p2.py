@@ -15,6 +15,6 @@ def test_series_e_needs_backlog(game):
     pg.evaluate("() => { S.p2.offers = []; makeOffer(); const o = S.p2.offers[0]; o.mw = 100; acceptOffer(o.id); render(); }")
     funds = pg.evaluate("() => S.funds")
     pg.click("#raise")
-    assert pg.evaluate("() => S.funds") - funds == 250e6
+    assert pg.evaluate("() => S.funds") - funds == 100e6
     assert pg.evaluate("() => S.p2.round") == 1
     assert "Series F" in pg.inner_text("#raise")

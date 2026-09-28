@@ -36,8 +36,8 @@ const CUSTOMERS = [
   "A sovereign AI fund", "A lab you have never heard of with $4B", "A chatbot company that is also a hardware company",
 ];
 const ROUNDS2 = [
-  { name: "Series E", backlog: 100, amount: 250e6 }, { name: "Series F", backlog: 300, amount: 800e6 },
-  { name: "Series G", backlog: 700, amount: 2e9 },
+  { name: "Series E", backlog: 100, amount: 100e6 }, { name: "Series F", backlog: 300, amount: 250e6 },
+  { name: "Series G", backlog: 700, amount: 600e6 },
 ];
 const campusRound = () => ROUNDS2[S.p2.round || 0];
 function raiseCampus() {
@@ -74,7 +74,8 @@ function freeKWByGen() {
   }
   return free;
 }
-const odRate = (g) => OD_RATE * Math.max(OD_FLOOR, Math.pow(OD_DECAY, S.chipIdx - g));
+const genPrice = (g) => Math.pow(1.6 / 1.4, g - 3);   // rates track each chip's launch price per kW (P4 = 1): newer chips rent for more
+const odRate = (g) => OD_RATE * genPrice(g) * Math.max(OD_FLOOR, Math.pow(OD_DECAY, S.chipIdx - g));
 const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g) * OD_UTIL, 0) * (S.block ? 0.5 : 1);
 const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
 const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
@@ -140,7 +141,7 @@ function makeOffer(first = false) {
   const term = 480 + Math.floor(Math.random() * 420);
   const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
   S.p2.offers.push({ id: `o${n}`, n, who, mw, minGen, start: S.t + startsIn, term,
-    upfront: mw * term * UPFRONT_RATE, fee: mw * FEE_RATE, expires: S.t + (first ? 280 : OFFER_TTL) });
+    upfront: mw * term * UPFRONT_RATE * genPrice(minGen), fee: mw * FEE_RATE * genPrice(minGen), expires: S.t + (first ? 280 : OFFER_TTL) });
   track("contract", { ev: "offer", mw });
 }
 

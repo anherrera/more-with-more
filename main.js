@@ -468,7 +468,7 @@ function render() {
   $("spotBox").hidden = !spotOpen();
   if (spotOpen()) {
     const m = spotMult();
-    $("spotNow").textContent = S.phase === 2 ? `${money(OD_RATE * m)}/MW-s for ${newest().name}s (${m.toFixed(1)}x on-demand)`
+    $("spotNow").textContent = S.phase === 2 ? `${money(OD_RATE * genPrice(S.chipIdx) * m)}/MW-s for ${newest().name}s (${m.toFixed(1)}x on-demand)`
       : `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
     $("spotNow").className = m >= 2 ? "good" : m < 1 ? "bad" : "";
     $("spot").disabled = !spotReady();

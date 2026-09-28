@@ -39,7 +39,7 @@ def test_sign_pays_upfront_and_adds_backlog(game):
     o = sign_first(pg)
     assert pg.evaluate("() => S.funds") == pytest.approx(funds + o["upfront"])
     assert pg.evaluate("() => backlogMW()") == 30
-    assert o["upfront"] == 30 * o["term"] * 550
+    assert o["upfront"] == pytest.approx(30 * o["term"] * 550 * (1.6 / 1.4) ** -3)   # old lab: any GPUs, P1 pricing
 
 
 def test_forecast_hand_then_buy_then_space(game):
@@ -59,7 +59,7 @@ def test_delivered_contract_pays_fee(game):
     assert pg.evaluate("() => S.p2.contracts[0].status") == "active"
     earned = pg.evaluate("() => S.p2.earned")
     run(pg, 10)
-    assert pg.evaluate("() => S.p2.earned") == pytest.approx(earned + 10 * 30 * 275, rel=1e-6)
+    assert pg.evaluate("() => S.p2.earned") == pytest.approx(earned + 10 * 30 * 275 * (1.6 / 1.4) ** -3, rel=1e-6)
     assert pg.inner_text("#gpuCount") == "30 MW"
 
 

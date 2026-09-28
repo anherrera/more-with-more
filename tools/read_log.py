@@ -88,10 +88,11 @@ def summarize(run):
         print("  grid:", dict(Counter(e.get("ev") for e in ev if e["a"] == "power")))
         campus = [e for e in ev if e["a"] == "snap" and e.get("p2")]
         if campus:
-            print("  time   energized delivered backlog late        funds")
+            print("  time   fleetMW leasedMW campusMW market delivered backlog late        funds")
             for s in campus[:: max(1, len(campus) // 20)]:
                 c = s["p2"]
-                print(f"  {mmss(s['t']):>6} {c.get('energizedMW', 0):>9} {c.get('deliveredMW', 0):>9} {c.get('backlogMW', 0):>7} {c.get('late', 0):>4} {s['funds']:>12,}")
+                print(f"  {mmss(s['t']):>6} {c.get('fleetMW', 0):>8} {c.get('leasedMW', 0):>8} {c.get('energizedMW', 0):>8} {c.get('market', 0):>6} "
+                      f"{c.get('deliveredMW', 0):>9} {c.get('backlogMW', 0):>7} {c.get('late', 0):>4} {s['funds']:>12,}")
 
     snaps = [e for e in ev if e["a"] == "snap"]
     if snaps:
