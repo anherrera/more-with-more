@@ -61,3 +61,15 @@ def test_phase2_survives_reload(game):
     pg.reload()
     assert pg.evaluate("() => [S.phase, S.p2.county]") == [2, "cheap"]
     assert pg.is_visible("#campusBox")
+
+
+def test_inherited_debt_is_refinanced(game):
+    pg = game({**READY, "debt": 5e8})
+    break_ground(pg)
+    pg.click("button[data-county='cheap']")
+    pg.evaluate("() => { S.p2.legacyMW = 0; S.p2.offers = []; S.p2.nextOffer = 1e9; }")
+    before = pg.evaluate("() => S.funds")
+    run(pg, 10)
+    # project-finance rate: a quarter of the phase 1 facility's
+    assert abs((before - pg.evaluate("() => S.funds")) - 5e8 * 0.0002 * 0.25 * 10) < 1
+    assert "refinanced" in pg.inner_text("#console")

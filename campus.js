@@ -13,6 +13,7 @@ const COUNTIES = [
     gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6 },
 ];
 const LEGACY_FEE = 100;   // $/s per MW of the phase 1 fleet left in leased colo
+const P2_RATE = 0.25;     // phase 1 debt is refinanced as project finance at a quarter of the facility's rate
 const HALL = { mw: 50, acres: 20, cost: 30e6, secs: 90 };   // a hall is 50 MW of GPUs once it has power
 const POWER = {
   turbine: { name: "gas turbine", mw: 50, cost: 25e6, secs: 60, acres: 0 },
@@ -125,8 +126,9 @@ function declineOffer(id) {
 function renegotiate(id) {
   const c = S.p2.contracts.find((x) => x.id === id);
   if (!c || c.reneg || (c.status !== "waiting" && c.status !== "late")) return;
-  c.start += RENEGOTIATE_SECS; c.end += RENEGOTIATE_SECS; c.reneg = true; c.warned = false;
-  if (c.status === "late") c.status = "waiting";
+  const term = c.end - c.start;
+  c.start = (c.status === "late" ? S.t : c.start) + RENEGOTIATE_SECS;   // late: two minutes from now, not from the missed date
+  c.end = c.start + term; c.reneg = true; c.warned = false; c.status = "waiting";
   S.hype = Math.max(5, S.hype - RENEGOTIATE_HYPE);
   track("contract", { ev: "renegotiate", mw: c.mw });
   say(`Pushed ${c.who.split(" (")[0]} back ${time(RENEGOTIATE_SECS)}. The customer agrees. Investors notice.`);
@@ -156,9 +158,10 @@ function stepContracts(dt) {
     if (!c.warned && late >= LATE_DEFAULT - 60) { c.warned = true; say(`${c.who.split(" (")[0]} walks in 60s unless you deliver ${fmt(c.mw)} MW or push the date.`); }
     if (late >= LATE_DEFAULT) {
       c.status = "defaulted"; c.end = S.t;
-      S.funds -= 0.5 * c.upfront; S.hype = Math.max(5, S.hype - 20); S.nextDraw = Math.max(S.nextDraw, S.t + 120);
+      // Full clawback: walking away never pays.
+      S.funds -= c.upfront; S.hype = Math.max(5, S.hype - 20); S.nextDraw = Math.max(S.nextDraw, S.t + 120);
       track("contract", { ev: "default", mw: c.mw });
-      say(`${c.who.split(" (")[0]} walked. They clawed back ${money(0.5 * c.upfront)}, told everyone, and the lenders froze your draws.`);
+      say(`${c.who.split(" (")[0]} walked. They clawed back the full ${money(c.upfront)}, told everyone, and the lenders froze your draws.`);
     }
   }
   S.p2.contracts = S.p2.contracts.filter((c) => live(c) || S.t - c.end < 60);
@@ -173,6 +176,7 @@ function startCampus() {
   milestone("phase 2: the campus");
   say("We are an infrastructure company now.");
   say(`Your ${fmt(S.p2.legacyMW)} MW of GPUs stay in the colo as legacy capacity. The model has opinions about which county is next.`);
+  if (S.debt > 0) say(`Lenders love infrastructure. Your ${money(S.debt)} was refinanced as project finance at a quarter of the rate.`);
 }
 
 function chooseCounty(id) {

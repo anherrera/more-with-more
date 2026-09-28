@@ -292,7 +292,8 @@ function rollback() {
 }
 
 // A debt facility secured by your GPUs, sized by hype. Opens once you lease a data hall.
-const DRAW_HYPE = 60, INTEREST = 0.0002;                  // per second on outstanding debt (~1.2%/min)
+const DRAW_HYPE = 60, INTEREST = 0.0002;
+const interestPerSec = () => S.debt * INTEREST * (S.phase === 2 ? P2_RATE : 1);                  // per second on outstanding debt (~1.2%/min)
 const drawSize = () => S.phase === 2 ? campusDrawSize() : (S.hype / 100) * 3 * Math.pow(5, S.gen) * 1000;
 const facilityOpen = () => S.phase === 2 || S.tier >= 3;
 const drawReady = () => facilityOpen() && S.hype >= DRAW_HYPE && S.t >= S.nextDraw;
@@ -349,7 +350,7 @@ function step(dt) {
   if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
   if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
-  S.funds -= S.debt * INTEREST * dt;
+  S.funds -= interestPerSec() * dt;
   if (db && S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
 }
 
@@ -435,7 +436,7 @@ function render() {
   $("credits").className = S.credits > 0 ? "hot" : "";
   $("debtRow").hidden = S.debt <= 0;
   $("debt").textContent = moneyFull(S.debt);
-  $("interest").textContent = S.debt > 0 ? `(interest ${money(S.debt * INTEREST)}/s)` : "";
+  $("interest").textContent = S.debt > 0 ? `(interest ${money(interestPerSec())}/s)` : "";
   $("repay").hidden = S.debt <= 0;
   $("repay").disabled = S.funds < 1;
   $("repay").textContent = S.funds >= S.debt ? `Pay off the debt: ${money(S.debt)}` : `Pay down debt: ${money(Math.max(0, S.funds))}`;

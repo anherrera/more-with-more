@@ -155,3 +155,29 @@ def test_debt_sized_on_backlog(game):
     pg.evaluate("""() => { S.p2.offers = []; makeOffer(); const o = S.p2.offers[0]; o.mw = 100; acceptOffer(o.id); }""")
     assert pg.evaluate("() => drawSize()") == pytest.approx(0.8 * 100 * 300000)
     assert pg.is_visible("#draw")
+
+
+def test_default_is_never_profitable(game):
+    pg = campus(game)
+    o = first_offer(pg)
+    funds = pg.evaluate("() => S.funds")
+    pg.click(f"button[data-accept='{o['id']}']")
+    pg.evaluate(f"() => {{ S.t = {o['start']}; }}")
+    run(pg, 181)
+    assert pg.evaluate("() => S.p2.contracts[0].status") == "defaulted"
+    assert pg.evaluate("() => S.funds") < funds
+
+
+def test_push_date_when_late_counts_from_now(game):
+    pg = campus(game)
+    o = first_offer(pg)
+    pg.click(f"button[data-accept='{o['id']}']")
+    pg.evaluate(f"() => {{ S.t = {o['start']} + 150; }}")
+    run(pg, 1)
+    cid = pg.evaluate("() => S.p2.contracts[0].id")
+    now = pg.evaluate("() => S.t")
+    pg.click(f"button[data-reneg='{cid}']")
+    c = pg.evaluate("() => S.p2.contracts[0]")
+    assert c["status"] == "waiting"
+    assert c["start"] == now + 120
+    assert c["end"] - c["start"] == o["term"]

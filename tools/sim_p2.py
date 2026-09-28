@@ -11,9 +11,10 @@ UPFRONT_RATE, FEE_RATE, LEGACY_FEE = 550, 275, 100
 QUEUE_DEPOSIT, QUEUE_GROWTH = 5e6, 1.3
 LATE_FREE, LATE_DEFAULT, OFFER_TTL = 60, 180, 60
 DEAL_EVERY, DEAL = 90, HALL["cost"] * 0.5
+INTEREST, P2_RATE = 0.0002, 0.25          # phase 1 debt refinanced at a quarter of the rate
 
 
-def run(county="strong", minutes=25, seed=1, funds=60e6, legacy=110, verbose=True):
+def run(county="strong", minutes=25, seed=1, funds=60e6, legacy=110, debt=0.0, verbose=True):
     rnd = random.Random(seed)
     c = COUNTIES[county]
     S = dict(t=0, funds=funds + c["cash"], credits=0.0, grid=c["grid"], queue=None, qn=0, builds=[],
@@ -46,7 +47,7 @@ def run(county="strong", minutes=25, seed=1, funds=60e6, legacy=110, verbose=Tru
         S["t"] += 1; t = S["t"]; acted = False
         if S["queue"] and t >= S["queue"][1]:
             S["grid"] += S["queue"][0]; S["queue"] = None; S["qn"] += 1
-        S["funds"] += legacy * LEGACY_FEE
+        S["funds"] += legacy * LEGACY_FEE - debt * INTEREST * P2_RATE
         if t >= S["next_deal"]:
             S["credits"] += DEAL; S["next_deal"] = t + DEAL_EVERY
         S["offers"] = [o for o in S["offers"] if o["expires"] > t and o["start"] > t]
@@ -64,7 +65,7 @@ def run(county="strong", minutes=25, seed=1, funds=60e6, legacy=110, verbose=Tru
                     k["status"] = "late"; late = t - k["start"]
                     if late > LATE_FREE: S["funds"] -= 0.5 * k["fee"]
                     if late >= LATE_DEFAULT:
-                        k["status"] = "defaulted"; S["funds"] -= 0.5 * k["upfront"]; S["defaults"] += 1
+                        k["status"] = "defaulted"; S["funds"] -= k["upfront"]; S["defaults"] += 1
         # player: sign offers it can cover by building in time with money on hand
         for o in list(S["offers"]):
             need = max(0, o["mw"] - spare_at(o["start"]))
@@ -101,7 +102,7 @@ def run(county="strong", minutes=25, seed=1, funds=60e6, legacy=110, verbose=Tru
             rows.append((t // 60, energized(t), delivered(), sum(k["mw"] for k in S["contracts"] if k["status"] in ("waiting", "late")),
                          sum(1 for k in S["contracts"] if k["status"] == "late"), S["funds"], S["credits"]))
     if verbose:
-        print(f"county={county} seed={seed}")
+        print(f"county={county} seed={seed} debt={debt:,.0f}")
         print(" min  energized delivered backlog late          funds       credits")
         for r in rows:
             print(f"{r[0]:>4} {r[1]:>10.0f} {r[2]:>9.0f} {r[3]:>7.0f} {r[4]:>4} {r[5]:>14,.0f} {r[6]:>13,.0f}")
@@ -110,7 +111,7 @@ def run(county="strong", minutes=25, seed=1, funds=60e6, legacy=110, verbose=Tru
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("--county", default="strong"); ap.add_argument("--minutes", type=int, default=25)
+    ap = argparse.ArgumentParser(); ap.add_argument("--county", default="strong"); ap.add_argument("--minutes", type=int, default=25); ap.add_argument("--debt", type=float, default=0)
     a = ap.parse_args()
     for county in ([a.county] if a.county != "all" else list(COUNTIES)):
-        run(county, a.minutes)
+        run(county, a.minutes, debt=a.debt)
