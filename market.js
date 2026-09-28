@@ -2,7 +2,8 @@
 // Ownership = founder shares / all shares. Every raise mints shares; secondaries move your shares into your pocket.
 
 const DILUTION = { "Pre-seed": 0.10, Seed: 0.15, "Series A": 0.20, "Series B": 0.15, "Series C": 0.12, "Series D": 0.10, "Series E": 0.08 };
-const MULTIPLE = 8, IPO_FLOAT = 0.10, IPO_DISCOUNT = 0.85, LOCKUP = 300;
+const REV_MULTIPLE = 20000, IPO_FLOAT = 0.10, IPO_DISCOUNT = 0.85, LOCKUP = 120;
+const IPO_BACKLOG = 400, IPO_CAMPUS = 600;
 const FOLLOW_ON = 0.08, FOLLOW_ON_EVERY = 300, SECONDARY = 0.01, SECONDARY_EVERY = 60;
 
 // Saves from before the cap table: rebuild it from the rounds already raised.
@@ -29,7 +30,8 @@ function dilute(fraction, amount, name) {
 }
 
 // ---- the public company ----
-const fundamentalCap = () => Math.max(capOf().lastVal, (S.phase === 2 ? campusRevenue() : 0) * 3.15e7 * MULTIPLE * (0.5 + S.hype / 100));
+// Game-scale valuation: ~30,000 seconds of revenue, times hype. (Real multiples would make the IPO dwarf the whole economy.)
+const fundamentalCap = () => Math.max(capOf().lastVal, (S.phase === 2 ? campusRevenue() : 0) * REV_MULTIPLE * (0.5 + S.hype / 100));
 // The classic arc: priced below range, pops 300% on day one, gives back 60%, settles.
 function ipoArc(tau) {
   if (tau < 60) return 0.85 + (3.4 - 0.85) * tau / 60;
@@ -44,8 +46,8 @@ const stockPrice = () => {
 };
 const marketCap = () => (isPublic() ? stockPrice() * capOf().shares : fundamentalCap());
 
-const ipoGap = () => backlogMW() < 300 ? `${mwText(300)} of signed backlog (have ${mwText(backlogMW())})`
-  : energizedAt() < 400 ? `${mwText(400)} of campus (have ${mwText(energizedAt())})` : null;
+const ipoGap = () => backlogMW() < IPO_BACKLOG ? `${mwText(IPO_BACKLOG)} of signed backlog (have ${mwText(backlogMW())})`
+  : energizedAt() < IPO_CAMPUS ? `${mwText(IPO_CAMPUS)} of campus (have ${mwText(energizedAt())})` : null;
 
 function ringTheBell() {
   if (isPublic() || ipoGap() || S.hype < HYPE_TO_RAISE) return;

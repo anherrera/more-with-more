@@ -24,8 +24,8 @@ def public_ready(game, **extra):
     pg.click("button[data-id='ground']")
     pg.click("button[data-county='strong']")
     pg.evaluate("""() => { S.rival.next = 1e9; S.nextChip = 1e9; S.p2.nextOffer = 1e9; S.p2.nextColo = 1e9; S.p2.offers = [];
-      S.p2.grid = 99999; for (let i = 0; i < 8; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true});
-      makeOffer(); const o = S.p2.offers[0]; o.mw = 300; o.minGen = 0; o.start = S.t + 5000; acceptOffer(o.id); render(); }""")
+      S.p2.grid = 99999; for (let i = 0; i < 12; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true});
+      makeOffer(); const o = S.p2.offers[0]; o.mw = 400; o.minGen = 0; o.start = S.t + 5000; acceptOffer(o.id); render(); }""")
     return pg
 
 
@@ -58,7 +58,7 @@ def test_lockup_opens_secondaries(game):
     pg = public_ready(game)
     ipo(pg)
     assert pg.is_disabled("#secondary") and "lockup" in pg.inner_text("#secondary").lower()
-    run(pg, 300)
+    run(pg, 120)
     assert "lockup expired" in pg.inner_text("#console").lower()
     assert pg.is_enabled("#secondary")
     funds, own, liq = pg.evaluate("() => [S.funds, ownership(), S.cap.liquidity]")

@@ -20,7 +20,9 @@ LATE_FREE, LATE_DEFAULT, OFFER_TTL = 60, 180, 60
 CHIP_EVERY, DEAL_EVERY, DEAL_MW = 480, 90, 20           # Parallax credits: ~20 MW of the newest GPUs
 LAND_ACRES, LAND_COST, LAND_GROWTH = 200, 15e6, 1.1
 INTEREST, P2_RATE = 0.0002, 0.25
-ROUNDS2 = [(100, 150, 100e6), (300, 400, 250e6), (700, 750, 600e6)]   # (backlog MW, campus MW, amount)
+ROUNDS2 = [(100, 150, 100e6)]   # Series E (backlog MW, campus MW, amount); then the IPO
+REV_MULTIPLE, IPO_FLOAT, FOLLOW_ON, FOLLOW_ON_EVERY = 20000, 0.10, 0.08, 300
+IPO_BACKLOG, IPO_CAMPUS = 400, 600
 BUILD_GROWTH, GOAL_MW = 1.03, 1000
 HYPE = 80                                                      # assume the player keeps hype around here with posts
 
@@ -39,7 +41,7 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
     c = COUNTIES[county]
     S = dict(t=0, funds=funds + c["cash"], credits=0.0, fleet={chip: float(fleet_kw)}, chip=chip, next_chip=CHIP_EVERY,
              leased=float(leased_kw), racks=racks, market=float(MARKET_START_MW), grid=c["grid"], queue=None, qn=0,
-             builds=[], land=0, props=set(), pending_grid=[], goal_at=None, offers=[], contracts=[], next_offer=90, next_deal=0, next_draw=0, debt=debt, round=0,
+             builds=[], land=0, ipo_at=None, last_follow=-1e9, props=set(), pending_grid=[], goal_at=None, offers=[], contracts=[], next_offer=90, next_deal=0, next_draw=0, debt=debt, round=0,
              n=0, defaults=0, idle=0, idle_log=[], acted_log=[])
 
     done = lambda kind, at: sum(1 for b in S["builds"] if b[0] == kind and b[1] <= at)
@@ -121,6 +123,12 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
         # player: money in
         if S["round"] < len(ROUNDS2) and backlog() >= ROUNDS2[S["round"]][0] and campus_kw(t) / 1000 >= ROUNDS2[S["round"]][1]:
             S["funds"] += ROUNDS2[S["round"]][2]; S["round"] += 1; acted = True
+        rev = on_demand() + sum(k["fee"] for k in S["contracts"] if k["status"] == "active")
+        cap = max(100e6 / 0.08, rev * REV_MULTIPLE * (0.5 + HYPE / 100))
+        if S["round"] >= 1 and S["ipo_at"] is None and backlog() >= IPO_BACKLOG and campus_kw(t) >= IPO_CAMPUS * 1000:
+            S["funds"] += 0.85 * cap * IPO_FLOAT / (1 - IPO_FLOAT); S["ipo_at"] = t; acted = True
+        elif S["ipo_at"] is not None and t >= S["last_follow"] + FOLLOW_ON_EVERY and S["funds"] < 200e6:
+            S["funds"] += FOLLOW_ON * cap * 1.2; S["last_follow"] = t; acted = True     # ~1.2x: the post-IPO pop
         # the model's proposals the greedy player approves when affordable (lobbyist, rezone, nuclear, utility)
         P = S["props"]
         if "lobbyist" not in P and S["qn"] + (1 if S["queue"] else 0) > 0 and S["funds"] >= 50e6: S["funds"] -= 50e6; P.add("lobbyist")
@@ -188,7 +196,7 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
             print(f"{r['min']:>4} {r['fleet']:>8.0f} {r['leased']:>8.0f} {r['campus']:>8.0f} {r['delivered']:>9.0f} {r['backlog']:>7.0f} "
                   f"{r['od']:>13,.0f} {r['funds']:>14,.0f} {r['market']:>6.0f} {r['rounds']:>3}")
         goal = f"{S['goal_at'] // 60}:{S['goal_at'] % 60:02d}" if S["goal_at"] else "not reached"
-        print(f"defaults={S['defaults']} idle stretches >90s: {S['idle_log'] or 'none'}  1 GW campus at: {goal}  proposals: {sorted(S['props'])}")
+        print(f"defaults={S['defaults']} idle stretches >90s: {S['idle_log'] or 'none'}  1 GW campus at: {goal}  proposals: {sorted(S['props'])}  IPO at: {S['ipo_at'] and f"{S['ipo_at'] // 60}:{S['ipo_at'] % 60:02d}"}")
     return rows, S
 
 
