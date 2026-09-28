@@ -1,6 +1,6 @@
 # More With More, phase 2 ("The Campus"): design
 
-Status: draft for review, 2026-09-27. Supersedes the loose notes in `PHASE2.md` where they disagree.
+Status: approved 2026-09-27. Supersedes the loose notes in `PHASE2.md` where they disagree.
 
 ## Intent
 
@@ -75,13 +75,24 @@ Offers arrive every 60 to 120 s. Each: `MW`, `startsIn` (seconds), `term` (secon
 a sovereign).
 - **Accept**: `upfront` paid now; contract added to **backlog**. You can sell capacity you haven't built.
 - At `startsIn = 0` the contract **starts**: it claims its MW from energized capacity. If short, it's
-  **late**: a penalty per second (a share of `fee`), hype drops, and a warning names the shortfall
-  ("Short 30 MW: power"). After a grace period a late contract **defaults**: clawback of part of the
-  upfront, a big hype hit, and lenders review (draws frozen).
+  **late** and a warning names the shortfall ("Short 30 MW: power"). Costs escalate slowly (see
+  "Keep deadlines low-stress" below): first only the lost fee, then a penalty per second and hype,
+  and only after a long grace period a **default** (clawback of part of the upfront, a big hype hit,
+  lenders review and freeze draws).
 - While delivered it pays `fee`/s; at the end of `term` the MW frees up.
 - Starting values: `upfront = MW × term × 400`, `fee = MW × 200`/s (tune in `sim_p2.py`). Offer size
   grows with backlog and hype.
 - **Backlog** = total MW signed but not yet delivered. It sizes the debt facility.
+
+**Keep deadlines low-stress** (a design rule, not a tuning knob):
+- Every offer shows a **delivery forecast** at its start date: "You'll have 40 MW free by then ✓" or
+  "Short 20 MW: needs a hall and power". Signing only green offers means never being late.
+- **Late is mild at first**: for the first 60 s late, the only cost is the fee not being paid. No
+  penalty, no hype hit.
+- **Renegotiate once** per contract: push the start date back (e.g. +2 min) for a small hype cost
+  ("The customer agrees. Investors notice.").
+- **Default only after a long grace period** (e.g. 3 min late), with console warnings well before it.
+- Offers never expire faster than ~45 s, and there is no penalty for declining or ignoring them.
 
 ### Halls (the spend)
 Capacity is built as **halls**, 50 MW each. A hall costs money, takes build time, and needs:
