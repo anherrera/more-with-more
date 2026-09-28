@@ -99,6 +99,11 @@
     <div class="sub" id="endingStats"></div>
     <div class="btns"><button id="toCampus" type="button" class="primary">Break ground: start phase 2</button></div>
   </div>
+  <div class="ending" id="ending2" hidden>
+    <p>&ldquo;I could do more with more.&rdquo;</p>
+    <div class="sub" id="ending2Stats"></div>
+    <div class="sub">Phase 3: the model has found another county. It has found several. The Moon has no water rights.</div>
+  </div>
 
   <div class="cols">
     <div class="col">
@@ -143,6 +148,17 @@
       <div id="countyBox" hidden>
         <h3>Pick a county</h3>
         <div class="choices" id="counties"></div>
+      </div>
+      <div id="modelBox" hidden>
+        <h3>The Model</h3>
+        <div class="line" id="goalLine"></div>
+        <div class="meter good" id="goalMeter"><i></i></div>
+        <div class="line sub" id="autonomy"></div>
+        <div id="proposal" class="deal" hidden>
+          <div class="line hot" id="propTitle"></div>
+          <div class="line sub" id="propText"></div>
+          <div class="btns"><button id="propYes" type="button" class="primary"></button><button id="propNo" type="button">Not now</button></div>
+        </div>
       </div>
       <div id="contractsBox" hidden>
         <h3>Contracts</h3>
@@ -240,4 +256,5 @@
 <script src="globals.js"></script>
 <script src="projects.js"></script>
 <script src="campus.js"></script>
+<script src="model.js"></script>
 <script src="main.js"></script>

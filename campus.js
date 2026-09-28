@@ -95,7 +95,7 @@ const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) 
 const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
 const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + (b.kind === "hall" ? HALL.acres : POWER[b.kind].acres), 0);
-const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres - acresUsed();
+const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
 const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0);
 function buyLand() {
   if (!S.p2.county || S.funds < landCost()) return;
@@ -104,7 +104,8 @@ function buyLand() {
   say(S.p2.landN === 1 ? "Bought the adjacent parcel. The farmer said it had been in the family for four generations. The check cleared in one."
     : `Bought another ${LAND.acres} acres. The county assessor has started waving at you.`);
 }
-const queueSecs = () => countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN);
+const queueSecs = () => modelDone("utility") ? 0
+  : countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN) * (modelDone("lobbyist") ? 0.5 : 1) * (S.done.lawyer ? 0.7 : 1);
 
 // Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered.
 const BUILD_GROWTH = 1.03;
@@ -182,7 +183,7 @@ function makeOffer(first = false) {
   const term = 480 + Math.floor(Math.random() * 420);
   const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
   S.p2.offers.push({ id: `o${n}`, n, who, mw, minGen, start: S.t + startsIn, term,
-    upfront: mw * term * UPFRONT_RATE * genPrice(minGen), fee: mw * FEE_RATE * genPrice(minGen), expires: S.t + (first ? 280 : OFFER_TTL) });
+    upfront: mw * term * UPFRONT_RATE * genPrice(minGen) * (modelDone("pricing") ? 1.3 : 1) * (S.done.resdesk ? 1.2 : 1), fee: mw * FEE_RATE * genPrice(minGen), expires: S.t + (first ? 280 : OFFER_TTL) });
   track("contract", { ev: "offer", mw });
 }
 
@@ -274,13 +275,15 @@ const campusDealSize = () => 20000 / newest().kw * gpuPrice();   // Parallax cre
 
 // Saves from before chip generations mattered: default missing fields.
 function migrateCampus() {
+  modelOf();
+  if (S.p2.startChip == null) S.p2.startChip = S.chipIdx;
   if (S.p2.market == null) S.p2.market = MARKET_START_MW;
   for (const x of [...S.p2.offers, ...S.p2.contracts]) if (x.minGen == null) x.minGen = 0;
 }
 
 function startCampus() {
   if (S.phase === 2) return;
-  S.phase = 2; S.p2 = freshP2();
+  S.phase = 2; S.p2 = freshP2(); S.p2.startChip = S.chipIdx; S.p2.model = freshModel();
   milestone("phase 2: the campus");
   say("We are an infrastructure company now.");
   say(`Your ${mwText(usedKW() / 1000)} of GPUs stay in the space you already lease. Whatever isn't under contract sells on-demand. The model has opinions about which county is next.`);
@@ -317,6 +320,7 @@ function stepCampus(dt) {
   S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
   if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + 60 + Math.random() * 60; }
   stepContracts(dt);
+  stepModel();
 }
 
 const campusSnap = () => ({ county: S.p2.county, fleetMW: Math.round(usedKW() / 1000), leasedMW: Math.round(leasedKW() / 1000), market: Math.round(S.p2.market), grid: S.p2.grid, queue: !!S.p2.queue,
@@ -333,6 +337,8 @@ function renderCampus() {
     : `Colo sold out: next one opens in ~${time(Math.max(0, (p.nextColo || S.t) - S.t))}`;
   $("leaseColo").disabled = p.market < COLO_MW || S.funds < coloCost();
   renderFleet();
+  $("modelBox").hidden = !p.county;
+  if (p.county) renderModel();
   if (!p.county) { $("countLabel").textContent = "Fleet"; $("gpuCount").textContent = `${mwText(usedKW() / 1000)}`; }
   $("countyBox").hidden = !!p.county;
   $("campusBox").hidden = $("contractsBox").hidden = !p.county;
@@ -505,6 +511,7 @@ function renderContracts() {
 }
 
 function wireCampus() {
+  wireModel();
   $("counties").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-county]");
     if (b) { chooseCounty(b.dataset.county); render(); }

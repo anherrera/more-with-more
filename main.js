@@ -48,18 +48,18 @@ const fitGPUs = () => Math.floor(capKW() / KW_PER_GPU);
 const PMAX = 500, N0 = 9900;                                         // volume pricing: price stops rising at $500 (~10k GPUs)
 const newest = () => chip(S.chipIdx);
 const basePrice = (n = S.gpus) => Math.min(PMAX, 5 * (1 + n / 100));
-const gpuPrice = (n = S.gpus) => basePrice(n) * newest().priceMult;
+const gpuPrice = (n = S.gpus) => basePrice(n) * newest().priceMult * gpuDiscount();
 const usedKW = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).kw, 0);
 const totalPerf = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).perf, 0);
 const avgPerf = () => (S.gpus > 0 ? totalPerf() / S.gpus : newest().perf);
 const roomNewest = () => Math.max(0, Math.floor((capKW() - usedKW()) / newest().kw + 1e-9));
 const F = (n) => n <= N0 ? 250 * Math.pow(1 + n / 100, 2)             // cumulative cost of the first n GPUs
   : 250 * Math.pow(1 + N0 / 100, 2) + PMAX * (n - N0);
-const costOf = (k) => (F(S.gpus + k) - F(S.gpus)) * newest().priceMult;
+const costOf = (k) => (F(S.gpus + k) - F(S.gpus)) * newest().priceMult * gpuDiscount();
 const maxBuy = (wallet = S.funds + S.credits) => {                   // as many as fit and the wallet covers
   const room = roomNewest();
   if (room <= 0 || wallet <= 0) return 0;
-  const target = F(S.gpus) + wallet / newest().priceMult;
+  const target = F(S.gpus) + wallet / (newest().priceMult * gpuDiscount());
   const nMax = target <= F(N0) ? 100 * (Math.sqrt(target / 250) - 1) : N0 + (target - F(N0)) / PMAX;
   const k = Math.floor(nMax - S.gpus);
   let n = Math.max(0, Math.min(room, k));
