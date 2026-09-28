@@ -115,6 +115,11 @@ const backlogMW = () => S.p2.contracts.filter((c) => c.status === "waiting" || c
 const genName = (g) => (g <= 0 ? "any GPUs" : `${chip(g).name}+ GPUs`);
 const eligibleFreeMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g >= minGen ? kw : 0), 0) / 1000;
 const roomMWAt = (at) => Math.max(0, (leasedKW() + campusKWAt(at) - usedKW()) / 1000);
+// Older chips not under contract: trading them in frees their space for newer ones.
+const tradeableMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g < minGen ? kw : 0), 0) / 1000;
+// The most you could deliver of this generation: on hand, free room, the lease market, trade-ins, and land left for halls.
+const deliverableMW = (minGen) => eligibleFreeMW(minGen) + roomMWAt(S.t) + Math.max(0, S.p2.market) + tradeableMW(minGen) +
+  (S.p2.county ? Math.floor(acresFree() / HALL.acres) * HALL.mw : 0);
 const pendingBefore = (o) => S.p2.contracts
   .filter((c) => (c.status === "waiting" || c.status === "late") && c.id !== o.id && c.start < o.start + o.term).reduce((a, c) => a + c.mw, 0);
 
@@ -128,15 +133,19 @@ function forecast(o) {
     return { ok: true, kind: "buy", buy, text: `✓ Covered if you buy ${fmt(buy)} MW of ${newest().name}s ` +
       `(≈${money(buy * 1000 / newest().kw * gpuPrice())}); you have the space.` };
   }
-  const short = buy - Math.max(0, room);
-  return { ok: false, kind: "space", short, text: `Short ${fmt(short)} MW of space: lease or build.` };
+  const short = buy - Math.max(0, room), trade = tradeableMW(o.minGen);
+  if (trade >= short) {
+    return { ok: true, kind: "trade", buy, text: `\u2713 Trade in older chips to free ${fmt(short)} MW, then buy ${fmt(buy)} MW of ${newest().name}s.` };
+  }
+  return { ok: false, kind: "space", short, text: `Short ${fmt(short - trade)} MW of space: lease or build${trade > 0 ? ", or trade in older chips" : ""}.` };
 }
 
 function makeOffer(first = false) {
   const n = ++S.p2.offerN;
   const scale = Math.max(20, 0.3 * (usedKW() / 1000 + 40));
   const minGen = first ? 0 : Math.max(0, S.chipIdx - (Math.random() < 0.4 ? 1 : 0));   // labs want current chips
-  const mw = first ? 30 : Math.max(10, Math.round(scale * (0.6 + Math.random() * 0.8) / 10) * 10);
+  const cap = Math.max(10, Math.floor(0.8 * deliverableMW(minGen) / 10) * 10);   // never ask for more than you could possibly deliver
+  const mw = first ? 30 : Math.min(cap, Math.max(10, Math.round(scale * (0.6 + Math.random() * 0.8) / 10) * 10));
   const startsIn = first ? 300 : 240 + Math.floor(Math.random() * 180);
   const term = 480 + Math.floor(Math.random() * 420);
   const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
@@ -193,7 +202,7 @@ function stepContracts(dt) {
     const late = S.t - c.start;
     if (c.status === "waiting") {
       c.status = "late"; track("contract", { ev: "late", mw: c.mw });
-      say(`${c.who.split(" (")[0]} wanted ${fmt(c.mw)} MW today and you are short ${fmt(c.mw - Math.max(0, free))} MW of ${genName(c.minGen || 0)} (${roomMWAt(S.t) > 0 ? "buy GPUs" : "lease or build space"}). The first minute is on the house.`);
+      say(`${c.who.split(" (")[0]} wanted ${fmt(c.mw)} MW today and you are short ${fmt(c.mw - Math.max(0, free))} MW of ${genName(c.minGen || 0)} (${roomMWAt(S.t) > 0 ? "buy GPUs" : tradeableMW(c.minGen || 0) > 0 ? "trade in older chips, then buy" : "lease or build space"}). The first minute is on the house.`);
     }
     if (late > LATE_FREE) { S.funds -= 0.5 * c.fee * dt; S.hype = Math.max(5, S.hype - 0.05 * dt); }
     if (!c.warned && late >= LATE_DEFAULT - 60) { c.warned = true; say(`${c.who.split(" (")[0]} walks in 60s unless you deliver ${fmt(c.mw)} MW or push the date.`); }

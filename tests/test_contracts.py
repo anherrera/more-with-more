@@ -188,3 +188,22 @@ def test_debt_sized_on_backlog(game):
     pg.evaluate("() => { S.p2.offers = []; makeOffer(); const o = S.p2.offers[0]; o.mw = 100; acceptOffer(o.id); }")
     assert pg.evaluate("() => drawSize()") == pytest.approx(0.8 * 100 * 300000)
     assert pg.is_visible("#draw")
+
+
+def test_forecast_suggests_trade_in_when_old_chips_fill_the_space(game):
+    pg = campus(game)
+    # Space is full of old P4s (gen 3); the offer wants P6+ (gen 5). Trading P4s in is the only way to make room.
+    pg.evaluate("""() => { S.chipIdx = 5; S.fleet = {3: Math.floor(leasedKW() / chip(3).kw)}; S.gpus = S.fleet[3];
+      S.p2.market = 0; S.p2.offers = []; makeOffer(); const o = S.p2.offers[0]; o.minGen = 5; o.mw = 30; render(); }""")
+    text = pg.inner_text("#offers")
+    assert "Trade in older chips" in text and "✓" in text
+
+
+def test_offers_never_exceed_what_you_could_deliver(game):
+    pg = campus(game, county="strong")
+    pg.evaluate("""() => { S.p2.market = 0; S.leases = {rack: 1}; S.leaseCool = {rack: {0: 1}}; S.fleet = {}; S.gpus = 0;
+      S.p2.builds = []; for (let i = 0; i < 74; i++) S.p2.builds.push({kind: 'hall', done: 1e9}); }""")   # land nearly gone
+    cap = pg.evaluate("() => deliverableMW(S.chipIdx)")
+    sizes = pg.evaluate("() => { const out = []; for (let i = 0; i < 40; i++) { S.p2.offers = []; makeOffer(); out.push(S.p2.offers[0].mw); } return out; }")
+    assert cap < 100
+    assert max(sizes) <= max(10, cap)
