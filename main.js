@@ -139,14 +139,15 @@ function vaguePost() {
 }
 
 // ---- spot market: a swinging rental rate; sell half your fleet for 30s at the current price
-const spotOpen = () => S.phase === 1 && S.gen >= 2;
+const spotOpen = () => S.gen >= 2;
 const spotMult = () => Math.max(0.15, 1.3 + 0.9 * Math.sin(S.t / 11) + 0.45 * Math.sin(S.t / 4.3 + 2) + S.spotWalk);
 const spotRate = () => Math.max(S.price, 0.002) * spotMult();       // $ per GPU-second
-const blockSize = () => Math.floor(workingGPUs() / 2);
+const blockSize = () => Math.floor((S.phase === 2 ? uncontractedGPUs() : workingGPUs()) / 2);
+const spotPay = () => (S.phase === 2 ? campusSpotPay() : blockSize() * avgPerf() * spotRate() * 30);
 const spotReady = () => spotOpen() && !S.block && blockSize() >= 1;
 function sellSpot() {
   if (!spotReady()) return;
-  const n = blockSize(), pay = n * avgPerf() * spotRate() * 30;
+  const n = blockSize(), pay = spotPay();
   S.block = { n, until: S.t + 30 }; track("spot", { n, mult: Math.round(spotMult() * 100) / 100, pay: Math.round(pay) });
   S.funds += pay; S.roundTrip += pay * 0.5; S.spotSales += 1;
   say(S.spotSales === 1
@@ -182,7 +183,8 @@ function realityCheck() {
   const severity = 0.3 + 0.5 * leverage;
   const loss = Math.round(froth() * severity);
   S.hype -= loss; S.checks = (S.checks || 0) + 1;
-  let line = `${REALITY[S.checks % REALITY.length]} Hype -${loss}.`, seized = 0;
+  const pool = S.done.depr6 ? [...REALITY, "A short-seller read your depreciation footnote."] : REALITY;
+  let line = `${pool[S.checks % pool.length]} Hype -${loss}.`, seized = 0;
   if (S.debt > 0 && severity > 0.5 && S.phase === 1) {
     // Margin call: the lenders mark your collateral to market and take 20% of the fleet, oldest chips first.
     S.nextDraw = Math.max(S.nextDraw, S.t + 120);
@@ -349,6 +351,9 @@ function step(dt) {
   S.t += dt;                                   // keeps running after the ending: the empire hums on
   S.fatigue = Math.max(0, S.fatigue - dt / (S.done.keynote ? 30 : 60));
   if (S.t >= S.nextChip) releaseChip();
+  S.spotWalk = Math.max(-0.4, Math.min(0.4, S.spotWalk + (Math.random() - 0.5) * 0.08 * dt));
+  if (Math.floor(S.t) !== Math.floor(S.t - dt)) { S.spotHist.push(spotMult()); if (S.spotHist.length > 90) S.spotHist.shift(); }
+  if (S.block && S.t >= S.block.until) S.block = null;
   if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
   if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
@@ -358,9 +363,6 @@ function step(dt) {
 }
 
 function stepPhase1(dt) {
-  S.spotWalk = Math.max(-0.4, Math.min(0.4, S.spotWalk + (Math.random() - 0.5) * 0.08 * dt));
-  if (Math.floor(S.t) !== Math.floor(S.t - dt)) { S.spotHist.push(spotMult()); if (S.spotHist.length > 90) S.spotHist.shift(); }
-  if (S.block && S.t >= S.block.until) S.block = null;
   if (S.done.dynprice) {
     const cap = servingGPUs();
     if (cap > 0) S.price = Math.max(0.0001, 0.25 * Math.pow(demandAt(0.25) / cap, 1 / 1.3));
@@ -464,11 +466,12 @@ function render() {
   $("spotBox").hidden = !spotOpen();
   if (spotOpen()) {
     const m = spotMult();
-    $("spotNow").textContent = `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
+    $("spotNow").textContent = S.phase === 2 ? `${money(OD_RATE * m)}/MW-s for ${newest().name}s (${m.toFixed(1)}x on-demand)`
+      : `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
     $("spotNow").className = m >= 2 ? "good" : m < 1 ? "bad" : "";
     $("spot").disabled = !spotReady();
     $("spot").textContent = S.block ? `${S.block.n.toLocaleString("en-US")} GPUs leased out, back in ${Math.ceil(S.block.until - S.t)}s`
-      : `Sell 30s of half your fleet: ${money(blockSize() * avgPerf() * spotRate() * 30)}`;
+      : `Sell 30s of half your fleet: ${money(spotPay())}`;
     drawSpot();
   }
   $("post").hidden = S.gen < 1;

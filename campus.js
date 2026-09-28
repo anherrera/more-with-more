@@ -13,6 +13,7 @@ const COUNTIES = [
     gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6 },
 ];
 const MARKET_START_MW = 150, MARKET_REGROW = 10 / 60;   // leasable MW left in this market; new colos open slowly
+const OD_RATE = 300, OD_DECAY = 0.7, OD_FLOOR = 0.15, OD_UTIL = 0.8;   // on-demand $/MW/s for the newest chip; older gens earn less but stay busy
 const P2_RATE = 0.25;     // phase 1 debt is refinanced as project finance at a quarter of the facility's rate
 const HALL = { mw: 50, acres: 20, cost: 10e6, secs: 90 };   // a powered shell: GPUs are bought separately and racked in it
 const POWER = {
@@ -48,6 +49,24 @@ const energizedAt = (at = S.t) => Math.min(hallMWAt(at), powerAt(at));
 const campusKWAt = (at = S.t) => (S.p2 && S.p2.county ? energizedAt(at) * 1000 : 0);
 const marketHas = (i) => unitKW(i) / 1000 <= S.p2.market;
 function takeFromMarket(i) { S.p2.market -= unitKW(i) / 1000; }
+// Which GPUs are under contract: active contracts take MW from the oldest generation they accept, in activation order.
+function freeKWByGen() {
+  const free = {};
+  for (const [g, n] of Object.entries(S.fleet)) if (n > 0) free[g] = n * chip(+g).kw;
+  const active = S.p2 ? S.p2.contracts.filter((k) => k.status === "active") : [];
+  for (const c of active.sort((a, b) => (a.activeAt || 0) - (b.activeAt || 0) || a.n - b.n)) {
+    let need = c.mw * 1000;
+    for (const g of Object.keys(free).map(Number).sort((a, b) => a - b)) {
+      if (g < (c.minGen || 0) || need <= 0) continue;
+      const take = Math.min(need, free[g]); free[g] -= take; need -= take;
+    }
+  }
+  return free;
+}
+const odRate = (g) => OD_RATE * Math.max(OD_FLOOR, Math.pow(OD_DECAY, S.chipIdx - g));
+const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g) * OD_UTIL, 0) * (S.block ? 0.5 : 1);
+const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
+const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + (b.kind === "hall" ? HALL.acres : POWER[b.kind].acres), 0);
 const acresFree = () => countyOf().acres - acresUsed();
 const queueSecs = () => countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN);
@@ -190,10 +209,11 @@ function chooseCounty(id) {
   say("Your old lab spun out. It wants 30 MW in five minutes. Parallax is paying for it, which means Parallax is paying you.");
 }
 
-const campusRevenue = () => (S.p2 && S.p2.county ? S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) : 0);
+const campusRevenue = () => (S.p2 ? S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) + onDemandRevenue() : 0);
 
 function stepCampus(dt) {
   if (S.p2.market == null) S.p2.market = MARKET_START_MW;   // Plan 1 saves
+  S.funds += onDemandRevenue() * dt;
   if (!S.p2.county) return;
   const q = S.p2.queue;
   if (q && S.t >= q.done) {
@@ -264,7 +284,7 @@ function renderContracts() {
   $("gpuCount").textContent = `${fmt(deliveredMW())} MW`;
   $("backlog").textContent = `${fmt(backlogMW())} MW`;
   $("delivered").textContent = `${fmt(deliveredMW())} of ${fmt(energizedAt())} MW`;
-  $("p2rev").textContent = `${money(campusRevenue())}/s`;
+  $("p2rev").textContent = `${money(campusRevenue())}/s (${money(onDemandRevenue())}/s of it on-demand)`;
   // Rebuild rows only when the set changes, so a click never lands on a button that was just replaced.
   const oKey = p.offers.map((o) => o.id).join(",");
   if (oKey !== lastOfferKey) {

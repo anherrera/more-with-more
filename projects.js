@@ -43,4 +43,7 @@ const PROJECTS = [
     when: () => S.gen >= 6,
     needs: () => [S.gen < 7 && "train Gen 7", usedKW() < GROUND_KW && `run ${fmt(GROUND_KW / 1000)} MW of GPUs (now ${fmt(usedKW() / 1000)} MW)`].filter(Boolean),
     buy: () => { endPhase(); } },
+  { id: "depr6", phase: 2, title: "Extend the depreciation schedule to 6 years", cost: 0,
+    desc: "Reported earnings jump. The GPUs are exactly as old as they were. +20 hype.",
+    when: () => Object.keys(S.fleet).some((g) => +g < S.chipIdx && S.fleet[g] > 0), buy: () => { S.hype += 20; } },
 ];
