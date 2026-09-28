@@ -332,7 +332,11 @@ function renderCampus() {
     $("halls").className = dark > 0 ? "bad" : "";
   }
   $("p2power").textContent = `${mwText(pw)} (grid ${fmt(gridAt())}, ${doneBuilds("turbine")} turbines, ${doneBuilds("solar")} solar)`;
-  $("land").textContent = `${acresFree().toLocaleString("en-US")} of ${countyOf().acres.toLocaleString("en-US")} acres free`;
+  {
+    const owned = countyOf().acres + (p.landN || 0) * LAND.acres;
+    $("land").textContent = `${acresFree().toLocaleString("en-US")} of ${owned.toLocaleString("en-US")} acres free` +
+      (p.landN ? ` (${p.landN} parcel${p.landN > 1 ? "s" : ""} bought)` : "");
+  }
   $("p2cap").textContent = `${mwText(leasedKW() / 1000)} leased + ${mwText(energizedAt())} campus; ${mwText(usedKW() / 1000)} of GPUs racked, room for ${mwText(Math.max(0, capKW() - usedKW()) / 1000)} more`;
   $("p2limit").textContent = campusLimit();
   $("buildHall").textContent = `Build a hall (${HALL.mw} MW, ${HALL.acres} acres, ${time(HALL.secs)}): ${money(HALL.cost)}`;

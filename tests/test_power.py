@@ -132,3 +132,10 @@ def test_halls_line_counts_the_sheds(game):
     run(pg, 1)
     text = pg.inner_text("#halls")
     assert "4 built: 1 energized, 3 dark (need 150 MW more power)" in text
+
+
+def test_land_total_includes_bought_parcels(game):
+    pg = campus(game, county="strong")          # 1,500 acres
+    pg.click("#buyLand")
+    pg.click("#buyLand")
+    assert pg.inner_text("#land") == "1,900 of 1,900 acres free (2 parcels bought)"
