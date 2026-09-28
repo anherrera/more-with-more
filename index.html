@@ -1,0 +1,1069 @@
+<meta charset="utf-8">
+<title>More With More</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --bg: #eef0ea; --ink: #161a16; --muted: #5f675f; --rule: #3a403a;
+    --btn: #e2e5dd; --btn-hover: #d3d7cd; --btn-border: #8a918a; --btn-off: #9aa19a;
+    --accent: #b45f10; --accent-hover: #9c520d; --accent-ink: #ffffff; --good: #2e7d4f; --bad: #b0281c;
+    --con-bg: #101310; --con-ink: #d9ded4; --con-prompt: #e39440; --rack: #d9ddd3;
+    --serif: "Times New Roman", Times, Georgia, serif;
+    --mono: "JetBrains Mono", "Courier New", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101310; --ink: #e1e5dd; --muted: #8b938a; --rule: #8b938a;
+      --btn: #1f241f; --btn-hover: #2a302a; --btn-border: #4a524a; --btn-off: #5d655d;
+      --accent: #e39440; --accent-hover: #f0a458; --accent-ink: #161a16; --good: #5fb97f; --bad: #e0685a;
+      --con-bg: #050605; --con-ink: #d9ded4; --con-prompt: #e39440; --rack: #232823;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101310; --ink: #e1e5dd; --muted: #8b938a; --rule: #8b938a;
+    --btn: #1f241f; --btn-hover: #2a302a; --btn-border: #4a524a; --btn-off: #5d655d;
+    --accent: #e39440; --accent-hover: #f0a458; --accent-ink: #161a16; --good: #5fb97f; --bad: #e0685a;
+    --con-bg: #050605; --con-ink: #d9ded4; --con-prompt: #e39440; --rack: #232823;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--serif); padding-inline: 16px; padding-block: 16px 40px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .count { font-size: 28px; margin: 0 0 2px; font-variant-numeric: tabular-nums; }
+  .ticker { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-variant-numeric: tabular-nums; }
+  .ticker b { color: var(--accent); }
+  #console {
+    font: 12px/1.5 var(--mono); background: var(--con-bg); color: var(--con-ink); border: 1px solid var(--con-bg);
+    height: 9.4em; overflow-y: auto; padding: 8px 10px; margin-bottom: 18px; white-space: pre-wrap;
+  }
+  #console div::before { content: "> "; color: var(--con-prompt); }
+  #console div:not(:last-child) { opacity: .62; }
+  #console div:last-child::after { content: "\2588"; color: var(--con-prompt); margin-left: 2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 8px 32px; align-items: start; }
+  .col { display: grid; gap: 18px; align-content: start; }
+  h3 { font-size: 15px; font-weight: bold; margin: 0 0 6px; padding-bottom: 2px; border-bottom: 1px solid var(--rule); }
+  .line { font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .good { color: var(--good); } .bad { color: var(--bad); } .hot { color: var(--accent); }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+  button {
+    font: 13px/1.3 var(--serif); color: var(--ink); background: var(--btn); border: 1px solid var(--btn-border);
+    border-radius: 2px; padding: 2px 8px; cursor: pointer; text-align: left;
+  }
+  button:hover:not(:disabled) { background: var(--btn-hover); }
+  button:disabled { color: var(--btn-off); cursor: default; }
+  button.primary:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input[type=range] { width: 100%; max-width: 240px; accent-color: var(--accent); }
+  .meter { height: 6px; background: var(--rack); position: relative; max-width: 260px; margin: 3px 0 6px; }
+  .meter > i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); }
+  .meter.good > i { background: var(--good); }
+  .meter.bad > i { background: var(--bad); }
+  .meter .tick { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--ink); opacity: .45; }
+  .ticklabels { position: relative; height: 12px; max-width: 260px; font-size: 10px; color: var(--muted); margin-top: -4px; }
+  .ticklabels span { position: absolute; transform: translateX(-50%); }
+  #spotChart { width: 100%; max-width: 300px; height: 64px; display: block; margin: 4px 0; }
+  .racks { display: flex; flex-wrap: wrap; gap: 2px; margin: 6px 0; align-items: flex-end; min-height: 24px; }
+  .rack { width: 6px; height: 22px; background: var(--rack); position: relative; }
+  .rack > i { position: absolute; inset: auto 0 0 0; background: var(--accent); }
+  .more { font-size: 12px; color: var(--muted); margin-left: 4px; }
+  #projects { display: grid; gap: 6px; }
+  #projects button { width: 100%; padding: 4px 8px; }
+  #projects .t { display: block; }
+  #projects .c { display: block; font-size: 12px; color: var(--muted); }
+  #projects button:disabled .c { color: var(--btn-off); }
+  .empty { color: var(--muted); font-size: 13px; }
+  .ending { border: 2px solid var(--accent); padding: 10px 12px; margin-bottom: 18px; }
+  .ending p { font-size: 20px; font-style: italic; margin: 0 0 6px; }
+  footer { margin-top: 28px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { #console div:last-child::after { animation: none; } }
+</style>
+
+<div class="wrap">
+  <div class="count">GPUs: <span id="gpuCount">0</span></div>
+  <div class="ticker" id="ticker"></div>
+  <div id="console" aria-live="polite"></div>
+
+  <div class="ending" id="ending" hidden>
+    <p>&ldquo;I could do more with more.&rdquo;</p>
+    <div class="sub" id="endingStats"></div>
+    <div class="sub">Phase 2 (build your own campus: power, water, land, political capital) is not built yet.</div>
+  </div>
+
+  <div class="cols">
+    <div class="col">
+      <div>
+        <h3>Business</h3>
+        <div class="line">Funds: <span id="funds">$0</span></div>
+        <div class="line" id="creditsRow" hidden>Parallax credits: <span id="credits">$0</span> <span class="sub">(GPUs only)</span></div>
+        <div class="line">Price per query: <span id="price">$0.25</span></div>
+        <div class="btns"><button id="priceDown" type="button">lower</button><button id="priceUp" type="button">raise</button></div>
+        <div class="line">Demand: <span id="demand">0 /s</span></div>
+        <div class="line">Serving: <span id="serving">0 /s</span></div>
+        <div class="line">Revenue: <span id="revenue">$0 /s</span></div>
+      </div>
+      <div>
+        <h3>Investors</h3>
+        <div class="line">Hype: <span id="hypeNum">20</span> <span class="sub" id="hypeNote">(raise at 40)</span></div>
+        <div class="meter" id="hypeMeter"><i></i><span class="tick" style="left:20%"></span><span class="tick" style="left:30%"></span><span class="tick" style="left:50%"></span></div>
+        <div class="ticklabels" aria-hidden="true"><span style="left:20%">raise</span><span style="left:30%">borrow</span><span style="left:50%">froth</span></div>
+        <div class="sub" id="hypeExplain"></div>
+        <div class="btns"><button id="post" type="button" hidden>Vague-post about the next model</button></div>
+        <div class="btns"><button id="raise" type="button" class="primary" hidden></button></div>
+        <div class="btns"><button id="deal" type="button" class="primary" hidden></button></div>
+        <div class="line" id="debtRow" hidden>Debt: <span id="debt" class="bad">$0</span> <span class="sub" id="interest"></span></div>
+        <div class="btns"><button id="draw" type="button" class="primary" hidden></button><button id="repay" type="button" hidden></button></div>
+        <div class="line sub" id="rivalLine" hidden></div>
+        <div id="spotBox" hidden>
+          <h3 style="margin-top:14px">Spot market</h3>
+          <canvas id="spotChart" width="300" height="64" aria-label="Spot price over the last 90 seconds"></canvas>
+          <div class="line">Spot: <span id="spotNow">&mdash;</span></div>
+          <div class="btns"><button id="spot" type="button" class="primary"></button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div>
+        <h3>Compute</h3>
+        <div class="btns"><button id="answer" type="button" class="primary">Answer a query</button></div>
+        <div class="line">GPUs: <span id="gpus">0 / 10 fit</span></div>
+        <div class="line">Newest chip: <span id="chipLine">P1</span></div>
+        <div class="line">GPU price: <span id="gpuPrice">$5</span></div>
+        <div class="btns"><button id="tradein" type="button" hidden></button></div>
+        <div class="line sub" id="tradeNote" hidden></div>
+        <div class="line" id="failRow" hidden>Failed: <span id="failed" class="bad">0</span> <span class="sub" id="rmaNote"></span></div>
+        <div class="btns"><button id="swap" type="button" hidden>Swap failed GPUs</button></div>
+        <div class="btns">
+          <button id="buy1" type="button">Buy 1 Parallax GPU</button>
+          <button type="button" data-buy="10" hidden>+10</button>
+          <button type="button" data-buy="100" hidden>+100</button>
+          <button type="button" data-buy="1000" hidden>+1K</button>
+          <button type="button" data-buy="10000" hidden>+10K</button>
+          <button id="buyCredits" type="button" class="primary" hidden>Buy max (credits)</button>
+          <button id="buyMax" type="button" class="primary">Buy max</button>
+        </div>
+      </div>
+      <div>
+        <h3>Training</h3>
+        <label class="line" for="split">Training share: <span id="splitVal">0%</span></label>
+        <input id="split" type="range" min="0" max="100" step="5" value="0">
+        <div class="line sub" id="splitTrade" hidden></div>
+        <div class="line">Current model: <span id="model">none</span></div>
+        <div class="line"><span id="trainLabel">Training Gen 1</span>: <span id="trainEta">paused</span></div>
+        <div class="meter good" id="trainMeter"><i></i></div>
+        <div class="btns"><button id="rollback" type="button" class="primary" hidden>Roll back to checkpoint</button></div>
+        <div class="btns"><button id="rentRival" type="button" hidden></button></div>
+        <div class="sub">Each generation needs 8&times; the compute of the last.</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div>
+        <h3>Facilities</h3>
+        <div class="line">Site: <span id="site">1 rack in a colo</span></div>
+        <div class="line">Racks: <span id="racks">1</span></div>
+        <div class="line">Cooling: <span id="cooling">Air, 10 kW/rack</span></div>
+        <div class="btns"><button id="retrofit" type="button" hidden></button></div>
+        <div class="line">Power: <span id="power">0 / 10 kW</span></div>
+        <div class="meter" id="powerMeter"><i></i></div>
+        <div class="line sub">Limited by <span id="limit">cooling</span></div>
+        <div class="racks" id="rackStrip" aria-hidden="true"></div>
+        <div class="line sub">Market rent: <span id="rent">1.0</span>x (rises with every rack you lease)</div>
+        <div class="btns" id="leases"></div>
+      </div>
+      <div>
+        <h3>Projects</h3>
+        <div id="projects"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="clock">0:00 played</span>
+    <span class="btns"><button id="reset" type="button">Reset</button><button id="resetYes" type="button" hidden>Really reset</button></span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  // ---------- constants ----------
+  const KW_PER_GPU = 1;                        // a GPU plus its share of the server, networking and fans
+  // Leased space stacks: own as many of each as you can afford. Power cap is what the landlord sells per unit.
+  const TYPES = [
+    { id: "rack", one: "rack", many: "racks", racks: 1, powerKW: 30, slot: 60 },
+    { id: "cage", one: "cage", many: "cages", racks: 6, powerKW: 200, slot: 50 },
+    { id: "row", one: "row", many: "rows", racks: 24, powerKW: 1500, slot: 42 },
+    { id: "hall", one: "data hall", many: "data halls", racks: 240, powerKW: 20000, slot: 35 },
+    { id: "building", one: "building", many: "buildings", racks: 1500, powerKW: 200000, slot: 30 },
+  ];
+  // Price per rack slot falls with unit size (volume discount); all of it scales with market rent, which
+  // rises with the total racks you lease. Bigger is always cheaper per kW, and the landlord always notices.
+  const RENT_K = 4, RENT_EXP = 0.9;
+  const GROUND_KW = 100000;                   // break ground once you run 100 MW of GPUs
+  const COOLING = [
+    { name: "Air", kw: 10 }, { name: "Hot-aisle containment", kw: 15 }, { name: "Rear-door heat exchangers", kw: 25 },
+    { name: "Direct-to-chip liquid", kw: 60 }, { name: "Immersion tanks", kw: 120 }, { name: "Two-phase immersion", kw: 200 },
+  ];
+  const ROUNDS = [
+    { name: "Pre-seed", gen: 1, amount: 300 }, { name: "Seed", gen: 2, amount: 3000 },
+    { name: "Series A", gen: 3, amount: 40000 }, { name: "Series B", gen: 4, amount: 500000 },
+    { name: "Series C", gen: 5, amount: 8000000 }, { name: "Series D", gen: 6, amount: 100000000 },
+  ];
+  const HYPE_TO_RAISE = 40;
+  // The treadmill: Parallax ships a new chip on a schedule. Each is 1.7x faster, draws 1.4x the power, costs 1.6x.
+  const chip = (c) => ({ name: `P${c + 1}`, perf: Math.pow(1.7, c), kw: Math.pow(1.4, c), priceMult: Math.pow(1.6, c) });
+  const FIRST_CHIP_AT = 300, CHIP_EVERY = 300;       // game seconds
+  const MODEL_LINES = [
+    "",
+    "Hello. I can answer questions.",
+    "I can answer harder questions. I could answer more with more.",
+    "Benchmark: 71%. I could do more with more.",
+    "Have you considered a larger cluster?",
+    "The current cluster is a rounding error.",
+    "I have drafted a site plan. It needs a river.",
+    "I could do more with more.",
+  ];
+
+  // ---------- state ----------
+  const fresh = () => ({
+    t: 0, funds: 0, price: 0.25, gpus: 0, queue: 0, served: 0, gpuSeconds: 0,
+    split: 0, gen: 0, progress: 0, hype: 20, tier: 0, cooling: 0, round: 0, leases: { rack: 1 }, powerBoost: 1, coolingV2: true, fleet: {}, chipIdx: 0, nextChip: 300,
+    leaseCool: { rack: { 0: 1 } }, rival: { px: 40, prev: 40, next: 150, n: 0 }, rentals: 0, rentUntil: 0,
+    demandMult: 1, done: {}, log: ["A model with no name is waiting for its first question."], ended: false,
+    credits: 0, vendorCap: 2e12, roundTrip: 0, nextDeal: 0, deals: 0, hints: {}, debt: 0, nextDraw: 0, draws: 0, failed: 0, rma: [], spike: null, lastCkpt: 0, fails: 0, spikes: 0, nextPost: 0, posts: 0, fatigue: 0, runId: null, chunkNo: 0, milestones: [], started: null, spotHist: [], spotWalk: 0, block: null, spotSales: 0,
+  });
+  let S = fresh();
+
+  // ---------- model ----------
+  const needFor = (g) => 100 * Math.pow(10, g - 1);           // GPU-seconds to train generation g
+  const quality = () => Math.pow(4, S.gen);                  // each generation quadruples what people want from it
+  const hypeMult = () => 0.5 + S.hype / 40;
+  const demand = () => 5 * quality() * hypeMult() * S.demandMult * Math.pow(0.25 / S.price, 1.3);
+  const owned = (i) => S.leases[TYPES[i].id] || 0;
+  // Each leased unit keeps the cooling it was built with (S.leaseCool[type][level] = count). Cooling projects set
+  // the standard for NEW leases; older space stays sparse until you pay to retrofit it.
+  const unitKW = (i, level = S.cooling) => Math.min(TYPES[i].racks * COOLING[level].kw, TYPES[i].powerKW * S.powerBoost);
+  const coolOf = (i) => S.leaseCool[TYPES[i].id] || {};
+  const capKW = () => TYPES.reduce((a, _, i) => a + Object.entries(coolOf(i)).reduce((b, [lv, n]) => b + n * unitKW(i, +lv), 0), 0);
+  const RETROFIT = 1.0;                   // retrofit costs what new space costs per kW gained, but adds no racks and no rent
+  const retrofitPlan = () => {
+    let cost = 0, kw = 0, units = 0;
+    TYPES.forEach((t, i) => {
+      for (const [lv, n] of Object.entries(coolOf(i))) {
+        if (+lv >= S.cooling) continue;
+        const gain = unitKW(i) - unitKW(i, +lv);
+        if (gain <= 0) continue;
+        kw += n * gain; units += n; cost += n * gain * RETROFIT * leaseCost(i) / unitKW(i);
+      }
+    });
+    return { cost, kw, units };
+  };
+  function retrofit() {
+    const plan = retrofitPlan();
+    if (plan.kw <= 0 || S.funds < plan.cost) return;
+    S.funds -= plan.cost;
+    TYPES.forEach((t, i) => {
+      const lc = coolOf(i); let moved = 0;
+      for (const lv of Object.keys(lc)) if (+lv < S.cooling && unitKW(i) > unitKW(i, +lv)) { moved += lc[lv]; delete lc[lv]; }
+      if (moved) { lc[S.cooling] = (lc[S.cooling] || 0) + moved; S.leaseCool[t.id] = lc; }
+    });
+    track("retrofit", { cost: Math.round(plan.cost), kw: Math.round(plan.kw), units: plan.units });
+    say(`Retrofitted ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name} while they were running. +${fmt(plan.kw)} kW. Nobody died. The contractor was surprised too.`);
+  }
+  const totalRacks = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0);
+  const highestType = () => { let h = 0; TYPES.forEach((_, i) => { if (owned(i) > 0) h = i; }); return h; };
+  const racksLeased = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0);
+  const rentIndex = () => Math.pow(1 + racksLeased() / RENT_K, RENT_EXP);
+  const leaseCost = (i) => TYPES[i].racks * TYPES[i].slot * rentIndex();
+  const leaseVisible = (i) => i === 0 || owned(i) > 0 || owned(i - 1) > 0;
+  const fitGPUs = () => Math.floor(capKW() / KW_PER_GPU);
+  const PMAX = 500, N0 = 9900;                                         // volume pricing: price stops rising at $500 (~10k GPUs)
+  const newest = () => chip(S.chipIdx);
+  const basePrice = (n = S.gpus) => Math.min(PMAX, 5 * (1 + n / 100));
+  const gpuPrice = (n = S.gpus) => basePrice(n) * newest().priceMult;
+  const usedKW = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).kw, 0);
+  const totalPerf = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).perf, 0);
+  const avgPerf = () => (S.gpus > 0 ? totalPerf() / S.gpus : newest().perf);
+  const roomNewest = () => Math.max(0, Math.floor((capKW() - usedKW()) / newest().kw + 1e-9));
+  const F = (n) => n <= N0 ? 250 * Math.pow(1 + n / 100, 2)             // cumulative cost of the first n GPUs
+    : 250 * Math.pow(1 + N0 / 100, 2) + PMAX * (n - N0);
+  const costOf = (k) => (F(S.gpus + k) - F(S.gpus)) * newest().priceMult;
+  const maxBuy = (wallet = S.funds + S.credits) => {                   // as many as fit and the wallet covers
+    const room = roomNewest();
+    if (room <= 0 || wallet <= 0) return 0;
+    const target = F(S.gpus) + wallet / newest().priceMult;
+    const nMax = target <= F(N0) ? 100 * (Math.sqrt(target / 250) - 1) : N0 + (target - F(N0)) / PMAX;
+    const k = Math.floor(nMax - S.gpus);
+    let n = Math.max(0, Math.min(room, k));
+    while (n > 0 && costOf(n) > wallet) n--;                          // guard float rounding at the edge
+    return n;
+  };
+  const inRMA = () => S.rma.reduce((a, r) => a + r[0], 0);
+  const workingGPUs = () => Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0));
+  const servingGPUs = () => workingGPUs() * avgPerf() * (1 - S.split / 100);                 // compute, in P1-equivalents
+  const trainMult = () => (S.done.synthdata ? 1.5 : 1) * (S.done.poach ? 1.5 : 1) * (S.t < S.rentUntil ? 2 : 1);
+  const trainingGPUs = () => S.spike ? 0 : workingGPUs() * avgPerf() * (S.split / 100) * trainMult();
+  const demandAt = (price) => 5 * quality() * hypeMult() * S.demandMult * Math.pow(0.25 / price, 1.3);
+  const FAIL_RATE = 0.0001;                                  // per working GPU per second (~a 3h MTBF, for comedy)
+
+  // Console lines saved while the page was decoded as windows-1252 ("â€œ" for a curly quote): re-encode and decode as UTF-8.
+  const CP1252 = "\u20ac\u0081\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u008d\u017d\u008f\u0090\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u009d\u017e\u0178";
+  function unMojibake(line) {
+    if (typeof line !== "string" || !/[\u00c2-\u00f4][\u0080-\u02ff\u2000-\u2122]/.test(line)) return line;
+    const bytes = [];
+    for (const ch of line) {
+      const c = ch.charCodeAt(0), i = CP1252.indexOf(ch);
+      if (c < 0x80 || (c >= 0xa0 && c < 0x100)) bytes.push(c); else if (i >= 0) bytes.push(0x80 + i); else return line;
+    }
+    try { return new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes)); } catch { return line; }
+  }
+  function say(line) { S.log.push(line); S.log = S.log.slice(-40); }
+
+  // ---------- projects ----------
+  const PROJECTS = [
+    { id: "dynprice", title: "Dynamic pricing", desc: "The price sets itself to wherever demand meets capacity.", cost: 250,
+      when: () => S.gen >= 1, buy: () => {} },
+    { id: "hands", title: "Remote hands", desc: "Someone at the colo swaps dead GPUs for you. Bills in 15-minute increments.", cost: 3000,
+      when: () => S.gen >= 2 && S.fails > 0, buy: () => {} },
+    { id: "autockpt", title: "Automatic checkpoint restarts", desc: "The run rolls itself back. You can finally sleep.", cost: 30000,
+      when: () => S.gen >= 3 && S.spikes > 0, buy: () => {} },
+    { id: "hac", title: "Hot-aisle containment", desc: "Plastic curtains, basically. 15 kW per rack. New leases only; older space needs a retrofit.", cost: 120,
+      when: () => S.gpus >= 5 && S.cooling < 1, buy: () => { S.cooling = Math.max(S.cooling, 1); } },
+    { id: "rdhx", title: "Rear-door heat exchangers", desc: "25 kW per rack. New leases only; older space needs a retrofit.", cost: 400,
+      when: () => S.gen >= 1 && S.cooling < 2, buy: () => { S.cooling = Math.max(S.cooling, 2); } },
+    { id: "modelcard", title: "Publish a model card", desc: "Transparency, briefly. +15 hype, and hype fades 25% slower from now on.", cost: 50,
+      when: () => S.gen >= 1, buy: () => { S.hype += 15; } },
+    { id: "evals", title: "Tune on the benchmark", desc: "Numbers went up. +35 hype, and every post can cite the benchmark: posts earn 50% more hype.", cost: 2000,
+      when: () => S.gen >= 3, buy: () => { S.hype += 35; } },
+    { id: "sales", title: "Enterprise sales team", desc: "They will find the demand. Demand x2.", cost: 20000,
+      when: () => S.gen >= 3, buy: () => { S.demandMult *= 2; } },
+    { id: "dlc", title: "Direct-to-chip liquid cooling", desc: "60 kW per rack. New leases only; older space needs a retrofit.", cost: 150000,
+      when: () => S.gen >= 4 && S.cooling < 3, buy: () => { S.cooling = Math.max(S.cooling, 3); } },
+    { id: "keynote", title: "Keynote: “the next one is the big one”", desc: "+50 hype. You now have fans: posts go viral twice as often, and the timeline tires of you half as fast.", cost: 200000,
+      when: () => S.gen >= 4, buy: () => { S.hype += 50; } },
+    { id: "water", title: "Pledge: water-positive by 2040", desc: "A pledge. It costs nothing today. +25 hype.", cost: 0,
+      when: () => S.tier >= 3, buy: () => { S.hype += 25; } },
+    { id: "immersion", title: "Immersion tanks", desc: "120 kW per rack. The GPUs go in the soup. New leases only; older space needs a retrofit.", cost: 5000000,
+      when: () => S.gen >= 5 && S.cooling < 4, buy: () => { S.cooling = Math.max(S.cooling, 4); } },
+    { id: "substation", title: "Pay for the substation", desc: "The landlord's power caps double. You paid for their upgrade.", cost: 15000000,
+      when: () => S.gen >= 5 && S.tier >= 3, buy: () => { S.powerBoost = 2; } },
+    { id: "twophase", title: "Two-phase immersion", desc: "200 kW per rack. The GPUs boil, on purpose. New leases only; older space needs a retrofit.", cost: 40000000,
+      when: () => S.gen >= 6 && S.cooling < 5, buy: () => { S.cooling = Math.max(S.cooling, 5); } },
+    { id: "synthdata", title: "Train on synthetic data", desc: "The model writes its own training data. What could go wrong. Training +50%.", cost: 2000000,
+      when: () => S.gen >= 5, buy: () => {} },
+    { id: "distill", title: "Distill a cheap tier", desc: "Same model, smaller, sold to everyone. Demand x2.", cost: 4000000,
+      when: () => S.gen >= 5, buy: () => { S.demandMult *= 2; } },
+    { id: "poach", title: "Poach a research team", desc: "Their equity vests in four years. Their loyalty vests never. Training +50%.", cost: 6000000,
+      when: () => S.gen >= 5, buy: () => {} },
+    { id: "sovereign", title: "Sovereign AI partnership", desc: "A country buys in. Demand x3.", cost: 3000000,
+      when: () => S.gen >= 5, buy: () => { S.demandMult *= 3; } },
+    { id: "cba", title: "Community benefits agreement", desc: "A new playground near the substation. +20 hype.", cost: 1000000,
+      when: () => S.tier >= 4, buy: () => { S.hype += 20; } },
+    { id: "ground", title: "Break ground on your own campus", desc: "You have outgrown every landlord in the county. Build your own.", cost: 60000000,
+      when: () => S.gen >= 6,
+      needs: () => [S.gen < 7 && "train Gen 7", usedKW() < GROUND_KW && `run ${fmt(GROUND_KW / 1000)} MW of GPUs (now ${fmt(usedKW() / 1000)} MW)`].filter(Boolean),
+      buy: () => { endPhase(); } },
+  ];
+
+  function endPhase() {
+    S.ended = true; S.endedAt = S.t; milestone("broke ground (end of phase 1)");
+    say("I could do more with more.");
+  }
+
+  // ---------- actions ----------
+  function answer() { answerClicks++; if (S.queue >= 1) { S.queue -= 1; S.served += 1; S.funds += S.price; } }
+  // Parallax invests in you; the money can only buy Parallax GPUs; Parallax books it as revenue.
+  const dealSize = () => 800 * Math.pow(5, S.gen) * (1 + S.deals * 0.15);
+  const dealReady = () => S.gen >= 1 && S.t >= S.nextDeal;
+  function takeDeal() {
+    if (!dealReady()) return;
+    const amt = dealSize();
+    S.credits += amt; S.deals += 1; S.nextDeal = S.t + 90; track("parallax", { amt: Math.round(amt) });
+    S.vendorCap += amt * 4;                                   // "strategic investment in the ecosystem"
+    say(S.deals === 1
+      ? `Parallax invested ${money(amt)} in you. It is in Parallax credits. The landlord does not take Parallax credits.`
+      : DEAL_QUIPS[(S.deals - 2) % DEAL_QUIPS.length](money(amt)));
+  }
+  // Parallax investment lines, in order, so none repeats until the list runs out.
+  const DEAL_QUIPS = [
+    (m) => `Parallax invested ${m} more. Their analysts call it \u201cecosystem health.\u201d`,
+    (m) => `Parallax invested ${m}. You will spend it on Parallax GPUs. Parallax will book it as revenue. Everyone claps.`,
+    (m) => `Parallax invested ${m}. Their stock went up more than ${m}. They are thinking about doing this again.`,
+    (m) => `Another ${m} from Parallax. Their earnings call described you as \u201ca customer with strong demand signals.\u201d You are the demand signal.`,
+    (m) => `Parallax invested ${m}. The press release says \u201cstrategic partnership.\u201d The term sheet says \u201cbuy our chips.\u201d`,
+    (m) => `${m} in Parallax credits. Non-transferable. Non-refundable. Expires if you ever look at a competitor.`,
+    (m) => `Parallax invested ${m}. Somewhere, a slide titled \u201cThe AI Flywheel\u201d gained a new arrow.`,
+    (m) => `Parallax invested ${m}. Their CFO asked if you could order a little faster before the quarter closes.`,
+    (m) => `Parallax invested ${m}. It went from their balance sheet to your balance sheet to their balance sheet in under a second. A new record.`,
+    (m) => `Parallax invested ${m}. An analyst asked where the money comes from. The analyst has been reassigned.`,
+    (m) => `Parallax invested ${m}. They also invested in your three biggest competitors. They love all of you equally.`,
+    (m) => `${m} from Parallax. The money never left the building. Technically neither did the GPUs.`,
+    (m) => `Parallax invested ${m}. Your valuation is now mostly Parallax credits multiplied by vibes.`,
+    (m) => `Parallax invested ${m}. Their keynote called you \u201cone of the most important companies in the world.\u201d They say that about everyone who orders.`,
+    (m) => `Parallax invested ${m}. The circle is complete. The circle was always complete. The circle is the product.`,
+    (m) => `Parallax invested ${m}. A reporter drew a diagram of the deal. It is a single arrow pointing at itself.`,
+    (m) => `Parallax invested ${m} and pre-booked the GPUs you will buy with it. Saves everyone a step.`,
+    (m) => `${m} from Parallax. Their auditors called it \u201cunusual but within guidance.\u201d Guidance has been updated.`,
+    (m) => `Parallax invested ${m}. In exchange you agreed to say \u201cParallax\u201d in every keynote. You now say it in your sleep.`,
+    (m) => `Parallax invested ${m}. Somewhere, a bond trader quietly closed a laptop.`,
+    (m) => `Parallax invested ${m}. You thanked them. They thanked you. The money thanked no one.`,
+    (m) => `Parallax invested ${m}. The model asked for the invoice. It wants to understand how this works. So do we.`,
+  ];
+  // ---------- play log: actions, milestones and snapshots in localStorage (read back from the browser profile) ----------
+  const LOG_KEY = "more-with-more-log-v1", MAX_EVENTS = 20000;
+  let pending = [], answerClicks = 0, lastSnapT = -1e9;
+  const db = true;                                    // logging is always on; it's local
+  function ensureRunIfDb() { ensureRun(); }
+  function ensureRun() {
+    if (!S.runId) { S.runId = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7); S.chunkNo = 0; S.started = new Date().toISOString(); }
+  }
+  let autoSwaps = 0;   // Remote hands swaps: counted in snapshots, not logged one by one
+  function track(a, extra = {}) { pending.push({ t: Math.round(S.t * 10) / 10, a, ...extra }); }
+  function milestone(what) { S.milestones.push({ t: Math.round(S.t), what }); if (S.milestones.length > 300) S.milestones.shift(); track("milestone", { what }); }
+  function snap() {
+    return { gen: S.gen, tier: S.tier, leases: { ...S.leases }, leaseCool: JSON.parse(JSON.stringify(S.leaseCool)), cooling: S.cooling, chip: S.chipIdx, fleet: { ...S.fleet }, gpus: S.gpus, funds: Math.round(S.funds), credits: Math.round(S.credits),
+      hype: Math.round(S.hype), price: S.price, split: S.split, debt: Math.round(S.debt), failed: S.failed,
+      demand: Math.round(demand()), serving: Math.round(Math.min(servingGPUs(), demand())), progressPct: Math.floor(100 * S.progress / needFor(S.gen + 1)), autoSwaps };
+  }
+  function flush() {
+    if (!pending.length && !answerClicks) return;
+    try {
+      ensureRun();
+      const log = JSON.parse(localStorage.getItem(LOG_KEY) || "{}");
+      const run = log[S.runId] || (log[S.runId] = { runId: S.runId, started: S.started, events: [], answerClicks: 0 });
+      run.events.push(...pending); if (run.events.length > MAX_EVENTS) run.events.splice(0, run.events.length - MAX_EVENTS);
+      run.answerClicks += answerClicks;
+      Object.assign(run, { updated: new Date().toISOString(), gameTime: Math.round(S.t), ended: S.ended, now: snap(),
+        milestones: S.milestones, roundTrip: Math.round(S.roundTrip), vendorCap: S.vendorCap });
+      localStorage.setItem(LOG_KEY, JSON.stringify(log));
+      pending = []; answerClicks = 0;
+    } catch (e) { /* storage full or blocked: keep playing, drop nothing yet */ }
+  }
+
+  const POSTS = [
+    "Something big is coming.", "we've been cooking", "the next one is different. can't say more",
+    "a thread (1/47)", "internal evals are... something", "if you know, you know",
+    "feeling the scaling laws today", "new model soon. not a promise. a vibe.",
+  ];
+  const postReady = () => S.gen >= 1 && S.t >= S.nextPost;
+  // Each post: base (5 + gen), shrunk by recent-post fatigue, then a roll: viral x3, ratioed x0.3.
+  const postBase = () => (5 + S.gen) * (S.done.evals ? 1.5 : 1) / (1 + 0.5 * S.fatigue);
+  function vaguePost() {
+    if (!postReady()) return;
+    const roll = Math.random();
+    const [mult, tag] = roll < (S.done.keynote ? 0.3 : 0.15) ? [3, " It went viral."] : roll < (S.done.keynote ? 0.45 : 0.35) ? [0.3, " Ratioed."] : [1, ""];
+    const gain = Math.max(1, Math.round(postBase() * mult));
+    S.hype += gain; S.nextPost = S.t + 25; S.fatigue += 1; track("post", { gain, result: mult === 3 ? "viral" : mult < 1 ? "ratioed" : "normal" });
+    say(`Posted: \u201c${POSTS[S.posts % POSTS.length]}\u201d +${gain} hype.${tag}`);
+    S.posts += 1;
+  }
+
+  // ---- spot market: a swinging rental rate; sell half your fleet for 30s at the current price
+  const spotOpen = () => S.gen >= 2;
+  const spotMult = () => Math.max(0.15, 1.3 + 0.9 * Math.sin(S.t / 11) + 0.45 * Math.sin(S.t / 4.3 + 2) + S.spotWalk);
+  const spotRate = () => Math.max(S.price, 0.002) * spotMult();       // $ per GPU-second
+  const blockSize = () => Math.floor(workingGPUs() / 2);
+  const spotReady = () => spotOpen() && !S.block && blockSize() >= 1;
+  function sellSpot() {
+    if (!spotReady()) return;
+    const n = blockSize(), pay = n * avgPerf() * spotRate() * 30;
+    S.block = { n, until: S.t + 30 }; track("spot", { n, mult: Math.round(spotMult() * 100) / 100, pay: Math.round(pay) });
+    S.funds += pay; S.roundTrip += pay * 0.5; S.spotSales += 1;
+    say(S.spotSales === 1
+      ? `Leased ${n.toLocaleString("en-US")} GPUs on the spot market for ${money(pay)}. The buyer is a startup funded by Parallax. They paid with Parallax money.`
+      : `Spot sale: ${n.toLocaleString("en-US")} GPUs for 30s, ${money(pay)} (${spotMult().toFixed(1)}x query revenue).`);
+  }
+
+  // Trade the oldest chips back to Parallax for 25% of today's price, in credits. Frees power for new chips.
+  const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && S.fleet[c] > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
+  const tradeValue = (c) => S.fleet[c] * basePrice() * chip(c).priceMult * 0.25;
+  function tradeIn() {
+    const c = oldestOld(); if (c === null) return;
+    const n = Math.min(S.fleet[c], Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0)));
+    if (n <= 0) return;
+    const val = n * basePrice() * chip(c).priceMult * 0.25;
+    S.fleet[c] -= n; if (S.fleet[c] <= 0) delete S.fleet[c]; S.gpus -= n; S.credits += val; S.vendorCap += val * 25;
+    track("tradein", { chip: chip(c).name, n, val: Math.round(val) });
+    say(`Traded in ${n.toLocaleString("en-US")} ${chip(c).name}s for ${money(val)} in Parallax credits. Parallax will refurbish them and sell them to someone else.`);
+  }
+  // ---- the bubble: hype above 100 is froth; reality checks knock off a share of it.
+  // Real revenue relative to debt interest softens the fall. A hard fall while in debt pauses draws.
+  const REALITY = [
+    "Analyst note: \u201cwhere's the revenue?\u201d", "A rival matched your model at half the price.",
+    "Someone read the S-1.", "A podcast asked what the business model is.",
+    "Parallax's earnings call mentioned \u201cdigestion.\u201d", "A benchmark you topped turns out to be in the training data.",
+    "A customer published their actual usage numbers.",
+  ];
+  const froth = () => Math.max(0, S.hype - 100);
+  function realityCheck() {
+    const rev = Math.min(servingGPUs(), demand()) * S.price, interest = S.debt * INTEREST;
+    // Leverage: debt measured against ten minutes of revenue. The more borrowed, the harder the fall.
+    const leverage = S.debt / (rev * 600 + S.debt + 1e-9);
+    const severity = 0.3 + 0.5 * leverage;
+    const loss = Math.round(froth() * severity);
+    S.hype -= loss; S.checks = (S.checks || 0) + 1;
+    let line = `${REALITY[S.checks % REALITY.length]} Hype -${loss}.`, seized = 0;
+    if (S.debt > 0 && severity > 0.5) {
+      // Margin call: the lenders mark your collateral to market and take 20% of the fleet, oldest chips first.
+      S.nextDraw = Math.max(S.nextDraw, S.t + 120);
+      let take = Math.floor(0.2 * S.gpus);
+      for (const c of Object.keys(S.fleet).map(Number).sort((a, b) => a - b)) {
+        const k = Math.min(take, S.fleet[c]); S.fleet[c] -= k; if (S.fleet[c] <= 0) delete S.fleet[c]; S.gpus -= k; take -= k; seized += k;
+        if (take <= 0) break;
+      }
+      S.failed = Math.min(S.failed, S.gpus);
+      line += ` Margin call: lenders marked your GPUs to market and took ${seized.toLocaleString("en-US")} of them. Draws frozen for 2 minutes.`;
+    }
+    track("crash", { loss, severity: Math.round(severity * 100) / 100, seized });
+    say(line);
+  }
+
+  // ---- PivotCloud: the rival neocloud. Ex-crypto miners, now an AI hyperscaler, stock moves 20% on a rumor.
+  const RIVAL_NEWS = [
+    (d) => `PivotCloud, formerly PivotCoin, formerly an Ethereum mining operation in a garage, now calls itself \u201cthe AI hyperscaler.\u201d The garage is still there. ${d}`,
+    (d) => `PivotCloud announced 50,000 Parallax GPUs, bought with a loan secured by 50,000 Parallax GPUs. ${d}`,
+    (d) => `PivotCloud's founders sold $400M of stock this quarter to \u201cdiversify.\u201d Analysts called it a vote of confidence. ${d}`,
+    (d) => `PivotCloud says the pivot from crypto was obvious: \u201cWe always had GPUs, electricity and no idea what to do with them.\u201d ${d}`,
+    (d) => `Parallax owns a stake in PivotCloud, sells chips to PivotCloud, and rents capacity back from PivotCloud. Nobody can find the edge of it. ${d}`,
+    (d) => `PivotCloud signed a $12B contract with a lab that has $2B. ${d}`,
+    (d) => `PivotCloud's IPO priced below range, then rose 300%, then fell 60%, then rose again. The CFO has stopped checking. ${d}`,
+    (d) => `PivotCloud's debt now has its own credit rating, its own ticker and a fan account. ${d}`,
+    (d) => `PivotCloud's investor day slide: \u201cWe were early to GPUs.\u201d Footnote: \u201cFor mining.\u201d ${d}`,
+    (d) => `A PivotCloud executive posted a laser-eyes profile picture, deleted it, and replaced it with a data center. ${d}`,
+    (d) => `PivotCloud is buying another ex-bitcoin miner for its power contracts. The bitcoin miners are thrilled. The bitcoins are not consulted. ${d}`,
+    (d) => `PivotCloud's largest customer is also its largest shareholder and its largest supplier's largest customer. ${d}`,
+    (d) => `PivotCloud's lockup expired. Early employees are now learning what a Lamborghini dealer's financing office looks like. ${d}`,
+    (d) => `PivotCloud reported record revenue and record losses in the same sentence. ${d}`,
+    (d) => `PivotCloud's CEO said \u201cthe demand is insatiable\u201d on a podcast recorded inside a half-empty data hall. ${d}`,
+    (d) => `PivotCloud raised $7B in debt at 11%. \u201cCheap,\u201d said someone who has never had a mortgage. ${d}`,
+    (d) => `A short-seller published a 90-page report on PivotCloud. The stock went up. Nobody understands anything. ${d}`,
+    (d) => `PivotCloud tried to lease your landlord's building. Your landlord asked if they take Parallax credits. ${d}`,
+  ];
+  // Weird things PivotCloud does that splash onto you: [line, hype change for you, their stock move].
+  const RIVAL_WEIRD = [
+    ["PivotCloud announced AGI in a tweet at 2 a.m. It was deleted by 2:05. The whole sector rallied anyway.", +12, 0.6],
+    ["A PivotCloud data hall caught fire. \u201cThermal event,\u201d says the press release. Investors now ask you about fire suppression.", -10, -0.4],
+    ["PivotCloud's CEO bought a football team. Your investors want to know why you don't have a football team.", +6, 0.15],
+    ["PivotCloud launched a token. It is called $PIVOT, again. It is backed by GPU-hours, vibes and nothing. The SEC has entered the chat.", -8, -0.3],
+    ["PivotCloud's cooling tower was filmed dumping steam over a suburb. \u201cAI is boiling the town\u201d trends. All neoclouds are now the villain.", -12, -0.25],
+    ["PivotCloud got a Parallax allocation you didn't. Your investors ask what your relationship with Parallax is \u201creally like.\u201d", -6, 0.3],
+    ["PivotCloud signed a sovereign deal with a country that didn't exist last year. Investors love it. Everyone wants a country.", +10, 0.5],
+    ["PivotCloud's founder livestreamed himself mining bitcoin on an H-class GPU \u201cfor old times' sake.\u201d Utilization questions follow everyone.", -7, -0.2],
+    ["PivotCloud was added to a major index. Index funds must buy it. Index funds must also, apparently, feel good about you.", +8, 0.35],
+    ["A PivotCloud customer defaulted and returned 20,000 GPUs. \u201cSpot supply glut\u201d headlines. Your hype dips in sympathy.", -9, -0.45],
+  ];
+  function rivalNews() {
+    const R = S.rival;
+    if (Math.random() < 0.35) {
+      const [line, dh, shock] = RIVAL_WEIRD[Math.floor(Math.random() * RIVAL_WEIRD.length)];
+      R.prev = R.px; R.px = Math.max(3, R.px * Math.exp(shock)); R.n += 1; R.next = S.t + 80 + Math.random() * 60;
+      const pct = Math.round(100 * (R.px / R.prev - 1));
+      S.hype = Math.max(5, S.hype + dh); track("rival", { dh, pct });
+      say(`${line} PIVT ${pct >= 0 ? "+" : ""}${pct}%. Your hype ${dh >= 0 ? "+" : ""}${dh}.`);
+      return;
+    }
+    // Fat-tailed moves: most days \u00b110%, some days the stock doubles or halves.
+    const shock = Math.random() < 0.15 ? (Math.random() < 0.5 ? -0.55 : 0.8) : (Math.random() - 0.45) * 0.25;
+    R.prev = R.px; R.px = Math.max(3, R.px * Math.exp(shock)); R.n += 1; R.next = S.t + 80 + Math.random() * 60;
+    const pct = Math.round(100 * (R.px / R.prev - 1));
+    const d = `PIVT ${pct >= 0 ? "+" : ""}${pct}%.`;
+    say(RIVAL_NEWS[(R.n - 1) % RIVAL_NEWS.length](d));
+    if (pct <= -30) { S.hype = Math.max(5, S.hype - 8); say("Your hype fell too. Investors can't tell neoclouds apart."); }
+    else if (pct >= 40) { S.hype += 8; say("Your hype rose with it. Investors can't tell neoclouds apart."); }
+  }
+
+  // Renting the rival's GPUs: cash straight into training speed. PivotCloud raises the price every time.
+  const rentOpen = () => S.gen >= 5;
+  const rentCost = () => 640 * Math.pow(5, S.gen) * Math.pow(1.3, S.rentals);
+  const RENT_LINES = [
+    "You rented PivotCloud's cluster. They reported \u201ca major new AI customer.\u201d It's you. PIVT +{p}%.",
+    "Rented PivotCloud again. Their earnings call thanked \u201cour partners.\u201d Your CFO asked who that is. PIVT +{p}%.",
+    "PivotCloud's GPUs are training your model. They were bought with Parallax money. So were yours. PIVT +{p}%.",
+    "Rented PivotCloud. Half their cluster still has a bitcoin miner's asset tags on it. PIVT +{p}%.",
+    "PivotCloud raised your rate. \u201cDemand is insatiable,\u201d they said, about you. PIVT +{p}%.",
+  ];
+  function rentRival() {
+    if (!rentOpen() || S.t < S.rentUntil || S.funds < rentCost()) return;
+    const c = rentCost();
+    S.funds -= c; S.rentals += 1; S.rentUntil = S.t + 60;
+    const R = S.rival, bump = 0.05 + Math.random() * 0.1;
+    R.prev = R.px; R.px *= 1 + bump;
+    track("rent", { cost: Math.round(c) });
+    say(RENT_LINES[(S.rentals - 1) % RENT_LINES.length].replace("{p}", Math.round(bump * 100)));
+  }
+
+  function releaseChip() {
+    S.chipIdx += 1; S.nextChip = S.t + CHIP_EVERY;
+    const c = newest(), prev = chip(S.chipIdx - 1);
+    S.vendorCap *= 1.08; milestone(`Parallax ${c.name}`);
+    say(`Parallax announced the ${c.name}: ${c.perf.toFixed(1)}x the speed of a P1, ${c.kw.toFixed(1)} kW each. Your ${prev.name}s are now \u201clegacy.\u201d`);
+  }
+
+  function swapFailed() {
+    if (S.failed <= 0) return;
+    S.rma.push([S.failed, S.t + 60]); if (S.done.hands) autoSwaps += S.failed; else track("swap", { n: S.failed });
+    if (!S.hints.rma1) { S.hints.rma1 = true; say(`Shipped ${S.failed} dead GPU${S.failed > 1 ? "s" : ""} back to Parallax. Replacements in about a minute.`); }
+    S.failed = 0;
+  }
+  function rollback() {
+    if (!S.spike) return;
+    S.spike = null; S.progress = S.lastCkpt; track("rollback");
+    say("Rolled back to the last checkpoint. The loss curve looks normal again. Nobody saw anything.");
+  }
+
+  // A debt facility secured by your GPUs, sized by hype. Opens once you lease a data hall.
+  const DRAW_HYPE = 60, INTEREST = 0.0002;                  // per second on outstanding debt (~1.2%/min)
+  const drawSize = () => (S.hype / 100) * 3 * Math.pow(5, S.gen) * 1000;
+  const facilityOpen = () => S.tier >= 3;
+  const drawReady = () => facilityOpen() && S.hype >= DRAW_HYPE && S.t >= S.nextDraw;
+  function draw() {
+    if (!drawReady()) return;
+    const amt = drawSize();
+    S.funds += amt; S.debt += amt; S.draws += 1; S.nextDraw = S.t + 60; S.hype -= 10; track("draw", { amt: Math.round(amt), debt: Math.round(S.debt) });
+    say(S.draws === 1
+      ? `Drew ${money(amt)} on a debt facility. Secured by your GPUs. Priced on vibes.`
+      : `Drew ${money(amt)} more. Your GPUs are collateral for more GPUs.`);
+  }
+  function repay() {
+    const amt = Math.min(S.debt, Math.max(0, S.funds));
+    if (amt <= 0) return;
+    S.funds -= amt; S.debt -= amt; if (S.debt < 1) S.debt = 0;
+    track("repay", { amt: Math.round(amt), debt: Math.round(S.debt) });
+    say(S.debt === 0 ? "Debt paid off. The bank is confused. Your CFO asks why you would do that." : `Paid down ${money(amt)}. Lenders note the \u201cunusual behavior.\u201d`);
+  }
+
+
+  function buy(k) {
+    const room = roomNewest(); k = Math.min(k, room);
+    if (k <= 0) return;
+    const c = costOf(k);
+    if (S.funds + S.credits < c) return;
+    const fromCredits = Math.min(S.credits, c);
+    S.credits -= fromCredits; S.funds -= c - fromCredits; S.gpus += k; S.fleet[S.chipIdx] = (S.fleet[S.chipIdx] || 0) + k; track("buy", { k, cost: Math.round(c), fromCredits: Math.round(fromCredits) });
+    const firstLoop = S.roundTrip === 0 && fromCredits > 0;
+    S.roundTrip += fromCredits;
+    S.vendorCap += c * 25;                                    // every GPU sale is revenue at a 25x multiple
+    if (firstLoop) say("Parallax reported record data center revenue. Some of it was their own money.");
+  }
+  function lease(i) {
+    const t = TYPES[i], c = leaseCost(i);
+    if (!t || !leaseVisible(i) || S.funds < c) return;
+    S.funds -= c; S.leases[t.id] = owned(i) + 1; S.tier = highestType();
+    { const lc = coolOf(i); lc[S.cooling] = (lc[S.cooling] || 0) + 1; S.leaseCool[t.id] = lc; }
+    milestone(`lease: ${t.one} #${owned(i)}`);
+    say(owned(i) === 1 ? `Signed the lease: your first ${t.one}.` : `Leased another ${t.one}. You have ${owned(i)} ${t.many}.`);
+  }
+  function raise() {
+    const r = ROUNDS[S.round];
+    if (r && S.gen >= r.gen && S.hype >= HYPE_TO_RAISE) {
+      S.funds += r.amount; S.round += 1; S.hype = Math.max(10, S.hype - 20); milestone(`raised ${r.name}`);
+      say(`Closed the ${r.name}: $${fmt(r.amount)}. The deck said “scaling laws” eleven times.`);
+    }
+  }
+
+  // ---------- tick ----------
+  function step(dt) {
+    S.t += dt;                                   // keeps running after the ending: the empire hums on
+    S.fatigue = Math.max(0, S.fatigue - dt / (S.done.keynote ? 30 : 60));
+    if (S.t >= S.nextChip) releaseChip();            // the timeline forgets you in about a minute per post
+    if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
+    S.spotWalk = Math.max(-0.4, Math.min(0.4, S.spotWalk + (Math.random() - 0.5) * 0.08 * dt));
+    if (Math.floor(S.t) !== Math.floor(S.t - dt)) { S.spotHist.push(spotMult()); if (S.spotHist.length > 90) S.spotHist.shift(); }
+    if (S.block && S.t >= S.block.until) S.block = null;
+    if (S.done.dynprice) {
+      const cap = servingGPUs();
+      if (cap > 0) S.price = Math.max(0.0001, 0.25 * Math.pow(demandAt(0.25) / cap, 1 / 1.3));
+    }
+    // hardware fails; failed GPUs sit dead until swapped; RMA'd ones come back after a minute
+    const exp = workingGPUs() * FAIL_RATE * dt; let nf = Math.floor(exp); if (Math.random() < exp - nf) nf++;
+    if (nf > 0) {
+      S.failed += Math.min(nf, workingGPUs()); S.fails += nf;
+      if (S.fails === nf) say("Error 79: GPU has fallen off the bus. Swap it out under Compute.");
+    }
+    if (S.done.hands && S.failed > 0) swapFailed();
+    while (S.rma.length && S.rma[0][1] <= S.t) {
+      const [n] = S.rma.shift();
+      S.vendorCap += n * gpuPrice() * 25;
+      if (!S.hints.rma2) { S.hints.rma2 = true; say("Replacements arrived. Parallax counted them as new sales."); }
+    }
+    S.queue = Math.min(S.queue + demand() * dt, Math.max(50, demand() * 30)); // people stop waiting after ~30s
+    const serve = Math.min(S.queue, servingGPUs() * dt);
+    S.queue -= serve; S.served += serve; S.funds += serve * S.price;
+    const trained = trainingGPUs() * dt;
+    S.progress += trained; S.gpuSeconds += trained + serve;
+    const ckptEvery = needFor(S.gen + 1) / 10;
+    S.lastCkpt = Math.max(S.lastCkpt, Math.floor(S.progress / ckptEvery) * ckptEvery);
+    if (S.spike && S.t >= S.spike.until) {
+      S.spike = null; S.progress = Math.max(0, S.lastCkpt - 2 * ckptEvery); S.lastCkpt = S.progress; S.hype = Math.max(5, S.hype - 8); track("diverged");
+      say("The run diverged. Restarted from an older checkpoint. Someone posted the loss curve.");
+    } else if (!S.spike && trained > 0 && Math.random() < dt / 90) {
+      S.spikes += 1;
+      track("spike", { auto: !!S.done.autockpt });
+      if (S.done.autockpt) { S.progress = S.lastCkpt; say("Loss spike. Auto-restarted from the last checkpoint."); }
+      else { S.spike = { until: S.t + 20 }; say(`Loss spike at step ${Math.floor(S.progress).toLocaleString("en-US")}: loss ${(1.8 + Math.random()).toFixed(2)} \u2192 NaN. Roll back to a checkpoint.`); }
+    }
+    if (S.progress >= needFor(S.gen + 1)) {
+      S.progress = 0; S.lastCkpt = 0; S.gen += 1; milestone(`Gen ${S.gen}`);
+      S.hype += 20 + 5 * S.gen;
+      say(`Gen ${S.gen}: “${MODEL_LINES[Math.min(S.gen, MODEL_LINES.length - 1)]}”`);
+    }
+    S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
+    if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
+    S.funds -= S.debt * INTEREST * dt;
+    hints();
+    if (db && S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
+  }
+
+  // One-time nudges, Paperclips style: the game tells you where the wall is.
+  function hint(id, cond, line) { if (!S.hints[id] && cond) { S.hints[id] = true; say(line); } }
+  function hints() {
+    hint("click", S.t > 15 && S.gpus === 0, "Answer queries until you can afford a GPU.");
+    hint("train", S.gpus >= 3 && S.split === 0 && S.gen === 0,
+      "Revenue will not build a data center. Move the Training share slider and train a model.");
+    hint("raise", S.gen >= 1, "Investors like a new model. Raise while hype is above 40.");
+    hint("full", S.gpus > 0 && roomNewest() < 1 && S.tier === 0, "The rack is full. Upgrade the cooling or lease more space.");
+    if (roomNewest() < 1 && S.credits + S.funds > gpuPrice() * 200 && S.t - (S.lastStranded || -1e9) > 300) {
+      S.lastStranded = S.t;
+      say(`${money(S.credits + S.funds)} to spend and nowhere to put GPUs. Lease more space or upgrade the cooling.`);
+    }
+    hint("bubble", S.hype > 100, "Hype above 100 is froth. It still raises money. It also pops.");
+    hint("parallax", dealReady(), "Parallax is on the line. They would like to invest in you.");
+    hint("spot", spotOpen(), "A spot market for GPUs opened. Rent out half your fleet when the price peaks.");
+    hint("bank", facilityOpen(), "A bank noticed your hype. It will lend against your GPUs whenever hype is above 60.");
+  }
+
+  // ---------- formatting ----------
+  function fmt(x) {
+    if (x < 1000) return x < 10 ? x.toFixed(2).replace(/\.00$/, "") : Math.round(x).toLocaleString("en-US");
+    const u = ["K", "M", "B", "T", "Qa"]; let i = -1;
+    while (x >= 1000 && i < u.length - 1) { x /= 1000; i++; }
+    return x.toFixed(x < 10 ? 2 : x < 100 ? 1 : 0) + u[i];
+  }
+  const money = (x) => "$" + fmt(x);
+  // Full digits, Paperclips style: $1,234,567.89 (falls back to short form past the quadrillions)
+  const moneyFull = (x) => Math.abs(x) >= 1e15 ? money(x)
+    : (x < 0 ? "-$" : "$") + Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const time = (s) => { s = Math.round(s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; };
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- render ----------
+  function render() {
+    $("gpuCount").textContent = S.gpus.toLocaleString("en-US");
+    $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>`;
+    $("creditsRow").hidden = S.gen < 1;
+    $("credits").textContent = moneyFull(S.credits);
+    $("deal").hidden = S.gen < 1;
+    $("deal").disabled = !dealReady();
+    $("deal").textContent = dealReady() ? `Take Parallax's strategic investment: ${money(dealSize())} in credits` : `Parallax will call back in ${time(S.nextDeal - S.t)}`;
+    if (S.log.length !== lastLogLen || S.log[S.log.length - 1] !== lastLogTail) {
+      lastLogLen = S.log.length; lastLogTail = S.log[S.log.length - 1];
+      const con = $("console");
+      con.innerHTML = S.log.map((l) => `<div>${l}</div>`).join("");
+      con.scrollTop = con.scrollHeight;
+    }
+    $("funds").textContent = moneyFull(S.funds);
+    $("credits").className = S.credits > 0 ? "hot" : "";
+    $("debtRow").hidden = S.debt <= 0;
+    $("debt").textContent = moneyFull(S.debt);
+    $("interest").textContent = S.debt > 0 ? `(interest ${money(S.debt * INTEREST)}/s)` : "";
+    $("repay").hidden = S.debt <= 0;
+    $("repay").disabled = S.funds < 1;
+    $("repay").textContent = S.funds >= S.debt ? `Pay off the debt: ${money(S.debt)}` : `Pay down debt: ${money(Math.max(0, S.funds))}`;
+    $("draw").hidden = !facilityOpen();
+    $("draw").disabled = !drawReady();
+    $("draw").textContent = drawReady() ? `Draw on the debt facility: ${money(drawSize())}`
+      : (S.hype < DRAW_HYPE ? `Debt facility needs hype ${DRAW_HYPE}+` : `Bank will take your call in ${time(S.nextDraw - S.t)}`);
+    $("price").textContent = "$" + (S.price < 0.01 ? S.price.toFixed(4) : S.price.toFixed(3)) + (S.done.dynprice ? " (auto)" : "");
+    const d = demand(), sv = Math.min(servingGPUs(), d);
+    $("demand").textContent = fmt(d) + " /s";
+    $("serving").textContent = fmt(sv) + " /s";
+    $("revenue").textContent = money(sv * S.price) + " /s";
+    $("hypeNum").textContent = Math.round(S.hype);
+    {
+      const nr = ROUNDS[S.round], notes = [];
+      if (!nr) notes.push(S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${fmt(GROUND_KW / 1000)} MW, then break ground` : "all rounds raised; next: break ground");
+      else if (S.gen < nr.gen) notes.push(`${nr.name} needs Gen ${nr.gen}`);
+      else notes.push(`${nr.name} at ${HYPE_TO_RAISE}`);
+      if (facilityOpen()) notes.push(`debt at ${DRAW_HYPE}`);
+      if (froth() > 0) notes.push(`froth ${Math.round(froth())}`);
+      $("hypeNote").textContent = `(${notes.join(", ")})`;
+    }
+    $("rivalLine").hidden = S.rival.n === 0;
+    if (S.rival.n) {
+      const pct = Math.round(100 * (S.rival.px / S.rival.prev - 1));
+      $("rivalLine").textContent = `Rival: PivotCloud (PIVT) $${S.rival.px.toFixed(2)} ${pct >= 0 ? "\u25b2" : "\u25bc"}${Math.abs(pct)}%`;
+    }
+    $("spotBox").hidden = !spotOpen();
+    if (spotOpen()) {
+      const m = spotMult();
+      $("spotNow").textContent = `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
+      $("spotNow").className = m >= 2 ? "good" : m < 1 ? "bad" : "";
+      $("spot").disabled = !spotReady();
+      $("spot").textContent = S.block ? `${S.block.n.toLocaleString("en-US")} GPUs leased out, back in ${Math.ceil(S.block.until - S.t)}s`
+        : `Sell 30s of half your fleet: ${money(blockSize() * avgPerf() * spotRate() * 30)}`;
+      drawSpot();
+    }
+    $("post").hidden = S.gen < 1;
+    $("post").disabled = !postReady();
+    $("post").textContent = postReady()
+      ? `Vague-post about the next model (~+${Math.max(1, Math.round(postBase()))} hype${S.fatigue >= 1 ? ", timeline is tired" : ""})`
+      : `Vague-post again in ${Math.ceil(S.nextPost - S.t)}s`;
+    $("hypeNum").className = S.hype > 100 ? "hot" : S.hype >= HYPE_TO_RAISE ? "good" : "";
+    $("hypeMeter").firstElementChild.style.width = Math.min(100, S.hype / 2) + "%";
+    $("hypeMeter").className = "meter" + (S.hype > 100 ? "" : S.hype >= HYPE_TO_RAISE ? " good" : "");
+    $("hypeExplain").textContent = S.hype > 100
+      ? "Froth. Raising and borrowing still work, but reality checks will knock it down. The more you owe, the harder it falls, and a hard fall while in debt is a margin call."
+      : S.hype >= DRAW_HYPE && facilityOpen() ? "Investors and the bank will take your call. You can raise and borrow."
+      : S.hype >= DRAW_HYPE ? "Investors will take a meeting. You can raise. The bank lends once you lease a data hall."
+      : S.hype >= HYPE_TO_RAISE ? "Investors will take a meeting. You can raise."
+      : "Investors aren't returning calls. Ship a model or post.";
+    const r = ROUNDS[S.round];
+    $("raise").hidden = !r || S.gen < r.gen;
+    if (r) {
+      $("raise").textContent = S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
+      $("raise").disabled = S.hype < HYPE_TO_RAISE;
+    }
+
+    $("answer").disabled = S.queue < 1;
+    const mix = Object.keys(S.fleet).map(Number).sort((a, b) => b - a).filter((c) => S.fleet[c] > 0)
+      .map((c) => `${chip(c).name} ${S.fleet[c].toLocaleString("en-US")}`).join(", ");
+    $("gpus").textContent = `${S.gpus.toLocaleString("en-US")}${mix && Object.keys(S.fleet).length > 1 ? ` (${mix})` : ""}, room for ${roomNewest().toLocaleString("en-US")} more`;
+    const nc = newest();
+    $("chipLine").textContent = `${nc.name}: ${nc.perf.toFixed(1)}x speed, ${nc.kw.toFixed(1)} kW` + (S.t < S.nextChip ? ` \u00b7 next in ${time(S.nextChip - S.t)}` : "");
+    const oc = oldestOld();
+    $("tradein").hidden = oc === null;
+    $("tradeNote").hidden = oc === null;
+    if (oc !== null) {
+      $("tradein").textContent = `Trade in ${S.fleet[oc].toLocaleString("en-US")} ${chip(oc).name}s for ${money(tradeValue(oc))} in credits`;
+      // Preview: the credits buy fewer, faster chips. Only worth it when power, not money, is the limit.
+      const n = S.fleet[oc], before = n * chip(oc).perf, freedKW = n * chip(oc).kw + Math.max(0, capKW() - usedKW());
+      const k = Math.max(0, Math.min(Math.floor(tradeValue(oc) / gpuPrice()), Math.floor(freedKW / nc.kw)));
+      const after = k * nc.perf, worse = after < before;
+      $("tradeNote").className = "line sub " + (worse ? "bad" : "good");
+      $("tradeNote").textContent = `Credits buy ~${k.toLocaleString("en-US")} ${nc.name}s: compute ${fmt(before)} \u2192 ${fmt(after)}` +
+        (worse ? ". You'd lose compute. Trade in when you're out of power, not money." : ". Worth it.");
+    }
+    $("gpuPrice").textContent = `${money(gpuPrice())} per ${nc.name}` + (basePrice() >= PMAX ? " (Parallax volume pricing)" : "");
+    const room = roomNewest();
+    const wallet = S.funds + S.credits;
+    $("failRow").hidden = S.fails === 0;
+    $("failed").textContent = S.failed.toLocaleString("en-US");
+    $("rmaNote").textContent = inRMA() ? `(${inRMA().toLocaleString("en-US")} in RMA)` : (S.done.hands ? "(remote hands on it)" : "");
+    $("swap").hidden = S.failed === 0 || !!S.done.hands;
+    $("swap").textContent = `Swap ${S.failed.toLocaleString("en-US")} failed GPU${S.failed === 1 ? "" : "s"}`;
+    $("rollback").hidden = !S.spike;
+    $("rentRival").hidden = !rentOpen();
+    if (rentOpen()) {
+      $("rentRival").disabled = S.funds < rentCost() || S.t < S.rentUntil;
+      $("rentRival").textContent = S.t < S.rentUntil ? `Renting PivotCloud's cluster: training x2 for ${Math.ceil(S.rentUntil - S.t)}s`
+        : `Rent PivotCloud's cluster: training x2 for 60s, ${money(rentCost())}`;
+    }
+    if (S.spike) $("rollback").textContent = `Roll back to checkpoint (diverges in ${Math.ceil(S.spike.until - S.t)}s)`;
+    $("priceUp").disabled = $("priceDown").disabled = !!S.done.dynprice;
+    $("buy1").disabled = room < 1 || wallet < costOf(1);
+    for (const b of document.querySelectorAll("button[data-buy]")) {
+      const k = Number(b.dataset.buy);
+      b.hidden = S.gpus < k;                     // each size shows up once the fleet is that big
+      b.disabled = room < k || wallet < costOf(k);
+      b.title = `${k.toLocaleString("en-US")} GPUs: ${money(costOf(k))}`;
+    }
+    const mc = maxBuy(S.credits);
+    $("buyCredits").hidden = S.credits <= 0;
+    $("buyCredits").disabled = mc < 1;
+    $("buyCredits").textContent = mc >= 1 ? `Buy max with credits (${mc.toLocaleString("en-US")})` : "Buy max with credits";
+    const mx = maxBuy();
+    $("buyMax").disabled = mx < 1;
+    $("buyMax").textContent = mx >= 1 ? `Buy max, credits + cash (${mx.toLocaleString("en-US")}) ${money(costOf(mx))}` : "Buy max, credits + cash";
+    $("splitVal").textContent = S.split + "%";
+    $("model").textContent = S.gen ? `Gen ${S.gen}` : "none";
+    const need = needFor(S.gen + 1), rate = trainingGPUs();
+    $("trainLabel").textContent = `Training Gen ${S.gen + 1} (${fmt(need)} GPU-s)`;
+    const pctDone = Math.floor(100 * S.progress / need);
+    $("trainEta").className = rate > 0 ? "good" : "bad";
+    if (S.spike) { $("trainEta").textContent = "LOSS SPIKE"; }
+    $("trainMeter").firstElementChild.style.width = Math.min(100, 100 * S.progress / need) + "%";
+    $("trainMeter").className = "meter " + (rate > 0 ? "good" : "bad");
+    if (!S.spike) $("trainEta").textContent = rate > 0 ? `${pctDone}%, ${time((need - S.progress) / rate)} left` : `${pctDone}%, paused`;
+    // What the other end of the slider would buy you: with dynamic pricing, serving less raises the price, so revenue barely drops.
+    {
+      const alt = S.split < 50 ? 85 : 15, compute = workingGPUs() * avgPerf();
+      const revAt = (split) => {
+        const cap = compute * (1 - split / 100);
+        if (cap <= 0) return 0;
+        if (S.done.dynprice) return cap * Math.max(0.0001, 0.25 * Math.pow(demandAt(0.25) / cap, 1 / 1.3));
+        return Math.min(cap, demandAt(S.price)) * S.price;
+      };
+      const altRate = compute * alt / 100 * trainMult(), show = S.gen >= 1 && compute > 0;
+      $("splitTrade").hidden = !show;
+      if (show) $("splitTrade").textContent = `At ${alt}% training: Gen ${S.gen + 1} in ${time((need - S.progress) / altRate)}, revenue ${money(revAt(alt))}/s (now ${money(revAt(S.split))}/s)`;
+    }
+
+    const cool = COOLING[S.cooling], cap = capKW(), used = usedKW();
+    $("site").textContent = TYPES.map((t, i) => owned(i) ? `${owned(i)} ${owned(i) === 1 ? t.one : t.many}` : "").filter(Boolean).join(", ");
+    $("racks").textContent = totalRacks().toLocaleString("en-US");
+    $("cooling").textContent = `${cool.name}, ${cool.kw} kW/rack for new leases`;
+    $("power").className = used >= cap - 0.5 ? "bad" : "";
+    $("powerMeter").firstElementChild.style.width = Math.min(100, 100 * used / Math.max(cap, 1)) + "%";
+    $("powerMeter").className = "meter" + (used >= cap - 0.5 ? " bad" : "");
+    $("power").textContent = `${fmt(used)} / ${fmt(cap)} kW`;
+    renderLeases();
+    renderRacks(totalRacks(), used / Math.max(cap, 1));
+    const hi = highestType(), capped = TYPES[hi].racks * cool.kw > TYPES[hi].powerKW * S.powerBoost;
+    const free = roomNewest();
+    $("limit").textContent = free >= 1
+      ? (S.funds + S.credits >= gpuPrice() ? `nothing yet: room for ${free.toLocaleString("en-US")} more ${newest().name}s` : `money: room for ${free.toLocaleString("en-US")} more ${newest().name}s`)
+      : capped
+      ? "landlord power caps: lease more space" + (S.done.substation ? "" : " (or pay for the substation)")
+      : retrofitPlan().kw > 0 ? "older, sparser space: retrofit it, or lease new space at the current standard"
+      : (S.cooling < COOLING.length - 1 ? "cooling: upgrade it in Projects, or lease more space" : "space: lease more");
+    {
+      const plan = retrofitPlan();
+      $("retrofit").hidden = plan.kw <= 0;
+      if (plan.kw > 0) {
+        $("retrofit").disabled = S.funds < plan.cost;
+        $("retrofit").textContent = `Retrofit ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name}: +${fmt(plan.kw)} kW, ${money(plan.cost)}`;
+      }
+    }
+
+    // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.
+    // (Rebuilding every tick swaps buttons out mid-click and the click never lands.)
+    const avail = PROJECTS.filter((p) => !S.done[p.id] && p.when());
+    const key = avail.map((p) => p.id).join(",");
+    if (key !== lastProjectKey) {
+      lastProjectKey = key;
+      $("projects").innerHTML = avail.length ? "" : `<div class="empty">Nothing yet. Train a model.</div>`;
+      for (const p of avail) {
+        const b = document.createElement("button");
+        b.type = "button"; b.dataset.id = p.id;
+        b.innerHTML = `<span class="t">${p.title} (${p.cost ? money(p.cost) : "free"})</span><span class="c">${p.desc}</span>`;
+        $("projects").appendChild(b);
+      }
+    }
+    for (const b of $("projects").querySelectorAll("button[data-id]")) {
+      const p = PROJECTS.find((x) => x.id === b.dataset.id);
+      const missing = p.needs ? p.needs() : [];
+      b.disabled = S.funds < p.cost || missing.length > 0;
+      if (p.needs) b.querySelector(".c").textContent = p.desc + (missing.length ? ` Still need to: ${missing.join(", ")}.` : " Ready.");
+    }
+    $("clock").textContent = `${time(S.t)} played · ${fmt(S.gpuSeconds)} GPU-seconds used`;
+    $("ending").hidden = !S.ended;
+    if (S.ended) $("endingStats").textContent = `Phase 1 took ${time(S.endedAt ?? (S.milestones.find((m) => m.what.startsWith("broke ground"))?.t) ?? S.t)}. ${fmt(S.served)} queries answered. ${fmt(S.gpuSeconds)} GPU-seconds. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}. You owe ${money(S.debt)}.`;
+  }
+
+  function drawSpot() {
+    const c = $("spotChart"), g = c.getContext("2d"), h = S.spotHist;
+    const css = getComputedStyle(document.documentElement);
+    const W = c.width, H = c.height, max = 3.2;
+    g.clearRect(0, 0, W, H);
+    g.strokeStyle = css.getPropertyValue("--rack").trim(); g.lineWidth = 1;
+    const y1 = H - (1 / max) * H;                                  // 1x = break-even vs serving queries
+    g.setLineDash([3, 3]); g.beginPath(); g.moveTo(0, y1); g.lineTo(W, y1); g.stroke(); g.setLineDash([]);
+    if (h.length < 2) return;
+    g.strokeStyle = css.getPropertyValue("--accent").trim(); g.lineWidth = 2; g.beginPath();
+    h.forEach((v, i) => { const x = (i / 89) * W, y = H - Math.min(v, max) / max * H; i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+    const lx = ((h.length - 1) / 89) * W, ly = H - Math.min(h[h.length - 1], max) / max * H;
+    g.fillStyle = css.getPropertyValue("--accent").trim(); g.beginPath(); g.arc(lx, ly, 3, 0, 7); g.fill();
+  }
+
+  let lastRackKey = "", lastProjectKey = null, lastLogLen = -1, lastLogTail = null, lastLeaseKey = null;
+  function renderLeases() {
+    $("rent").textContent = rentIndex().toFixed(1);
+    const vis = TYPES.map((_, i) => i).filter(leaseVisible);
+    const key = vis.join(",");
+    if (key !== lastLeaseKey) {
+      lastLeaseKey = key;
+      $("leases").innerHTML = "";
+      for (const i of vis) { const b = document.createElement("button"); b.type = "button"; b.dataset.lease = i; $("leases").appendChild(b); }
+    }
+    for (const b of $("leases").querySelectorAll("button[data-lease]")) {
+      const i = Number(b.dataset.lease), t = TYPES[i];
+      b.textContent = `Lease ${owned(i) ? "another" : "a"} ${t.one} (${t.racks.toLocaleString("en-US")} rack${t.racks > 1 ? "s" : ""}, ${fmt(unitKW(i))} kW): ${money(leaseCost(i))} \u00b7 ${money(leaseCost(i) / unitKW(i))}/kW`;
+      b.disabled = S.funds < leaseCost(i);
+    }
+  }
+  function buyProject(id) {
+    const p = PROJECTS.find((x) => x.id === id);
+    if (!p || S.done[p.id] || S.funds < p.cost || (p.needs && p.needs().length)) return;
+    S.funds -= p.cost; S.done[p.id] = true; p.buy(); milestone(`project: ${p.title}`); render();
+  }
+  function renderRacks(racks, fill) {
+    const shown = Math.min(racks, 60), filled = fill * shown;
+    const key = `${racks}|${Math.round(filled * 20)}`;
+    if (key === lastRackKey) return; lastRackKey = key;
+    let html = "";
+    for (let i = 0; i < shown; i++) {
+      const f = Math.max(0, Math.min(1, filled - i));
+      html += `<div class="rack"><i style="height:${100 * f}%"></i></div>`;
+    }
+    if (racks > shown) html += `<span class="more">+${(racks - shown).toLocaleString("en-US")} racks</span>`;
+    $("rackStrip").innerHTML = html;
+  }
+
+  // ---------- wiring ----------
+  function wire() {
+    $("answer").addEventListener("click", () => { answer(); render(); });
+    $("priceUp").addEventListener("click", () => { S.price = +(S.price * 1.1).toPrecision(3); track("price", { p: S.price }); render(); });
+    $("priceDown").addEventListener("click", () => { S.price = Math.max(0.0001, +(S.price / 1.1).toPrecision(3)); track("price", { p: S.price }); render(); });
+    $("buy1").addEventListener("click", () => { buy(1); render(); });
+    for (const b of document.querySelectorAll("button[data-buy]")) b.addEventListener("click", () => { buy(Number(b.dataset.buy)); render(); });
+    $("buyMax").addEventListener("click", () => { buy(maxBuy()); render(); });
+    $("buyCredits").addEventListener("click", () => { buy(maxBuy(S.credits)); render(); });
+    $("split").addEventListener("input", (e) => { S.split = Number(e.target.value); render(); });
+    $("leases").addEventListener("click", (e) => { const b = e.target.closest("button[data-lease]"); if (b) { lease(Number(b.dataset.lease)); render(); } });
+    $("raise").addEventListener("click", () => { raise(); render(); });
+    $("deal").addEventListener("click", () => { takeDeal(); render(); });
+    $("draw").addEventListener("click", () => { draw(); render(); });
+    $("repay").addEventListener("click", () => { repay(); render(); });
+    $("swap").addEventListener("click", () => { swapFailed(); render(); });
+    $("tradein").addEventListener("click", () => { tradeIn(); render(); });
+    $("post").addEventListener("click", () => { vaguePost(); render(); });
+    $("spot").addEventListener("click", () => { sellSpot(); render(); });
+    $("rollback").addEventListener("click", () => { rollback(); render(); });
+    $("rentRival").addEventListener("click", () => { rentRival(); render(); });
+    $("retrofit").addEventListener("click", () => { retrofit(); render(); });
+    $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
+    $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
+    $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = 0; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; render(); });
+  }
+
+  const SAVE_KEY = "more-with-more-v1";
+  function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+  function load() { try { const raw = localStorage.getItem(SAVE_KEY); if (raw) return JSON.parse(raw); } catch (e) {} return null; }
+
+  function start(data) {
+    const saved = (data && data.state) || load();
+    if (saved) { S = Object.assign(fresh(), saved); if (!saved.logV2) { S.log = S.log.slice().reverse(); } S.log = S.log.map(unMojibake); }
+    S.logV2 = true;
+    if (saved && !saved.leases) { S.leases = { [TYPES[saved.tier || 0].id]: 1 }; }          // old saves: one of the tier they had
+    if (saved && !saved.coolingV2) { S.cooling = [0, 2, 3, 4][saved.cooling || 0] ?? 0; S.coolingV2 = true; } // cooling list grew
+    if (saved && !saved.leaseCool) { S.leaseCool = {}; TYPES.forEach((t, i) => { if (owned(i)) S.leaseCool[t.id] = { [S.cooling]: owned(i) }; }); }
+    S.tier = highestType();
+    if (saved && !saved.fleet) { S.fleet = S.gpus ? { 0: S.gpus } : {}; S.chipIdx = 0; S.nextChip = Math.max(S.t + 60, FIRST_CHIP_AT); }
+    $("split").value = S.split;
+    ensureRun(); track("session", { resumedAt: Math.round(S.t) }); setInterval(flush, 20000);
+    wire();
+    let last = performance.now();
+    setInterval(() => {
+      const now = performance.now(), dt = Math.min((now - last) / 1000, 1); last = now;
+      step(dt); render();
+    }, 100);
+    setInterval(save, 5000);
+    // Save right after any button press or slider move, and when the page is hidden or closed,
+    // so a refresh never rewinds the last few seconds (and can't re-roll a ratioed post).
+    document.addEventListener("click", (e) => { if (e.target.closest("button")) setTimeout(save, 0); });
+    $("split").addEventListener("change", () => { save(); track("split", { v: S.split }); });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") { save(); flush(); } });
+    window.addEventListener("pagehide", () => { save(); flush(); });
+    render();
+  }
+
+  window.claude?.hot?.snapshot?.(() => ({ state: S }));
+  if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
+})();
+</script>
