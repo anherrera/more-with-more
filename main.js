@@ -156,11 +156,13 @@ function sellSpot() {
 }
 
 // Trade the oldest chips back to Parallax for 25% of today's price, in credits. Frees power for new chips.
-const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && S.fleet[c] > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
-const tradeValue = (c) => S.fleet[c] * basePrice() * chip(c).priceMult * 0.25;
+// Phase 2: GPUs under contract can't be traded in; only the free part of a cohort can go.
+const tradeCount = (c) => Math.min(S.fleet[c] || 0, S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
+const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && tradeCount(c) > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
+const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * 0.25;
 function tradeIn() {
   const c = oldestOld(); if (c === null) return;
-  const n = Math.min(S.fleet[c], Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0)));
+  const n = Math.min(tradeCount(c), Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0)));
   if (n <= 0) return;
   const val = n * basePrice() * chip(c).priceMult * 0.25;
   S.fleet[c] -= n; if (S.fleet[c] <= 0) delete S.fleet[c]; S.gpus -= n; S.credits += val; S.vendorCap += val * 25;
@@ -547,9 +549,9 @@ function renderPhase1() {
   $("tradein").hidden = oc === null;
   $("tradeNote").hidden = oc === null;
   if (oc !== null) {
-    $("tradein").textContent = `Trade in ${S.fleet[oc].toLocaleString("en-US")} ${chip(oc).name}s for ${money(tradeValue(oc))} in credits`;
+    $("tradein").textContent = `Trade in ${tradeCount(oc).toLocaleString("en-US")} ${chip(oc).name}s for ${money(tradeValue(oc))} in credits`;
     // Preview: the credits buy fewer, faster chips. Only worth it when power, not money, is the limit.
-    const n = S.fleet[oc], before = n * chip(oc).perf, freedKW = n * chip(oc).kw + Math.max(0, capKW() - usedKW());
+    const n = tradeCount(oc), before = n * chip(oc).perf, freedKW = n * chip(oc).kw + Math.max(0, capKW() - usedKW());
     const k = Math.max(0, Math.min(Math.floor(tradeValue(oc) / gpuPrice()), Math.floor(freedKW / nc.kw)));
     const after = k * nc.perf, worse = after < before;
     $("tradeNote").className = "line sub " + (worse ? "bad" : "good");
@@ -625,6 +627,8 @@ function renderPhase1() {
   const free = roomNewest();
   $("limit").textContent = free >= 1
     ? (S.funds + S.credits >= gpuPrice() ? `nothing yet: room for ${free.toLocaleString("en-US")} more ${newest().name}s` : `money: room for ${free.toLocaleString("en-US")} more ${newest().name}s`)
+    : S.phase === 2 && S.p2 && S.p2.market < 1                  // a rack or two left is not capacity
+    ? "Leased capacity is sold out in this market: build on your campus, or trade in older chips"
     : capped
     ? "landlord power caps: lease more space" + (S.done.substation ? "" : " (or pay for the substation)")
     : retrofitPlan().kw > 0 ? "older, sparser space: retrofit it, or lease new space at the current standard"
@@ -670,6 +674,7 @@ function renderLeases() {
     const i = Number(b.dataset.lease), t = TYPES[i];
     b.textContent = `Lease ${owned(i) ? "another" : "a"} ${t.one} (${t.racks.toLocaleString("en-US")} rack${t.racks > 1 ? "s" : ""}, ${fmt(unitKW(i))} kW): ${money(leaseCost(i))} \u00b7 ${money(leaseCost(i) / unitKW(i))}/kW`;
     b.disabled = S.funds < leaseCost(i) || (S.phase === 2 && !marketHas(i));
+    b.title = S.phase === 2 && !marketHas(i) ? `Not enough MW left in this market for one (${fmt(unitKW(i) / 1000)} MW needed)` : "";
   }
 }
 function buyProject(id) {
@@ -723,6 +728,7 @@ function start(data) {
   const saved = (data && data.state) || load();
   if (saved) { S = Object.assign(fresh(), saved); if (!saved.logV2) { S.log = S.log.slice().reverse(); } S.log = S.log.map(unMojibake); }
   S.logV2 = true;
+  if (S.p2) migrateCampus();
   if (saved && !saved.leases) { S.leases = { [TYPES[saved.tier || 0].id]: 1 }; }          // old saves: one of the tier they had
   if (saved && !saved.coolingV2) { S.cooling = [0, 2, 3, 4][saved.cooling || 0] ?? 0; S.coolingV2 = true; } // cooling list grew
   if (saved && !saved.leaseCool) { S.leaseCool = {}; TYPES.forEach((t, i) => { if (owned(i)) S.leaseCool[t.id] = { [S.cooling]: owned(i) }; }); }

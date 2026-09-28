@@ -67,8 +67,13 @@ def test_break_ground_starts_campus(game):
 
 def test_plan1_save_loads(game):
     pg = game({**READY, "phase": 2, "ended": True, "p2": {"county": "cheap", "legacyMW": 110, "grid": 50, "queue": None,
-               "queueN": 0, "builds": [{"kind": "hall", "done": 0}], "offers": [], "contracts": [], "nextOffer": 0,
-               "offerN": 0, "contractN": 0, "earned": 0}})
+               "queueN": 0, "builds": [{"kind": "hall", "done": 0}], "nextOffer": 1e9, "offerN": 1, "contractN": 1, "earned": 0,
+               "offers": [{"id": "o1", "n": 1, "who": "A lab funded by Parallax", "mw": 20, "start": 1400, "term": 600,
+                           "upfront": 1, "fee": 1, "expires": 1300}],
+               "contracts": [{"id": "c1", "n": 1, "who": "A lab funded by Parallax", "mw": 30, "start": 1500, "end": 2100,
+                              "fee": 1, "upfront": 1, "status": "waiting", "reneg": False, "warned": False}]}})
     run(pg, 2)
     assert pg.evaluate("() => [S.phase, S.p2.county, typeof S.p2.market]") == [2, "cheap", "number"]
     assert pg.is_visible("#campusBox")
+    assert "NaN" not in pg.inner_text("#contractsBox")
+    assert "\u2713 covered" in pg.inner_text("#contracts")

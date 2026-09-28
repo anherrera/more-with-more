@@ -91,3 +91,11 @@ def test_chips_keep_shipping_in_phase2(game):
     pg.evaluate("() => { S.nextChip = S.t + 1; }")
     run(pg, 2)
     assert pg.evaluate("() => S.chipIdx") == 4
+
+
+def test_sold_out_market_is_named(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.p2.market = 0; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
+    run(pg, 1)
+    assert pg.inner_text("#limit").startswith("Leased capacity is sold out in this market")
+    assert "not enough mw left" in pg.get_attribute("#leases button[data-lease='3']", "title").lower()

@@ -207,3 +207,26 @@ def test_offers_never_exceed_what_you_could_deliver(game):
     sizes = pg.evaluate("() => { const out = []; for (let i = 0; i < 40; i++) { S.p2.offers = []; makeOffer(); out.push(S.p2.offers[0].mw); } return out; }")
     assert cap < 100
     assert max(sizes) <= max(10, cap)
+
+
+def test_trade_in_skips_contracted_gpus(game):
+    pg = campus(game)
+    pg.evaluate("""() => { S.fleet = {3: 20000}; S.gpus = 20000; S.p2.offers = []; makeOffer(); const o = S.p2.offers[0];
+      o.mw = 30; o.minGen = 0; o.start = S.t + 1; acceptOffer(o.id); }""")
+    run(pg, 2)
+    assert pg.evaluate("() => S.p2.contracts[0].status") == "active"
+    pg.evaluate("() => { S.chipIdx = 4; render(); }")
+    pg.click("#tradein")
+    # the 30 MW under contract stays racked; only the free P4s were traded
+    assert pg.evaluate("() => usedKW() / 1000") == pytest.approx(30, abs=0.01)
+    assert pg.evaluate("() => eligibleFreeMW(0)") == pytest.approx(0, abs=0.01)
+
+
+def test_signed_contract_forecasts_see_each_other(game):
+    pg = campus(game)
+    pg.evaluate("""() => { S.fleet = {3: Math.round(40000 / chip(3).kw)}; S.gpus = S.fleet[3];
+      S.leases = {rack: 1}; S.leaseCool = {rack: {0: 1}}; S.p2.market = 0; S.p2.offers = [];
+      for (let i = 0; i < 2; i++) { makeOffer(); const o = S.p2.offers[S.p2.offers.length - 1];
+        o.mw = 30; o.minGen = 0; o.start = S.t + 100 + i; acceptOffer(o.id); } render(); }""")
+    rows = pg.inner_text("#contracts")
+    assert rows.count("✓ covered") == 1, rows

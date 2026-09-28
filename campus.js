@@ -120,8 +120,12 @@ const tradeableMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]
 // The most you could deliver of this generation: on hand, free room, the lease market, trade-ins, and land left for halls.
 const deliverableMW = (minGen) => eligibleFreeMW(minGen) + roomMWAt(S.t) + Math.max(0, S.p2.market) + tradeableMW(minGen) +
   (S.p2.county ? Math.floor(acresFree() / HALL.acres) * HALL.mw : 0);
+// Signed contracts that get GPUs before this one: for a signed contract, those ahead of it in line;
+// for an offer (last in line if signed), everything that starts during its term.
 const pendingBefore = (o) => S.p2.contracts
-  .filter((c) => (c.status === "waiting" || c.status === "late") && c.id !== o.id && c.start < o.start + o.term).reduce((a, c) => a + c.mw, 0);
+  .filter((c) => (c.status === "waiting" || c.status === "late") && c.id !== o.id &&
+    (o.end != null ? c.start < o.start || (c.start === o.start && c.n < o.n) : c.start < o.start + o.term))
+  .reduce((a, c) => a + c.mw, 0);
 
 // Can you deliver this? From GPUs on hand, by buying GPUs into space you'll have, or not without more space.
 function forecast(o) {
@@ -219,6 +223,12 @@ function stepContracts(dt) {
 
 const campusDrawSize = () => (S.hype / 100) * Math.max(backlogMW(), 10) * 300000;   // lenders size on signed backlog
 const campusDealSize = () => 20e6;   // Parallax credits: GPUs only
+
+// Saves from before chip generations mattered: default missing fields.
+function migrateCampus() {
+  if (S.p2.market == null) S.p2.market = MARKET_START_MW;
+  for (const x of [...S.p2.offers, ...S.p2.contracts]) if (x.minGen == null) x.minGen = 0;
+}
 
 function startCampus() {
   if (S.phase === 2) return;
