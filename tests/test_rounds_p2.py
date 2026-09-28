@@ -20,4 +20,4 @@ def test_series_e_needs_backlog(game):
     pg.click("#raise")
     assert pg.evaluate("() => S.funds") - funds == 100e6
     assert pg.evaluate("() => S.p2.round") == 1
-    assert "Series F" in pg.inner_text("#raise")
+    assert "IPO needs" in pg.inner_text("#raise")                            # after Series E you go public

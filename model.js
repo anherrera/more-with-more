@@ -146,7 +146,7 @@ function renderModel() {
   $("ending2").hidden = m.endedAt == null;
   if (m.endedAt != null) {
     $("ending2Stats").textContent = `Phase 2 took ${time(m.endedAt - (S.endedAt || 0))}. A ${mwText(en)} campus, ${mwText(deliveredMW())} delivered, ` +
-      `${money(S.debt)} owed. The model's autonomy: ${m.autonomy}%.`;
+      `${money(S.debt)} owed. The model's autonomy: ${m.autonomy}%. You personally cleared ${money(capOf().liquidity)}. You own ${(100 * ownership()).toFixed(1)}%.`;
   }
 }
 

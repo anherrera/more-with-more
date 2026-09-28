@@ -342,9 +342,10 @@ function lease(i) {
   say(owned(i) === 1 ? `Signed the lease: your first ${t.one}.` : `Leased another ${t.one}. You have ${owned(i)} ${t.many}.`);
 }
 function raise() {
-  if (S.phase === 2) return raiseCampus();
+  if (S.phase === 2) return campusRound() ? raiseCampus() : publicRaise();
   const r = ROUNDS[S.round];
   if (r && S.gen >= r.gen && S.hype >= HYPE_TO_RAISE) {
+    dilute(DILUTION[r.name], r.amount, r.name);
     S.funds += r.amount; S.round += 1; S.hype = Math.max(10, S.hype - 20); milestone(`raised ${r.name}`);
     say(`Closed the ${r.name}: $${fmt(r.amount)}. The deck said “scaling laws” eleven times.`);
   }
@@ -455,7 +456,7 @@ function render() {
   $("hypeNum").textContent = Math.round(S.hype);
   {
     const nr = S.phase === 2 ? campusRound() : ROUNDS[S.round], notes = [];
-    if (S.phase === 2) notes.push(nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${mwText(nr.backlog)} backlog` : "all rounds raised");
+    if (S.phase === 2) notes.push(nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${mwText(nr.backlog)} backlog` : isPublic() ? `follow-ons at ${HYPE_TO_RAISE}` : `IPO at ${HYPE_TO_RAISE}`);
     else if (!nr) notes.push(S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${mwText(GROUND_KW / 1000)}, then break ground` : "all rounds raised; next: break ground");
     else if (S.gen < nr.gen) notes.push(`${nr.name} needs Gen ${nr.gen}`);
     else notes.push(`${nr.name} at ${HYPE_TO_RAISE}`);
@@ -493,9 +494,11 @@ function render() {
     : S.hype >= DRAW_HYPE ? "Investors will take a meeting. You can raise. The bank lends once you lease a data hall."
     : S.hype >= HYPE_TO_RAISE ? "Investors will take a meeting. You can raise."
     : "Investors aren't returning calls. Ship a model or post.";
+  renderMarket();
   const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
+  if (S.phase === 2 && !r) renderPublicRaise();
   const gated = !!r && (S.phase === 2 ? !!roundGap(r) : S.gen < r.gen);
-  $("raise").hidden = !r || (S.phase === 1 && gated);
+  if (S.phase === 1 || r) $("raise").hidden = !r || (S.phase === 1 && gated);
   if (r) {
     $("raise").textContent = S.phase === 2 && gated ? `${r.name} needs ${roundGap(r)}`
       : S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;

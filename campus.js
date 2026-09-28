@@ -39,8 +39,7 @@ const CUSTOMERS = [
   "A sovereign AI fund", "A lab you have never heard of with $4B", "A chatbot company that is also a hardware company",
 ];
 const ROUNDS2 = [
-  { name: "Series E", backlog: 100, campus: 150, amount: 100e6 }, { name: "Series F", backlog: 300, campus: 400, amount: 250e6 },
-  { name: "Series G", backlog: 700, campus: 750, amount: 600e6 },
+  { name: "Series E", backlog: 100, campus: 150, amount: 100e6 },   // then the IPO (market.js)
 ];
 const campusRound = () => ROUNDS2[S.p2.round || 0];
 // Investors fund build-outs: a round needs signed backlog AND a campus to show for it. Returns what's missing, or null.
@@ -49,6 +48,7 @@ const roundGap = (r) => backlogMW() < r.backlog ? `${mwText(r.backlog)} of signe
 function raiseCampus() {
   const r = campusRound();
   if (!r || roundGap(r) || S.hype < HYPE_TO_RAISE) return;
+  dilute(DILUTION[r.name], r.amount, r.name);
   S.funds += r.amount; S.p2.round = (S.p2.round || 0) + 1; S.hype = Math.max(10, S.hype - 20); milestone(`raised ${r.name}`);
   say(`Closed the ${r.name}: ${money(r.amount)}. The deck said “backlog” eleven times. Most of the backlog is labs funded by Parallax.`);
 }
@@ -342,6 +342,7 @@ function stepCampus(dt) {
   if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + (60 + Math.random() * 60) * (S.done.sales2 ? 0.7 : 1); }
   stepContracts(dt);
   stepRobots();
+  stepMarket(dt);
   stepModel();
 }
 
@@ -548,6 +549,7 @@ function renderContracts() {
 
 function wireCampus() {
   wireModel();
+  wireMarket();
   $("counties").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-county]");
     if (b) { chooseCounty(b.dataset.county); render(); }
