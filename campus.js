@@ -286,6 +286,7 @@ const campusSnap = () => ({ county: S.p2.county, fleetMW: Math.round(usedKW() / 
   late: S.p2.contracts.filter((c) => c.status === "late").length, earned: Math.round(S.p2.earned) });
 
 function renderCampus() {
+  renderFleet();
   const p = S.p2;
   if (!p.county) { $("countLabel").textContent = "Fleet"; $("gpuCount").textContent = `${mwText(usedKW() / 1000)}`; }
   $("countyBox").hidden = !!p.county;
@@ -326,6 +327,41 @@ function renderCampus() {
   $("underway").textContent = pending.length
     ? "Under construction: " + pending.map((b) => `${b.kind} ${time(b.done - S.t)}`).join(", ") : "";
   renderContracts();
+}
+
+// The fleet by chip generation: what can serve new contracts, and what is old and only earns on-demand.
+const contractReady = (g) => g >= S.chipIdx - 1;   // offers ask for the newest chip or one behind
+let lastFleetKey = null;
+function renderFleet() {
+  const free = freeKWByGen();
+  const gens = Object.keys(S.fleet).map(Number).filter((g) => S.fleet[g] > 0).sort((a, b) => b - a);
+  const kwOf = (g) => S.fleet[g] * chip(g).kw;
+  const ready = gens.filter(contractReady), old = gens.filter((g) => !contractReady(g));
+  const sum = (list, f) => list.reduce((a, g) => a + f(g), 0);
+  $("fleetSummary").textContent = `Contract-ready: ${kwText(sum(ready, kwOf))} (${kwText(sum(ready, (g) => free[g] || 0))} free) \u00b7 ` +
+    `Old: ${kwText(sum(old, kwOf))} earning on-demand \u00b7 Room: ${kwText(Math.max(0, capKW() - usedKW()))}`;
+  const key = gens.map((g) => `${g}:${contractReady(g)}:${tradeCount(g) > 0}`).join(",");
+  if (key !== lastFleetKey) {
+    lastFleetKey = key;
+    $("fleetRows").innerHTML = gens.length ? "" : `<div class="empty">No GPUs. Buy some under Compute.</div>`;
+    for (const g of gens) {
+      const d = document.createElement("div"); d.className = "deal"; d.dataset.gen = g;
+      d.innerHTML = `<div class="line fl"></div>` + (!contractReady(g) && tradeCount(g) > 0
+        ? `<div class="btns"><button type="button" data-tradegen="${g}"></button></div>` : "");
+      $("fleetRows").appendChild(d);
+    }
+  }
+  for (const d of $("fleetRows").querySelectorAll("[data-gen]")) {
+    const g = Number(d.dataset.gen); if (!S.fleet[g]) continue;
+    const under = kwOf(g) - (free[g] || 0);
+    const status = contractReady(g) ? `contract-ready${under > 0 ? `, ${kwText(under)} under contract` : ""}` : "old: on-demand only";
+    const fl = d.querySelector(".fl");
+    fl.className = "line fl " + (contractReady(g) ? "good" : "");
+    fl.textContent = `${chip(g).name} \u00b7 ${S.fleet[g].toLocaleString("en-US")} GPUs \u00b7 ${kwText(kwOf(g))} \u00b7 ${status} \u00b7 ` +
+      `${money(odRate(g) * OD_UTIL)}/MW-s on-demand`;
+    const b = d.querySelector("[data-tradegen]");
+    if (b) b.textContent = `Trade in ${tradeCount(g).toLocaleString("en-US")}: ${money(tradeValue(g))} in credits, frees ${kwText(tradeCount(g) * chip(g).kw)}`;
+  }
 }
 
 let lastOfferKey = null, lastContractKey = null;
@@ -399,6 +435,10 @@ function wireCampus() {
   $("offers").addEventListener("click", (e) => {
     const a = e.target.closest("button[data-accept]"), d = e.target.closest("button[data-decline]");
     if (a) { acceptOffer(a.dataset.accept); render(); } else if (d) { declineOffer(d.dataset.decline); render(); }
+  });
+  $("fleetRows").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tradegen]");
+    if (b) { tradeIn(Number(b.dataset.tradegen)); render(); }
   });
   $("contracts").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-reneg]");

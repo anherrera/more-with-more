@@ -30,7 +30,7 @@
   }
   [hidden] { display: none !important; }
   body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--serif); padding-inline: 16px; padding-block: 16px 40px; }
-  .wrap { max-width: 980px; margin: 0 auto; }
+  .wrap { max-width: 1800px; margin: 0 auto; }
   .count { font-size: 28px; margin: 0 0 2px; font-variant-numeric: tabular-nums; }
   .ticker { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-variant-numeric: tabular-nums; }
   .ticker b { color: var(--accent); }
@@ -139,7 +139,7 @@
       </div>
     </div>
 
-    <div class="col">
+    <div class="col" id="colDeals" hidden>
       <div id="countyBox" hidden>
         <h3>Pick a county</h3>
         <div class="choices" id="counties"></div>
@@ -152,6 +152,14 @@
         <div id="offers"></div>
         <div class="line sub">Signed</div>
         <div id="contracts"></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div id="fleetBox" hidden>
+        <h3>Fleet</h3>
+        <div class="line" id="fleetSummary"></div>
+        <div id="fleetRows"></div>
       </div>
       <div id="computeBox">
         <h3>Compute</h3>

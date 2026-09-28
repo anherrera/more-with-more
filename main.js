@@ -160,8 +160,8 @@ function sellSpot() {
 const tradeCount = (c) => Math.min(S.fleet[c] || 0, S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
 const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && tradeCount(c) > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
 const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * 0.25;
-function tradeIn() {
-  const c = oldestOld(); if (c === null) return;
+function tradeIn(gen) {
+  const c = gen ?? oldestOld(); if (c === null || c === undefined || c >= S.chipIdx) return;
   const n = Math.min(tradeCount(c), Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0)));
   if (n <= 0) return;
   const val = n * basePrice() * chip(c).priceMult * 0.25;
@@ -502,6 +502,7 @@ function render() {
   }
 
   for (const id of ["p1biz", "trainingBox", "answer"]) $(id).hidden = S.phase !== 1;
+  $("colDeals").hidden = $("fleetBox").hidden = S.phase !== 2;
   renderPhase1();                                   // compute and leased space work in both phases
   if (S.phase === 1) $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true;
   else renderCampus();
@@ -546,8 +547,8 @@ function renderPhase1() {
   const nc = newest();
   $("chipLine").textContent = `${nc.name}: ${nc.perf.toFixed(1)}x speed, ${kwText(nc.kw)}` + (S.t < S.nextChip ? ` \u00b7 next in ${time(S.nextChip - S.t)}` : "");
   const oc = oldestOld();
-  $("tradein").hidden = oc === null;
-  $("tradeNote").hidden = oc === null;
+  $("tradein").hidden = oc === null || S.phase === 2;   // phase 2: the Fleet panel has a trade-in per generation
+  $("tradeNote").hidden = oc === null || S.phase === 2;
   if (oc !== null) {
     $("tradein").textContent = `Trade in ${tradeCount(oc).toLocaleString("en-US")} ${chip(oc).name}s for ${money(tradeValue(oc))} in credits`;
     // Preview: the credits buy fewer, faster chips. Only worth it when power, not money, is the limit.

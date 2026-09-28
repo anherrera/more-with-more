@@ -215,8 +215,8 @@ def test_trade_in_skips_contracted_gpus(game):
       o.mw = 30; o.minGen = 0; o.start = S.t + 1; acceptOffer(o.id); }""")
     run(pg, 2)
     assert pg.evaluate("() => S.p2.contracts[0].status") == "active"
-    pg.evaluate("() => { S.chipIdx = 4; render(); }")
-    pg.click("#tradein")
+    pg.evaluate("() => { S.chipIdx = 5; render(); }")          # P4 is two behind: old, tradeable in the Fleet panel
+    pg.click("button[data-tradegen='3']")
     # the 30 MW under contract stays racked; only the free P4s were traded
     assert pg.evaluate("() => usedKW() / 1000") == pytest.approx(30, abs=0.01)
     assert pg.evaluate("() => eligibleFreeMW(0)") == pytest.approx(0, abs=0.01)
