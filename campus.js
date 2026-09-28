@@ -12,9 +12,9 @@ const COUNTIES = [
     pitch: "$20M in tax incentives up front. The town already has a Facebook group about you.",
     gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6 },
 ];
-const LEGACY_FEE = 100;   // $/s per MW of the phase 1 fleet left in leased colo
+const MARKET_START_MW = 150, MARKET_REGROW = 10 / 60;   // leasable MW left in this market; new colos open slowly
 const P2_RATE = 0.25;     // phase 1 debt is refinanced as project finance at a quarter of the facility's rate
-const HALL = { mw: 50, acres: 20, cost: 30e6, secs: 90 };   // a hall is 50 MW of GPUs once it has power
+const HALL = { mw: 50, acres: 20, cost: 10e6, secs: 90 };   // a powered shell: GPUs are bought separately and racked in it
 const POWER = {
   turbine: { name: "gas turbine", mw: 50, cost: 25e6, secs: 60, acres: 0 },
   solar: { name: "solar + batteries", mw: 30, cost: 20e6, secs: 180, acres: 150 },
@@ -22,7 +22,7 @@ const POWER = {
 const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.3;             // each request waits 30% longer: everyone is in the queue
 const BUILD_DONE = {
   hall: () => `Hall ${doneBuilds("hall")} is up. ` +
-    (hallMWAt() > powerAt() ? "It has no power yet. It is a very expensive shed." : "Energized."),
+    (hallMWAt() > powerAt() ? "It has no power yet. It is a very expensive shed." : "Energized. Rack some GPUs in it."),
   turbine: () => "A gas turbine came online. The neighbors can hear it.",
   solar: () => "The solar farm is live. It works about a third of the time; the batteries cover the rest, mostly.",
 };
@@ -36,7 +36,7 @@ const CUSTOMERS = [
 ];
 
 const freshP2 = () => ({
-  county: null, legacyMW: 0, grid: 0, queue: null, queueN: 0, builds: [],
+  county: null, market: MARKET_START_MW, round: 0, grid: 0, queue: null, queueN: 0, builds: [],
   offers: [], contracts: [], nextOffer: 0, offerN: 0, contractN: 0, earned: 0,
 });
 const countyOf = () => COUNTIES.find((c) => c.id === S.p2.county);
@@ -45,16 +45,17 @@ const gridAt = (at = S.t) => S.p2.grid + (S.p2.queue && S.p2.queue.done <= at ? 
 const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * POWER.turbine.mw + doneBuilds("solar", at) * POWER.solar.mw;
 const hallMWAt = (at = S.t) => doneBuilds("hall", at) * HALL.mw;
 const energizedAt = (at = S.t) => Math.min(hallMWAt(at), powerAt(at));
+const campusKWAt = (at = S.t) => (S.p2 && S.p2.county ? energizedAt(at) * 1000 : 0);
+const marketHas = (i) => unitKW(i) / 1000 <= S.p2.market;
+function takeFromMarket(i) { S.p2.market -= unitKW(i) / 1000; }
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + (b.kind === "hall" ? HALL.acres : POWER[b.kind].acres), 0);
 const acresFree = () => countyOf().acres - acresUsed();
 const queueSecs = () => countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN);
 
 function build(kind) {
   const spec = kind === "hall" ? HALL : POWER[kind];
-  if (!spec || !S.p2.county || spec.acres > acresFree()) return;
-  const credits = kind === "hall" ? Math.min(S.credits, spec.cost) : 0;   // Parallax credits pay for a hall's GPUs
-  if (S.funds + credits < spec.cost) return;
-  S.credits -= credits; S.funds -= spec.cost - credits;
+  if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < spec.cost) return;
+  S.funds -= spec.cost;
   S.p2.builds.push({ kind, done: S.t + spec.secs });
   track("build", { ev: "start", kind, cost: Math.round(spec.cost) });
   say(kind === "hall" ? `Broke ground on hall ${S.p2.builds.filter((b) => b.kind === "hall").length}. Ready in ${time(spec.secs)}.`
@@ -168,14 +169,14 @@ function stepContracts(dt) {
 }
 
 const campusDrawSize = () => (S.hype / 100) * Math.max(backlogMW(), 10) * 300000;   // lenders size on signed backlog
-const campusDealSize = () => HALL.cost * 0.5;                                        // Parallax credits: half a hall of GPUs
+const campusDealSize = () => 20e6;   // Parallax credits: GPUs only
 
 function startCampus() {
   if (S.phase === 2) return;
-  S.phase = 2; S.p2 = freshP2(); S.p2.legacyMW = Math.round(usedKW() / 1000);
+  S.phase = 2; S.p2 = freshP2();
   milestone("phase 2: the campus");
   say("We are an infrastructure company now.");
-  say(`Your ${fmt(S.p2.legacyMW)} MW of GPUs stay in the colo as legacy capacity. The model has opinions about which county is next.`);
+  say(`Your ${fmt(usedKW() / 1000)} MW of GPUs stay in the space you already lease. Whatever isn't under contract sells on-demand. The model has opinions about which county is next.`);
   if (S.debt > 0) say(`Lenders love infrastructure. Your ${money(S.debt)} was refinanced as project finance at a quarter of the rate.`);
 }
 
@@ -189,10 +190,10 @@ function chooseCounty(id) {
   say("Your old lab spun out. It wants 30 MW in five minutes. Parallax is paying for it, which means Parallax is paying you.");
 }
 
-const campusRevenue = () => (S.p2 && S.p2.county
-  ? S.p2.legacyMW * LEGACY_FEE + S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) : 0);
+const campusRevenue = () => (S.p2 && S.p2.county ? S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) : 0);
 
 function stepCampus(dt) {
+  if (S.p2.market == null) S.p2.market = MARKET_START_MW;   // Plan 1 saves
   if (!S.p2.county) return;
   const q = S.p2.queue;
   if (q && S.t >= q.done) {
@@ -203,13 +204,13 @@ function stepCampus(dt) {
   for (const b of S.p2.builds) {
     if (!b.announced && S.t >= b.done) { b.announced = true; track("build", { ev: "done", kind: b.kind }); say(BUILD_DONE[b.kind]()); }
   }
-  S.funds += S.p2.legacyMW * LEGACY_FEE * dt;
+  S.p2.market += MARKET_REGROW * dt;
   S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
   if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + 60 + Math.random() * 60; }
   stepContracts(dt);
 }
 
-const campusSnap = () => ({ county: S.p2.county, legacyMW: S.p2.legacyMW, grid: S.p2.grid, queue: !!S.p2.queue,
+const campusSnap = () => ({ county: S.p2.county, fleetMW: Math.round(usedKW() / 1000), leasedMW: Math.round(leasedKW() / 1000), market: Math.round(S.p2.market), grid: S.p2.grid, queue: !!S.p2.queue,
   halls: doneBuilds("hall"), turbines: doneBuilds("turbine"), solar: doneBuilds("solar"),
   energizedMW: energizedAt(), acresFree: acresFree(),
   deliveredMW: deliveredMW(), backlogMW: backlogMW(), offers: S.p2.offers.length,
@@ -217,7 +218,7 @@ const campusSnap = () => ({ county: S.p2.county, legacyMW: S.p2.legacyMW, grid: 
 
 function renderCampus() {
   const p = S.p2;
-  if (!p.county) { $("countLabel").textContent = "Legacy colo"; $("gpuCount").textContent = `${fmt(p.legacyMW)} MW`; }
+  if (!p.county) { $("countLabel").textContent = "Fleet"; $("gpuCount").textContent = `${fmt(usedKW() / 1000)} MW`; }
   $("countyBox").hidden = !!p.county;
   $("campusBox").hidden = $("contractsBox").hidden = !p.county;
   if (!p.county) {
@@ -238,10 +239,10 @@ function renderCampus() {
     (hallMW > pw ? `, ${fmt(hallMW - pw)} MW dark` : "");
   $("p2power").textContent = `${fmt(pw)} MW (grid ${fmt(gridAt())}, ${doneBuilds("turbine")} turbines, ${doneBuilds("solar")} solar)`;
   $("land").textContent = `${acresFree().toLocaleString("en-US")} of ${countyOf().acres.toLocaleString("en-US")} acres free`;
-  $("legacy").textContent = `${fmt(p.legacyMW)} MW, ${money(p.legacyMW * LEGACY_FEE)}/s`;
+  $("p2cap").textContent = `${fmt(leasedKW() / 1000)} MW leased + ${fmt(energizedAt())} MW campus; ${fmt(usedKW() / 1000)} MW of GPUs racked, room for ${fmt(Math.max(0, capKW() - usedKW()) / 1000)} MW more`;
   $("p2limit").textContent = campusLimit();
   $("buildHall").textContent = `Build a hall (${HALL.mw} MW, ${HALL.acres} acres, ${time(HALL.secs)}): ${money(HALL.cost)}`;
-  $("buildHall").disabled = S.funds + S.credits < HALL.cost || acresFree() < HALL.acres;
+  $("buildHall").disabled = S.funds < HALL.cost || acresFree() < HALL.acres;
   $("buildTurbine").textContent = `Gas turbine (+${POWER.turbine.mw} MW, ${time(POWER.turbine.secs)}): ${money(POWER.turbine.cost)}`;
   $("buildTurbine").disabled = S.funds < POWER.turbine.cost;
   $("buildSolar").textContent = `Solar + batteries (+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}): ${money(POWER.solar.cost)}`;

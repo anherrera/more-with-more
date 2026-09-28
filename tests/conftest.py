@@ -16,8 +16,9 @@ MID = {"leases": {"rack": 3, "cage": 1, "row": 4, "hall": 1},
        "funds": 2.5e8, "tier": 3, "gen": 6, "round": 6, "cooling": 5, "done": {"dynprice": True},
        "chipIdx": 3, "nextChip": 99999, "t": 1000, "fleet": {"3": 5000}, "gpus": 5000, "split": 95,
        "hype": 80, "rival": {"px": 40, "prev": 40, "next": 99999, "n": 0}, "logV2": True, "coolingV2": True}
-# Ready to break ground: Gen 7 and 40k P4s (2.744 kW each, ~110 MW).
-READY = {**MID, "gen": 7, "fleet": {"3": 40000}, "gpus": 40000}
+# Ready to break ground: Gen 7, 40k P4s (2.744 kW each, ~110 MW) in ~220 MW of leased space (incl. a building).
+READY = {**MID, "gen": 7, "fleet": {"3": 40000}, "gpus": 40000, "tier": 4,
+         "leases": {**MID["leases"], "building": 1}, "leaseCool": {**MID["leaseCool"], "building": {"5": 1}}}
 
 
 class _Quiet(http.server.SimpleHTTPRequestHandler):

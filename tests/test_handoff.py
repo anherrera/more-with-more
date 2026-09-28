@@ -5,19 +5,6 @@ def break_ground(pg):
     pg.click("button[data-id='ground']")
 
 
-def test_break_ground_starts_campus(game):
-    pg = game(READY)
-    legacy = pg.evaluate("() => Math.round(usedKW() / 1000)")
-    break_ground(pg)
-    assert pg.evaluate("() => S.phase") == 2
-    assert pg.evaluate("() => S.p2.legacyMW") == legacy == 110
-    assert pg.is_visible("#countyBox")
-    for hidden in ["#computeBox", "#trainingBox", "#facilitiesBox", "#p1biz", "#ending"]:
-        assert not pg.is_visible(hidden), hidden
-    assert pg.is_visible("#hypeNum") and pg.is_visible("#funds")
-    assert "We are an infrastructure company now." in pg.inner_text("#console")
-
-
 def test_choose_county(game):
     pg = game(READY)
     break_ground(pg)
@@ -34,15 +21,6 @@ def test_incentive_county_pays(game):
     before = pg.evaluate("() => S.funds")
     pg.click("button[data-county='incent']")
     assert pg.evaluate("() => S.funds") - before == 20e6
-
-
-def test_legacy_colo_pays(game):
-    pg = game({**READY, "debt": 0})
-    break_ground(pg)
-    pg.click("button[data-county='cheap']")
-    before = pg.evaluate("() => S.funds")
-    run(pg, 10)
-    assert abs(pg.evaluate("() => S.funds") - before - 110 * 100 * 10) < 1
 
 
 def test_old_ended_save_can_continue(game):
@@ -67,9 +45,30 @@ def test_inherited_debt_is_refinanced(game):
     pg = game({**READY, "debt": 5e8})
     break_ground(pg)
     pg.click("button[data-county='cheap']")
-    pg.evaluate("() => { S.p2.legacyMW = 0; S.p2.offers = []; S.p2.nextOffer = 1e9; }")
+    pg.evaluate("() => { S.fleet = {}; S.gpus = 0; S.p2.offers = []; S.p2.nextOffer = 1e9; }")
     before = pg.evaluate("() => S.funds")
     run(pg, 10)
     # project-finance rate: a quarter of the phase 1 facility's
     assert abs((before - pg.evaluate("() => S.funds")) - 5e8 * 0.0002 * 0.25 * 10) < 1
     assert "refinanced" in pg.inner_text("#console")
+
+
+def test_break_ground_starts_campus(game):
+    pg = game(READY)
+    break_ground(pg)
+    assert pg.evaluate("() => [S.phase, S.gpus]") == [2, 40000]
+    assert pg.is_visible("#countyBox")
+    for hidden in ["#trainingBox", "#p1biz", "#ending", "#answer"]:
+        assert not pg.is_visible(hidden), hidden
+    for shown in ["#computeBox", "#facilitiesBox", "#hypeNum", "#funds"]:
+        assert pg.is_visible(shown), shown
+    assert "We are an infrastructure company now." in pg.inner_text("#console")
+
+
+def test_plan1_save_loads(game):
+    pg = game({**READY, "phase": 2, "ended": True, "p2": {"county": "cheap", "legacyMW": 110, "grid": 50, "queue": None,
+               "queueN": 0, "builds": [{"kind": "hall", "done": 0}], "offers": [], "contracts": [], "nextOffer": 0,
+               "offerN": 0, "contractN": 0, "earned": 0}})
+    run(pg, 2)
+    assert pg.evaluate("() => [S.phase, S.p2.county, typeof S.p2.market]") == [2, "cheap", "number"]
+    assert pg.is_visible("#campusBox")

@@ -38,3 +38,8 @@ def test_reload_keeps_state(game):
     pg.click("button[data-buy='10']")
     pg.reload()
     assert pg.inner_text("#gpuCount") == "5,010"
+
+
+def test_phase1_capacity_unchanged(game):
+    pg = game(MID)
+    assert pg.evaluate("() => capKW() === leasedKW()")

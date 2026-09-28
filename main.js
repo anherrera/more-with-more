@@ -10,7 +10,8 @@ const owned = (i) => S.leases[TYPES[i].id] || 0;
 // the standard for NEW leases; older space stays sparse until you pay to retrofit it.
 const unitKW = (i, level = S.cooling) => Math.min(TYPES[i].racks * COOLING[level].kw, TYPES[i].powerKW * S.powerBoost);
 const coolOf = (i) => S.leaseCool[TYPES[i].id] || {};
-const capKW = () => TYPES.reduce((a, _, i) => a + Object.entries(coolOf(i)).reduce((b, [lv, n]) => b + n * unitKW(i, +lv), 0), 0);
+const leasedKW = () => TYPES.reduce((a, _, i) => a + Object.entries(coolOf(i)).reduce((b, [lv, n]) => b + n * unitKW(i, +lv), 0), 0);
+const capKW = () => leasedKW() + (S.phase === 2 ? campusKWAt() : 0);   // phase 2: plus energized campus halls
 const RETROFIT = 1.0;                   // retrofit costs what new space costs per kW gained, but adds no racks and no rent
 const retrofitPlan = () => {
   let cost = 0, kw = 0, units = 0;
@@ -328,8 +329,9 @@ function buy(k) {
 }
 function lease(i) {
   const t = TYPES[i], c = leaseCost(i);
-  if (!t || !leaseVisible(i) || S.funds < c) return;
+  if (!t || !leaseVisible(i) || S.funds < c || (S.phase === 2 && !marketHas(i))) return;
   S.funds -= c; S.leases[t.id] = owned(i) + 1; S.tier = highestType();
+  if (S.phase === 2) takeFromMarket(i);
   { const lc = coolOf(i); lc[S.cooling] = (lc[S.cooling] || 0) + 1; S.leaseCool[t.id] = lc; }
   milestone(`lease: ${t.one} #${owned(i)}`);
   say(owned(i) === 1 ? `Signed the lease: your first ${t.one}.` : `Leased another ${t.one}. You have ${owned(i)} ${t.many}.`);
@@ -346,6 +348,7 @@ function raise() {
 function step(dt) {
   S.t += dt;                                   // keeps running after the ending: the empire hums on
   S.fatigue = Math.max(0, S.fatigue - dt / (S.done.keynote ? 30 : 60));
+  if (S.t >= S.nextChip) releaseChip();
   if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
   if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
@@ -355,7 +358,6 @@ function step(dt) {
 }
 
 function stepPhase1(dt) {
-  if (S.t >= S.nextChip) releaseChip();
   S.spotWalk = Math.max(-0.4, Math.min(0.4, S.spotWalk + (Math.random() - 0.5) * 0.08 * dt));
   if (Math.floor(S.t) !== Math.floor(S.t - dt)) { S.spotHist.push(spotMult()); if (S.spotHist.length > 90) S.spotHist.shift(); }
   if (S.block && S.t >= S.block.until) S.block = null;
@@ -422,7 +424,7 @@ function render() {
   $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>`;
   $("creditsRow").hidden = S.gen < 1;
   $("credits").textContent = moneyFull(S.credits);
-  $("creditsNote").textContent = S.phase === 1 ? "(GPUs only)" : "(pays for halls' GPUs)";
+  $("creditsNote").textContent = "(GPUs only)";
   $("deal").hidden = S.gen < 1;
   $("deal").disabled = !dealReady();
   $("deal").textContent = dealReady() ? `Take Parallax's strategic investment: ${money(dealSize())} in credits` : `Parallax will call back in ${time(S.nextDeal - S.t)}`;
@@ -490,8 +492,9 @@ function render() {
     $("raise").disabled = S.hype < HYPE_TO_RAISE;
   }
 
-  for (const id of ["p1biz", "computeBox", "trainingBox", "facilitiesBox"]) $(id).hidden = S.phase !== 1;
-  if (S.phase === 1) { renderPhase1(); $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true; }
+  for (const id of ["p1biz", "trainingBox", "answer"]) $(id).hidden = S.phase !== 1;
+  renderPhase1();                                   // compute and leased space work in both phases
+  if (S.phase === 1) $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true;
   else renderCampus();
 
   // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.
@@ -648,6 +651,7 @@ function drawSpot() {
 let lastRackKey = "", lastProjectKey = null, lastLogLen = -1, lastLogTail = null, lastLeaseKey = null;
 function renderLeases() {
   $("rent").textContent = rentIndex().toFixed(1);
+  $("marketLeft").textContent = S.phase === 2 && S.p2 ? ` \u00b7 landlords have ${fmt(Math.max(0, S.p2.market))} MW left in this market` : "";
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
   const key = vis.join(",");
   if (key !== lastLeaseKey) {
@@ -658,7 +662,7 @@ function renderLeases() {
   for (const b of $("leases").querySelectorAll("button[data-lease]")) {
     const i = Number(b.dataset.lease), t = TYPES[i];
     b.textContent = `Lease ${owned(i) ? "another" : "a"} ${t.one} (${t.racks.toLocaleString("en-US")} rack${t.racks > 1 ? "s" : ""}, ${fmt(unitKW(i))} kW): ${money(leaseCost(i))} \u00b7 ${money(leaseCost(i) / unitKW(i))}/kW`;
-    b.disabled = S.funds < leaseCost(i);
+    b.disabled = S.funds < leaseCost(i) || (S.phase === 2 && !marketHas(i));
   }
 }
 function buyProject(id) {

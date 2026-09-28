@@ -10,26 +10,6 @@ def campus(game, county="strong", **extra):
     return pg
 
 
-def test_hall_costs_money_and_time(game):
-    pg = campus(game)
-    funds = pg.evaluate("() => S.funds")
-    pg.click("#buildHall")
-    assert pg.evaluate("() => S.funds") == pytest.approx(funds - 30e6)
-    run(pg, 89)
-    assert pg.evaluate("() => energizedAt()") == 0
-    run(pg, 1)
-    assert pg.evaluate("() => energizedAt()") == 50
-    assert "Hall 1 is up" in pg.inner_text("#console")
-
-
-def test_hall_uses_credits_first(game):
-    pg = campus(game, credits=10e6)
-    funds = pg.evaluate("() => S.funds")
-    pg.click("#buildHall")
-    assert pg.evaluate("() => S.credits") == 0
-    assert pg.evaluate("() => S.funds") == pytest.approx(funds - 20e6)
-
-
 def test_power_limits_energized(game):
     pg = campus(game, county="cheap")          # 50 MW grid
     pg.evaluate("() => { S.p2.builds.push({kind: 'hall', done: 0}, {kind: 'hall', done: 0}); }")
@@ -71,3 +51,43 @@ def test_land_runs_out(game):
     assert pg.evaluate("() => acresFree()") == 0
     assert pg.is_disabled("#buildHall")
     assert pg.inner_text("#p2limit").startswith("land")
+
+
+def test_hall_is_a_shell_that_adds_room(game):
+    pg = campus(game)
+    funds, room = pg.evaluate("() => [S.funds, roomNewest()]")
+    pg.click("#buildHall")
+    assert pg.evaluate("() => S.funds") == pytest.approx(funds - 10e6)
+    run(pg, 89)
+    assert pg.evaluate("() => roomNewest()") == room
+    run(pg, 1)
+    assert pg.evaluate("() => energizedAt()") == 50
+    assert pg.evaluate("() => roomNewest()") == pytest.approx(room + 50000 / 2.744, abs=1)
+    assert "Hall 1 is up" in pg.inner_text("#console")
+
+
+def test_hall_does_not_take_credits(game):
+    pg = campus(game, credits=10e6)
+    pg.click("#buildHall")
+    assert pg.evaluate("() => S.credits") == 10e6
+
+
+def test_leased_market_is_finite_and_regrows(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.p2.market = 25; }")
+    run(pg, 1)
+    hall_btn = "#leases button[data-lease='3']"            # data hall: 240 racks, 20 MW at this cooling
+    assert pg.is_enabled(hall_btn)
+    pg.click(hall_btn)
+    assert pg.evaluate("() => S.p2.market") == pytest.approx(25 + 10 / 60 - 20, abs=0.01)
+    assert not pg.is_enabled(hall_btn)
+    assert "left in this market" in pg.inner_text("#facilitiesBox")
+    run(pg, 90)
+    assert pg.is_enabled(hall_btn)
+
+
+def test_chips_keep_shipping_in_phase2(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.nextChip = S.t + 1; }")
+    run(pg, 2)
+    assert pg.evaluate("() => S.chipIdx") == 4
