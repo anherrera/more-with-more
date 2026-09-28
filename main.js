@@ -339,6 +339,7 @@ function lease(i) {
   say(owned(i) === 1 ? `Signed the lease: your first ${t.one}.` : `Leased another ${t.one}. You have ${owned(i)} ${t.many}.`);
 }
 function raise() {
+  if (S.phase === 2) return raiseCampus();
   const r = ROUNDS[S.round];
   if (r && S.gen >= r.gen && S.hype >= HYPE_TO_RAISE) {
     S.funds += r.amount; S.round += 1; S.hype = Math.max(10, S.hype - 20); milestone(`raised ${r.name}`);
@@ -450,8 +451,9 @@ function render() {
     : (S.hype < DRAW_HYPE ? `Debt facility needs hype ${DRAW_HYPE}+` : `Bank will take your call in ${time(S.nextDraw - S.t)}`);
   $("hypeNum").textContent = Math.round(S.hype);
   {
-    const nr = ROUNDS[S.round], notes = [];
-    if (!nr) notes.push(S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${fmt(GROUND_KW / 1000)} MW, then break ground` : "all rounds raised; next: break ground");
+    const nr = S.phase === 2 ? campusRound() : ROUNDS[S.round], notes = [];
+    if (S.phase === 2) notes.push(nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${fmt(nr.backlog)} MW backlog` : "all rounds raised");
+    else if (!nr) notes.push(S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${fmt(GROUND_KW / 1000)} MW, then break ground` : "all rounds raised; next: break ground");
     else if (S.gen < nr.gen) notes.push(`${nr.name} needs Gen ${nr.gen}`);
     else notes.push(`${nr.name} at ${HYPE_TO_RAISE}`);
     if (facilityOpen()) notes.push(`debt at ${DRAW_HYPE}`);
@@ -488,11 +490,13 @@ function render() {
     : S.hype >= DRAW_HYPE ? "Investors will take a meeting. You can raise. The bank lends once you lease a data hall."
     : S.hype >= HYPE_TO_RAISE ? "Investors will take a meeting. You can raise."
     : "Investors aren't returning calls. Ship a model or post.";
-  const r = ROUNDS[S.round];
-  $("raise").hidden = !r || S.gen < r.gen;
+  const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
+  const gated = !!r && (S.phase === 2 ? backlogMW() < r.backlog : S.gen < r.gen);
+  $("raise").hidden = !r || (S.phase === 1 && gated);
   if (r) {
-    $("raise").textContent = S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
-    $("raise").disabled = S.hype < HYPE_TO_RAISE;
+    $("raise").textContent = S.phase === 2 && gated ? `${r.name} needs ${fmt(r.backlog)} MW of signed backlog (have ${fmt(backlogMW())})`
+      : S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
+    $("raise").disabled = gated || S.hype < HYPE_TO_RAISE;
   }
 
   for (const id of ["p1biz", "trainingBox", "answer"]) $(id).hidden = S.phase !== 1;

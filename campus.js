@@ -35,6 +35,17 @@ const CUSTOMERS = [
   "Your old lab (Parallax is paying)", "A lab funded by Parallax", "PivotCloud, subleasing to its own customers",
   "A sovereign AI fund", "A lab you have never heard of with $4B", "A chatbot company that is also a hardware company",
 ];
+const ROUNDS2 = [
+  { name: "Series E", backlog: 100, amount: 250e6 }, { name: "Series F", backlog: 300, amount: 800e6 },
+  { name: "Series G", backlog: 700, amount: 2e9 },
+];
+const campusRound = () => ROUNDS2[S.p2.round || 0];
+function raiseCampus() {
+  const r = campusRound();
+  if (!r || backlogMW() < r.backlog || S.hype < HYPE_TO_RAISE) return;
+  S.funds += r.amount; S.p2.round = (S.p2.round || 0) + 1; S.hype = Math.max(10, S.hype - 20); milestone(`raised ${r.name}`);
+  say(`Closed the ${r.name}: ${money(r.amount)}. The deck said “backlog” eleven times. Most of the backlog is labs funded by Parallax.`);
+}
 
 const freshP2 = () => ({
   county: null, market: MARKET_START_MW, round: 0, grid: 0, queue: null, queueN: 0, builds: [],
