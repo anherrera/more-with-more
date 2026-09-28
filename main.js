@@ -74,7 +74,9 @@ const FAIL_RATE = 0.0001;                                  // per working GPU pe
 
 function endPhase() {
   S.ended = true; S.endedAt = S.t; milestone("broke ground (end of phase 1)");
+  say(`Phase 1 took ${time(S.t)}. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}.`);
   say("I could do more with more.");
+  startCampus();
 }
 
 // ---------- actions ----------
@@ -136,7 +138,7 @@ function vaguePost() {
 }
 
 // ---- spot market: a swinging rental rate; sell half your fleet for 30s at the current price
-const spotOpen = () => S.gen >= 2;
+const spotOpen = () => S.phase === 1 && S.gen >= 2;
 const spotMult = () => Math.max(0.15, 1.3 + 0.9 * Math.sin(S.t / 11) + 0.45 * Math.sin(S.t / 4.3 + 2) + S.spotWalk);
 const spotRate = () => Math.max(S.price, 0.002) * spotMult();       // $ per GPU-second
 const blockSize = () => Math.floor(workingGPUs() / 2);
@@ -173,14 +175,14 @@ const REALITY = [
 ];
 const froth = () => Math.max(0, S.hype - 100);
 function realityCheck() {
-  const rev = Math.min(servingGPUs(), demand()) * S.price, interest = S.debt * INTEREST;
+  const rev = S.phase === 1 ? Math.min(servingGPUs(), demand()) * S.price : campusRevenue();
   // Leverage: debt measured against ten minutes of revenue. The more borrowed, the harder the fall.
   const leverage = S.debt / (rev * 600 + S.debt + 1e-9);
   const severity = 0.3 + 0.5 * leverage;
   const loss = Math.round(froth() * severity);
   S.hype -= loss; S.checks = (S.checks || 0) + 1;
   let line = `${REALITY[S.checks % REALITY.length]} Hype -${loss}.`, seized = 0;
-  if (S.debt > 0 && severity > 0.5) {
+  if (S.debt > 0 && severity > 0.5 && S.phase === 1) {
     // Margin call: the lenders mark your collateral to market and take 20% of the fleet, oldest chips first.
     S.nextDraw = Math.max(S.nextDraw, S.t + 120);
     let take = Math.floor(0.2 * S.gpus);
@@ -191,6 +193,7 @@ function realityCheck() {
     S.failed = Math.min(S.failed, S.gpus);
     line += ` Margin call: lenders marked your GPUs to market and took ${seized.toLocaleString("en-US")} of them. Draws frozen for 2 minutes.`;
   }
+  else if (S.debt > 0 && severity > 0.5) { S.nextDraw = Math.max(S.nextDraw, S.t + 120); line += " Lenders froze your draws for 2 minutes."; }
   track("crash", { loss, severity: Math.round(severity * 100) / 100, seized });
   say(line);
 }
@@ -250,7 +253,7 @@ function rivalNews() {
 }
 
 // Renting the rival's GPUs: cash straight into training speed. PivotCloud raises the price every time.
-const rentOpen = () => S.gen >= 5;
+const rentOpen = () => S.phase === 1 && S.gen >= 5;
 const rentCost = () => 640 * Math.pow(5, S.gen) * Math.pow(1.3, S.rentals);
 const RENT_LINES = [
   "You rented PivotCloud's cluster. They reported \u201ca major new AI customer.\u201d It's you. PIVT +{p}%.",
@@ -342,8 +345,16 @@ function raise() {
 function step(dt) {
   S.t += dt;                                   // keeps running after the ending: the empire hums on
   S.fatigue = Math.max(0, S.fatigue - dt / (S.done.keynote ? 30 : 60));
-  if (S.t >= S.nextChip) releaseChip();            // the timeline forgets you in about a minute per post
   if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
+  if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);
+  S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
+  if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
+  S.funds -= S.debt * INTEREST * dt;
+  if (db && S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
+}
+
+function stepPhase1(dt) {
+  if (S.t >= S.nextChip) releaseChip();
   S.spotWalk = Math.max(-0.4, Math.min(0.4, S.spotWalk + (Math.random() - 0.5) * 0.08 * dt));
   if (Math.floor(S.t) !== Math.floor(S.t - dt)) { S.spotHist.push(spotMult()); if (S.spotHist.length > 90) S.spotHist.shift(); }
   if (S.block && S.t >= S.block.until) S.block = null;
@@ -377,18 +388,14 @@ function step(dt) {
     S.spikes += 1;
     track("spike", { auto: !!S.done.autockpt });
     if (S.done.autockpt) { S.progress = S.lastCkpt; say("Loss spike. Auto-restarted from the last checkpoint."); }
-    else { S.spike = { until: S.t + 20 }; say(`Loss spike at step ${Math.floor(S.progress).toLocaleString("en-US")}: loss ${(1.8 + Math.random()).toFixed(2)} \u2192 NaN. Roll back to a checkpoint.`); }
+    else { S.spike = { until: S.t + 20 }; say(`Loss spike at step ${Math.floor(S.progress).toLocaleString("en-US")}: loss ${(1.8 + Math.random()).toFixed(2)} → NaN. Roll back to a checkpoint.`); }
   }
   if (S.progress >= needFor(S.gen + 1)) {
     S.progress = 0; S.lastCkpt = 0; S.gen += 1; milestone(`Gen ${S.gen}`);
     S.hype += 20 + 5 * S.gen;
     say(`Gen ${S.gen}: “${MODEL_LINES[Math.min(S.gen, MODEL_LINES.length - 1)]}”`);
   }
-  S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
-  if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
-  S.funds -= S.debt * INTEREST * dt;
   hints();
-  if (db && S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
 }
 
 // One-time nudges, Paperclips style: the game tells you where the wall is.
@@ -411,7 +418,6 @@ function hints() {
 
 // ---------- render ----------
 function render() {
-  $("gpuCount").textContent = S.gpus.toLocaleString("en-US");
   $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>`;
   $("creditsRow").hidden = S.gen < 1;
   $("credits").textContent = moneyFull(S.credits);
@@ -436,11 +442,6 @@ function render() {
   $("draw").disabled = !drawReady();
   $("draw").textContent = drawReady() ? `Draw on the debt facility: ${money(drawSize())}`
     : (S.hype < DRAW_HYPE ? `Debt facility needs hype ${DRAW_HYPE}+` : `Bank will take your call in ${time(S.nextDraw - S.t)}`);
-  $("price").textContent = "$" + (S.price < 0.01 ? S.price.toFixed(4) : S.price.toFixed(3)) + (S.done.dynprice ? " (auto)" : "");
-  const d = demand(), sv = Math.min(servingGPUs(), d);
-  $("demand").textContent = fmt(d) + " /s";
-  $("serving").textContent = fmt(sv) + " /s";
-  $("revenue").textContent = money(sv * S.price) + " /s";
   $("hypeNum").textContent = Math.round(S.hype);
   {
     const nr = ROUNDS[S.round], notes = [];
@@ -487,6 +488,43 @@ function render() {
     $("raise").disabled = S.hype < HYPE_TO_RAISE;
   }
 
+  for (const id of ["p1biz", "computeBox", "trainingBox", "facilitiesBox"]) $(id).hidden = S.phase !== 1;
+  if (S.phase === 1) { renderPhase1(); $("countyBox").hidden = $("campusBox").hidden = true; }
+  else renderCampus();
+
+  // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.
+  // (Rebuilding every tick swaps buttons out mid-click and the click never lands.)
+  const avail = PROJECTS.filter((p) => (p.phase || 1) === S.phase && !S.done[p.id] && p.when());
+  const key = avail.map((p) => p.id).join(",");
+  if (key !== lastProjectKey) {
+    lastProjectKey = key;
+    $("projects").innerHTML = avail.length ? "" : `<div class="empty">${S.phase === 1 ? "Nothing yet. Train a model." : "Nothing yet. The model is thinking."}</div>`;
+    for (const p of avail) {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.id = p.id;
+      b.innerHTML = `<span class="t">${p.title} (${p.cost ? money(p.cost) : "free"})</span><span class="c">${p.desc}</span>`;
+      $("projects").appendChild(b);
+    }
+  }
+  for (const b of $("projects").querySelectorAll("button[data-id]")) {
+    const p = PROJECTS.find((x) => x.id === b.dataset.id);
+    const missing = p.needs ? p.needs() : [];
+    b.disabled = S.funds < p.cost || missing.length > 0;
+    if (p.needs) b.querySelector(".c").textContent = p.desc + (missing.length ? ` Still need to: ${missing.join(", ")}.` : " Ready.");
+  }
+  $("clock").textContent = `${time(S.t)} played · ${fmt(S.gpuSeconds)} GPU-seconds used`;
+  $("ending").hidden = !(S.ended && S.phase === 1);
+  if (S.ended) $("endingStats").textContent = `Phase 1 took ${time(S.endedAt ?? (S.milestones.find((m) => m.what.startsWith("broke ground"))?.t) ?? S.t)}. ${fmt(S.served)} queries answered. ${fmt(S.gpuSeconds)} GPU-seconds. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}. You owe ${money(S.debt)}.`;
+}
+
+function renderPhase1() {
+  $("countLabel").textContent = "GPUs";
+  $("gpuCount").textContent = S.gpus.toLocaleString("en-US");
+  $("price").textContent = "$" + (S.price < 0.01 ? S.price.toFixed(4) : S.price.toFixed(3)) + (S.done.dynprice ? " (auto)" : "");
+  const d = demand(), sv = Math.min(servingGPUs(), d);
+  $("demand").textContent = fmt(d) + " /s";
+  $("serving").textContent = fmt(sv) + " /s";
+  $("revenue").textContent = money(sv * S.price) + " /s";
   $("answer").disabled = S.queue < 1;
   const mix = Object.keys(S.fleet).map(Number).sort((a, b) => b - a).filter((c) => S.fleet[c] > 0)
     .map((c) => `${chip(c).name} ${S.fleet[c].toLocaleString("en-US")}`).join(", ");
@@ -587,30 +625,6 @@ function render() {
       $("retrofit").textContent = `Retrofit ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name}: +${fmt(plan.kw)} kW, ${money(plan.cost)}`;
     }
   }
-
-  // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.
-  // (Rebuilding every tick swaps buttons out mid-click and the click never lands.)
-  const avail = PROJECTS.filter((p) => !S.done[p.id] && p.when());
-  const key = avail.map((p) => p.id).join(",");
-  if (key !== lastProjectKey) {
-    lastProjectKey = key;
-    $("projects").innerHTML = avail.length ? "" : `<div class="empty">Nothing yet. Train a model.</div>`;
-    for (const p of avail) {
-      const b = document.createElement("button");
-      b.type = "button"; b.dataset.id = p.id;
-      b.innerHTML = `<span class="t">${p.title} (${p.cost ? money(p.cost) : "free"})</span><span class="c">${p.desc}</span>`;
-      $("projects").appendChild(b);
-    }
-  }
-  for (const b of $("projects").querySelectorAll("button[data-id]")) {
-    const p = PROJECTS.find((x) => x.id === b.dataset.id);
-    const missing = p.needs ? p.needs() : [];
-    b.disabled = S.funds < p.cost || missing.length > 0;
-    if (p.needs) b.querySelector(".c").textContent = p.desc + (missing.length ? ` Still need to: ${missing.join(", ")}.` : " Ready.");
-  }
-  $("clock").textContent = `${time(S.t)} played · ${fmt(S.gpuSeconds)} GPU-seconds used`;
-  $("ending").hidden = !S.ended;
-  if (S.ended) $("endingStats").textContent = `Phase 1 took ${time(S.endedAt ?? (S.milestones.find((m) => m.what.startsWith("broke ground"))?.t) ?? S.t)}. ${fmt(S.served)} queries answered. ${fmt(S.gpuSeconds)} GPU-seconds. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}. You owe ${money(S.debt)}.`;
 }
 
 function drawSpot() {
@@ -688,6 +702,8 @@ function wire() {
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
   $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = 0; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; render(); });
+  $("toCampus").addEventListener("click", () => { startCampus(); render(); });
+  wireCampus();
 }
 
 function start(data) {
