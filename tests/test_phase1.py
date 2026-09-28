@@ -43,3 +43,10 @@ def test_reload_keeps_state(game):
 def test_phase1_capacity_unchanged(game):
     pg = game(MID)
     assert pg.evaluate("() => capKW() === leasedKW()")
+
+
+def test_spot_market_sits_in_the_middle_column(game):
+    pg = game(MID)
+    col = pg.evaluate("() => { const cols = [...document.querySelectorAll('.cols > .col')].filter((c) => c.offsetParent); "
+                      "return cols.findIndex((c) => c.contains(document.getElementById('spotBox'))); }")
+    assert col == 1

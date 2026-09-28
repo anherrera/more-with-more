@@ -135,12 +135,6 @@
         <div class="line" id="debtRow" hidden>Debt: <span id="debt" class="bad">$0</span> <span class="sub" id="interest"></span></div>
         <div class="btns"><button id="draw" type="button" class="primary" hidden></button><button id="repay" type="button" hidden></button></div>
         <div class="line sub" id="rivalLine" hidden></div>
-        <div id="spotBox" hidden>
-          <h3 style="margin-top:14px">Spot market</h3>
-          <canvas id="spotChart" width="300" height="64" aria-label="Spot price over the last 90 seconds"></canvas>
-          <div class="line">Spot: <span id="spotNow">&mdash;</span></div>
-          <div class="btns"><button id="spot" type="button" class="primary"></button></div>
-        </div>
       </div>
     </div>
 
@@ -209,6 +203,12 @@
         <div class="btns"><button id="rollback" type="button" class="primary" hidden>Roll back to checkpoint</button></div>
         <div class="btns"><button id="rentRival" type="button" hidden></button></div>
         <div class="sub">Each generation needs 8&times; the compute of the last.</div>
+      </div>
+      <div id="spotBox" hidden>
+        <h3>Spot market</h3>
+        <canvas id="spotChart" width="300" height="64" aria-label="Spot price over the last 90 seconds"></canvas>
+        <div class="line">Spot: <span id="spotNow">&mdash;</span></div>
+        <div class="btns"><button id="spot" type="button" class="primary"></button></div>
       </div>
     </div>
 
