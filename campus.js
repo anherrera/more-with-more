@@ -89,7 +89,7 @@ function freeKWByGen() {
   }
   return free;
 }
-const genPrice = (g) => Math.pow(1.6 / 1.4, g - 3);   // rates track each chip's launch price per kW (P4 = 1): newer chips rent for more
+const genPrice = (g) => (chip(g).priceMult / chip(g).kw) / (chip(3).priceMult / chip(3).kw);   // rates track each chip's launch price per kW (P4 = 1)
 const odRate = (g) => OD_RATE * genPrice(g) * Math.max(OD_FLOOR, Math.pow(OD_DECAY, S.chipIdx - g));
 const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g) * OD_UTIL, 0) * (S.block ? 0.5 : 1);
 const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));

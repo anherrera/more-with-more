@@ -24,7 +24,8 @@ const ROUNDS = [
 ];
 const HYPE_TO_RAISE = 40;
 // The treadmill: Parallax ships a new chip on a schedule. Each is 1.7x faster, draws 1.4x the power, costs 1.6x.
-const chip = (c) => ({ name: `P${c + 1}`, perf: Math.pow(1.7, c), kw: Math.pow(1.4, c), priceMult: Math.pow(1.6, c) });
+// Power per GPU climbs 1.4x a generation through P7 (all of phase 1), then levels off at +5%: real chips creep, they don't explode.
+const chip = (c) => ({ name: `P${c + 1}`, perf: Math.pow(1.7, c), kw: Math.pow(1.4, Math.min(c, 6)) * Math.pow(1.05, Math.max(0, c - 6)), priceMult: Math.pow(1.6, c) });
 const FIRST_CHIP_AT = 300, CHIP_EVERY = 300;       // game seconds
 const MODEL_LINES = [
   "",

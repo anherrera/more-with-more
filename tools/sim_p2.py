@@ -24,8 +24,12 @@ ROUNDS2 = [(100, 100e6), (300, 250e6), (700, 600e6)]
 HYPE = 80                                                      # assume the player keeps hype around here with posts
 
 
-def gpu_cost_per_kw(g):          # volume price $500 x 1.6^g per GPU, 1.4^g kW per GPU
-    return 500 * (1.6 / 1.4) ** g
+def chip_kw(g):                  # mirrors globals.js chip(): 1.4x/gen through P7, then +5%/gen
+    return 1.4 ** min(g, 6) * 1.05 ** max(0, g - 6)
+
+
+def gpu_cost_per_kw(g):          # volume price $500 x 1.6^g per GPU
+    return 500 * 1.6 ** g / chip_kw(g)
 
 
 def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leased_kw=220_000, racks=1845,
@@ -57,7 +61,7 @@ def run(county="strong", minutes=25, seed=1, funds=100e6, fleet_kw=110_000, leas
         return free
 
     eligible = lambda min_gen: sum(kw for g, kw in free_by_gen().items() if g >= min_gen) / 1000
-    gen_price = lambda g: (1.6 / 1.4) ** (g - 3)                       # rates track each chip's launch price (P4 = 1)
+    gen_price = lambda g: gpu_cost_per_kw(g) / gpu_cost_per_kw(3)      # rates track each chip's launch price per kW (P4 = 1)
     od_rate = lambda g: OD_RATE * gen_price(g) * max(OD_FLOOR, OD_DECAY ** (S["chip"] - g))
     on_demand = lambda: sum(kw / 1000 * od_rate(g) * OD_UTIL for g, kw in free_by_gen().items())
     backlog = lambda: sum(k["mw"] for k in S["contracts"] if live(k))

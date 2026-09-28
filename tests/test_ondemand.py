@@ -76,3 +76,11 @@ def test_parallax_deals_keep_pace_with_the_treadmill(game):
     for idx in (3, 12):
         mw = pg.evaluate(f"() => {{ S.chipIdx = {idx}; return dealSize() / gpuPrice() * newest().kw / 1000; }}")
         assert mw == pytest.approx(20, rel=0.05)
+
+
+def test_chip_power_levels_off_after_p7(game):
+    pg = campus(game)
+    assert pg.evaluate("() => chip(6).kw") == pytest.approx(1.4 ** 6)          # phase 1 treadmill unchanged
+    assert pg.evaluate("() => chip(27).kw") == pytest.approx(1.4 ** 6 * 1.05 ** 21)
+    gpus = pg.evaluate("() => { S.chipIdx = 27; return dealSize() / gpuPrice(); }")
+    assert gpus > 500                                                           # a strategic investment buys a real cluster (~950 P28s)

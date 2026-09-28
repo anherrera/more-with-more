@@ -16,7 +16,7 @@ def test_power_limits_energized(game):
     run(pg, 1)
     assert pg.evaluate("() => energizedAt()") == 50
     assert pg.inner_text("#p2limit").startswith("power: 50 MW of halls are very expensive sheds")
-    assert "50 MW dark" in pg.inner_text("#halls")
+    assert "1 dark (need 50 MW more power)" in pg.inner_text("#halls")
 
 
 def test_halls_limit_when_power_is_ahead(game):
