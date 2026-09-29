@@ -4,13 +4,13 @@
 const COUNTIES = [
   { id: "cheap", name: "Cheap land, weak grid",
     pitch: "3,000 acres for the price of a parking garage. The grid is two wires and a prayer.",
-    gridMW: 50, acres: 3000, queueMW: 100, queueSecs: 300, cash: 0 },
+    gridMW: 50, acres: 3000, queueMW: 100, queueSecs: 300, cash: 0, water: 12, drought: [600, 900] },
   { id: "strong", name: "Strong grid, drought county",
     pitch: "A 200 MW connection on day one. The reservoir is a rumor.",
-    gridMW: 200, acres: 1500, queueMW: 150, queueSecs: 200, cash: 0 },
+    gridMW: 200, acres: 1500, queueMW: 150, queueSecs: 200, cash: 0, water: 5, drought: [240, 360] },
   { id: "incent", name: "Big incentives, organized town",
     pitch: "$20M in tax incentives up front. The town already has a Facebook group about you.",
-    gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6 },
+    gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6, water: 10, drought: [600, 900] },
 ];
 const MARKET_START_MW = 150, MARKET_CAP_MW = 300;       // leasable colo MW in this market
 const COLO_MW = 20, COLO_RACKS = 240, COLO_SLOT = 35;   // you lease colo in 20 MW blocks (a data hall's worth)
@@ -23,12 +23,20 @@ const POWER = {
   solar: { name: "solar + batteries", mw: 30, cost: 20e6, secs: 180, acres: 150 },
 };
 const LAND = { acres: 200, cost: 15e6, growth: 1.1 };       // adjacent parcels: each one costs 10% more than the last
+// Water: every MW of energized hall evaporates cooling water. Measured in million gallons a day (MGD).
+const WATER_PER_MW = 0.01, DROUGHT_CUT = 0.6, DROUGHT_SECS = 180, AQUIFER_DRAIN = 0.05;   // aquifer % per second per well
+const WATER = {
+  well: { name: "well", mgd: 2, cost: 15e6, secs: 45, acres: 0 },
+  reclaimed: { name: "reclaimed water plant", mgd: 3, cost: 40e6, secs: 120, acres: 0 },
+};
 const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.3;             // each request waits 30% longer: everyone is in the queue
 const BUILD_DONE = {
   hall: () => `Hall ${doneBuilds("hall")} is up. ` +
     (hallMWAt() > powerAt() ? "It has no power yet. It is a very expensive shed." : "Energized. Rack some GPUs in it."),
   turbine: () => "A gas turbine came online. The neighbors can hear it.",
   solar: () => "The solar farm is live. It works about a third of the time; the batteries cover the rest, mostly.",
+  well: () => "A new well is pumping. The aquifer has opinions about this, slowly.",
+  reclaimed: () => "The reclaimed water plant is online. Nobody asks where the water was before.",
 };
 const UPFRONT_RATE = 550;    // $ per MW-second of the term, paid when you sign
 const FEE_RATE = 275;        // $ per MW per second while delivered
@@ -64,7 +72,11 @@ const hallSize = () => (S.done.liquid ? 75 : HALL.mw);            // liquid-cool
 const turbineMW = () => (S.done.btm ? 70 : POWER.turbine.mw);   // behind-the-meter turbines
 const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * turbineMW() + doneBuilds("solar", at) * POWER.solar.mw;
 const hallMWAt = (at = S.t) => doneBuilds("hall", at) * hallSize();
-const energizedAt = (at = S.t) => Math.min(hallMWAt(at), powerAt(at));
+const droughtOn = (at = S.t) => !!(S.p2.drought && at < S.p2.drought.until);
+const waterAt = (at = S.t) => countyOf().water * (droughtOn(at) ? DROUGHT_CUT : 1)
+  + (S.p2.aquifer > 0 ? doneBuilds("well", at) * WATER.well.mgd : 0) + doneBuilds("reclaimed", at) * WATER.reclaimed.mgd + (S.p2.extraWater || 0);
+const waterMWAt = (at = S.t) => waterAt(at) / WATER_PER_MW;
+const energizedAt = (at = S.t) => (S.p2 && S.p2.county ? Math.min(hallMWAt(at), powerAt(at), waterMWAt(at)) : 0);
 const campusKWAt = (at = S.t) => (S.p2 && S.p2.county ? energizedAt(at) * 1000 : 0);
 const coloCost = () => COLO_RACKS * COLO_SLOT * rentIndex();
 function leaseColo() {
@@ -99,7 +111,8 @@ const odRate = (g) => OD_RATE * genPrice(g) * Math.max(S.done.inference ? OD_FLO
 const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g) * OD_UTIL, 0) * (S.block ? 0.5 : 1);
 const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
 const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
-const acresUsed = () => S.p2.builds.reduce((a, b) => a + (b.kind === "hall" ? HALL.acres : POWER[b.kind].acres), 0);
+const specOf = (kind) => (kind === "hall" ? HALL : POWER[kind] || WATER[kind]);
+const acresUsed = () => S.p2.builds.reduce((a, b) => a + specOf(b.kind).acres, 0);
 const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
 const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0);
 function buyLand() {
@@ -114,10 +127,10 @@ const queueSecs = () => modelDone("utility") ? 0
 
 // Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered.
 const BUILD_GROWTH = 1.03;
-const buildCost = (kind) => (kind === "hall" ? HALL : POWER[kind]).cost * Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length);
+const buildCost = (kind) => specOf(kind).cost * Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length);
 
 function build(kind) {
-  const spec = kind === "hall" ? HALL : POWER[kind];
+  const spec = specOf(kind);
   const cost = buildCost(kind);
   if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost) return;
   S.funds -= cost;
@@ -136,7 +149,8 @@ function requestQueue() {
 }
 
 function campusLimit() {
-  const halls = hallMWAt(), pw = powerAt();
+  const halls = hallMWAt(), pw = powerAt(), wa = waterMWAt();
+  if (halls > wa && wa <= pw) return `water: ${mwText(halls - wa)} of halls have no cooling water${droughtOn() ? " (drought)" : ""}. Drill wells, build a reclaimed water plant, or wait out the drought`;
   if (acresFree() < HALL.acres && halls <= pw) return "land: buy the adjacent parcel";
   if (halls > pw) return `power: ${mwText(halls - pw)} of halls are very expensive sheds. Add turbines, solar or grid`;
   if (halls < pw) return `halls: ${mwText(pw - halls)} of power is waiting for a building`;
@@ -347,6 +361,15 @@ function stepCampus(dt) {
     if (!b.announced && S.t >= b.done) { b.announced = true; track("build", { ev: "done", kind: b.kind }); say(BUILD_DONE[b.kind]()); }
   }
   if (S.p2.nextColo == null) S.p2.nextColo = S.t + COLO_EVERY[0];
+  if (S.p2.aquifer == null) S.p2.aquifer = 100;
+  S.p2.aquifer = Math.max(0, S.p2.aquifer - doneBuilds("well") * AQUIFER_DRAIN * dt);
+  const dr = countyOf().drought;
+  if (S.p2.nextDrought == null) S.p2.nextDrought = S.t + dr[0] + Math.random() * (dr[1] - dr[0]);
+  if (S.t >= S.p2.nextDrought) {
+    S.p2.drought = { until: S.t + DROUGHT_SECS }; S.p2.nextDrought = S.t + dr[0] + Math.random() * (dr[1] - dr[0]);
+    track("water", { ev: "drought" });
+    say(`Drought declared. The county cut your water allocation 40% for ${time(DROUGHT_SECS)}. The golf course was exempted.`);
+  }
   if (S.t >= S.p2.nextColo) openColo();
   S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
   if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + (60 + Math.random() * 60) * (S.done.sales2 ? 0.7 : 1); }
@@ -390,12 +413,25 @@ function renderCampus() {
   const pw = powerAt(), hallMW = hallMWAt();
   $("countyName").textContent = countyOf().name;
   {
-    const built = doneBuilds("hall"), lit = Math.min(built, Math.floor(pw / hallSize())), dark = built - lit;
+    const wa = waterMWAt(), cap = Math.min(pw, wa);
+    const built = doneBuilds("hall"), lit = Math.min(built, Math.floor(cap / hallSize())), dark = built - lit;
     $("halls").textContent = `${built} built: ${lit} energized` +
-      (dark > 0 ? `, ${dark} dark (need ${mwText(hallMW - pw)} more power)` : "");
+      (dark > 0 ? `, ${dark} dark (need ${mwText(hallMW - cap)} more ${wa < pw ? "water" : "power"})` : "");
     $("halls").className = dark > 0 ? "bad" : "";
   }
   $("p2power").textContent = `${mwText(pw)} (grid ${fmt(gridAt())}, ${doneBuilds("turbine")} turbines, ${doneBuilds("solar")} solar)`;
+  {
+    const used = Math.min(hallMWAt(), powerAt()) * WATER_PER_MW, have = waterAt();
+    $("p2water").textContent = `${fmt(Math.min(used, have))} of ${fmt(have)} MGD (enough for ${mwText(waterMWAt())}) \u00b7 allocation ${fmt(countyOf().water)}` +
+      (droughtOn() ? ` \u00b7 DROUGHT: ${time(p.drought.until - S.t)} left` : "") +
+      (doneBuilds("well") ? ` \u00b7 ${doneBuilds("well")} wells, aquifer ${Math.max(0, Math.round(p.aquifer))}%${p.aquifer <= 0 ? " (dry)" : ""}` : "") +
+      (doneBuilds("reclaimed") ? ` \u00b7 ${doneBuilds("reclaimed")} reclaimed` : "");
+    $("p2water").className = droughtOn() || waterMWAt() < hallMWAt() ? "bad" : "";
+    $("buildWell").textContent = `Drill a well (+${WATER.well.mgd} MGD, drains the aquifer): ${money(buildCost("well"))}`;
+    $("buildWell").disabled = S.funds < buildCost("well") || p.aquifer <= 0;
+    $("buildReclaimed").textContent = `Reclaimed water plant (+${WATER.reclaimed.mgd} MGD, ${time(WATER.reclaimed.secs)}): ${money(buildCost("reclaimed"))}`;
+    $("buildReclaimed").disabled = S.funds < buildCost("reclaimed");
+  }
   {
     const owned = countyOf().acres + (p.landN || 0) * LAND.acres;
     $("land").textContent = `${acresFree().toLocaleString("en-US")} of ${owned.toLocaleString("en-US")} acres free` +
@@ -573,6 +609,8 @@ function wireCampus() {
   $("buildHall").addEventListener("click", () => { build("hall"); render(); });
   $("buildTurbine").addEventListener("click", () => { build("turbine"); render(); });
   $("buildSolar").addEventListener("click", () => { build("solar"); render(); });
+  $("buildWell").addEventListener("click", () => { build("well"); render(); });
+  $("buildReclaimed").addEventListener("click", () => { build("reclaimed"); render(); });
   $("requestQueue").addEventListener("click", () => { requestQueue(); render(); });
   $("buyLand").addEventListener("click", () => { buyLand(); render(); });
   $("leaseColo").addEventListener("click", () => { leaseColo(); render(); });

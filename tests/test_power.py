@@ -46,7 +46,7 @@ def test_queue_adds_grid_and_gets_slower(game):
 
 def test_land_runs_out(game):
     pg = campus(game, county="strong")          # 1,500 acres
-    pg.evaluate("() => { for (let i = 0; i < 75; i++) S.p2.builds.push({kind: 'hall', done: 0}); S.p2.grid = 99999; }")
+    pg.evaluate("() => { for (let i = 0; i < 75; i++) S.p2.builds.push({kind: 'hall', done: 0}); S.p2.grid = 99999; S.p2.extraWater = 999; }")
     run(pg, 1)
     assert pg.evaluate("() => acresFree()") == 0
     assert pg.is_disabled("#buildHall")

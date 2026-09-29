@@ -24,7 +24,7 @@ def public_ready(game, **extra):
     pg.click("button[data-id='ground']")
     pg.click("button[data-county='strong']")
     pg.evaluate("""() => { S.rival.next = 1e9; S.nextChip = 1e9; S.p2.nextOffer = 1e9; S.p2.nextColo = 1e9; S.p2.offers = [];
-      S.p2.grid = 99999; for (let i = 0; i < 12; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true});
+      S.p2.grid = 99999; S.p2.extraWater = 999; for (let i = 0; i < 12; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true});
       makeOffer(); const o = S.p2.offers[0]; o.mw = 400; o.minGen = 0; o.start = S.t + 5000; acceptOffer(o.id); render(); }""")
     return pg
 
