@@ -519,6 +519,7 @@ function render() {
     : S.hype >= HYPE_TO_RAISE ? "Investors will take a meeting. You can raise."
     : "Investors aren't returning calls. Ship a model or post.";
   renderMarket();
+  renderAlerts();
   const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
   if (S.phase === 2 && !r) renderPublicRaise();
   const gated = !!r && (S.phase === 2 ? !!roundGap(r) : S.gen < r.gen);

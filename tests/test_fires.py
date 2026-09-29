@@ -85,3 +85,24 @@ def test_fire_projects_are_priced_for_the_phase(game):
     assert pg.evaluate("() => projectCost(PROJECTS.find((p) => p.id === 'ups'))") == 25000
     pg.evaluate("() => { S.gen = 7; S.phase = 2; }")
     assert pg.evaluate("() => projectCost(PROJECTS.find((p) => p.id === 'suppression'))") == 2e6
+
+
+def test_fires_show_in_the_alert_line_until_they_are_over(game):
+    pg = phase1(game)
+    assert not pg.is_visible("#alerts")
+    ignite(pg)
+    text = pg.inner_text("#alerts")
+    assert "Fire in" in text and "GPUs down" in text and "back in" in text
+    run(pg, 120)
+    assert "Insurance pays" in pg.inner_text("#alerts")
+    run(pg, 60)
+    assert not pg.is_visible("#alerts")
+
+
+def test_droughts_show_in_the_alert_line(game):
+    pg = game({**READY, "debt": 0})
+    pg.click("button[data-id='ground']")
+    pg.click("button[data-county='strong']")
+    pg.evaluate("() => { S.rival.next = 1e9; firesOf().next = 1e9; S.p2.nextDrought = S.t + 1; }")
+    run(pg, 2)
+    assert "Drought" in pg.inner_text("#alerts")

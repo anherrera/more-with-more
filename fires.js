@@ -36,9 +36,10 @@ function startFire() {
   }
   if (!n) return;
   S.gpus -= n;
-  f.out = { gens, n, value, until: S.t + (S.done.firecrew ? 60 : FIRE_DOWN) }; f.n += 1;   // an on-site crew halves the downtime
+  const where = fireWhere();
+  f.out = { gens, n, value, where, until: S.t + (S.done.firecrew ? 60 : FIRE_DOWN) }; f.n += 1;   // an on-site crew halves the downtime
   track("fire", { n });
-  say(`Fire in ${fireWhere()}: ${n.toLocaleString("en-US")} GPUs down for about ${time(FIRE_DOWN)}. Everyone is fine. The GPUs are less fine.`);
+  say(`Fire in ${where}: ${n.toLocaleString("en-US")} GPUs down for about ${time(FIRE_DOWN)}. Everyone is fine. The GPUs are less fine.`);
 }
 
 function endFire() {
@@ -66,4 +67,14 @@ function stepFires(dt) {
   if (!firesOn()) return;
   if (f.next == null) f.next = S.t + fireGap(Math.random());
   if (!f.out && S.t >= f.next) { startFire(); f.next = S.t + fireGap(Math.random()); }
+}
+
+// The alert line under the title: things happening right now that the console would scroll away.
+function renderAlerts() {
+  const f = firesOf(), out = [];
+  if (f.out) out.push(`\ud83d\udd25 Fire in ${f.out.where || "the data center"}: ${f.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, f.out.until - S.t))}`);
+  if (f.payout) out.push(`Insurance pays ${money(f.payout.amt)} in ${time(Math.max(0, f.payout.at - S.t))}`);
+  if (S.phase === 2 && S.p2 && S.p2.county && droughtOn()) out.push(`Drought: water allocation \u2212${Math.round(100 * (1 - DROUGHT_CUT))}% for ${time(S.p2.drought.until - S.t)}`);
+  $("alerts").hidden = !out.length;
+  $("alerts").textContent = out.join(" \u00b7 ");
 }
