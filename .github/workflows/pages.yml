@@ -32,7 +32,10 @@ jobs:
       - name: Collect the game files
         run: |
           mkdir site
-          cp index.html globals.js projects.js campus.js model.js market.js main.js site/
+          cp index.html *.js site/
+          # Cache busting: every script link carries the commit, so a browser can never mix old and new files.
+          sed -i "s/\.js\"/.js?v=${GITHUB_SHA::7}\"/g" site/index.html
+          grep -c "?v=${GITHUB_SHA::7}" site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

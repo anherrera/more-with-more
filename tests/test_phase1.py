@@ -81,3 +81,12 @@ def test_saved_games_keep_ticking_without_a_click(game):
     t0 = pg.evaluate("() => S.t")
     pg.wait_for_timeout(1200)
     assert pg.evaluate("() => S.t") > t0
+
+
+def test_answer_is_clickable_before_the_clock_starts_even_with_no_queries(game):
+    pg = game({"queue": 0, "logV2": True, "coolingV2": True}, test=False)   # e.g. an old save or a mixed-version load
+    pg.wait_for_timeout(300)
+    assert pg.is_enabled("#answer")
+    pg.click("#answer")
+    pg.wait_for_timeout(1500)
+    assert pg.evaluate("() => S.t") > 0.5                                   # the click started the clock: no deadlock

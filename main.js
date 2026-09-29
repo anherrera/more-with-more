@@ -567,7 +567,7 @@ function renderPhase1() {
   $("demand").textContent = fmt(d) + " /s";
   $("serving").textContent = fmt(sv) + " /s";
   $("revenue").textContent = money(sv * S.price) + " /s";
-  $("answer").disabled = S.queue < 1;
+  $("answer").disabled = S.queue < 1 && clockOn;   // before the clock starts it stays clickable: the click starts it
   const mix = Object.keys(S.fleet).map(Number).sort((a, b) => b - a).filter((c) => S.fleet[c] > 0)
     .map((c) => `${chip(c).name} ${S.fleet[c].toLocaleString("en-US")}`).join(", ");
   $("gpus").textContent = `${S.gpus.toLocaleString("en-US")}${mix && Object.keys(S.fleet).length > 1 ? ` (${mix})` : ""}, room for ${roomNewest().toLocaleString("en-US")} more`;
