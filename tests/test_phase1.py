@@ -64,3 +64,20 @@ def test_new_games_start_training_at_half(game):
     pg = game()
     assert pg.evaluate("() => S.split") == 50
     assert pg.input_value("#split") == "50"
+
+
+def test_clock_waits_for_the_first_click(game):
+    pg = game(test=False)
+    pg.wait_for_timeout(1200)
+    assert pg.evaluate("() => S.t") == 0
+    assert pg.inner_text("#clock").startswith("0:00")
+    pg.click("#answer")
+    pg.wait_for_timeout(1200)
+    assert pg.evaluate("() => S.t") > 0.5
+
+
+def test_saved_games_keep_ticking_without_a_click(game):
+    pg = game(MID, test=False)
+    t0 = pg.evaluate("() => S.t")
+    pg.wait_for_timeout(1200)
+    assert pg.evaluate("() => S.t") > t0

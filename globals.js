@@ -41,7 +41,8 @@ const MODEL_LINES = [
 
 // ---------- state ----------
 const fresh = () => ({
-  t: 0, funds: 0, price: 0.25, gpus: 0, queue: 0, served: 0, gpuSeconds: 0, phase: 1, p2: null,
+  // queue: a few questions are already waiting, so the first click is always possible
+  t: 0, funds: 0, price: 0.25, gpus: 0, queue: 5, served: 0, gpuSeconds: 0, phase: 1, p2: null,
   split: 50, gen: 0, progress: 0, hype: 20, tier: 0, cooling: 0, round: 0, leases: { rack: 1 }, powerBoost: 1, coolingV2: true, fleet: {}, chipIdx: 0, nextChip: 300,
   leaseCool: { rack: { 0: 1 } }, rival: { px: 40, prev: 40, next: 150, n: 0 }, rentals: 0, rentUntil: 0,
   demandMult: 1, done: {}, log: ["A model with no name is waiting for its first question."], ended: false,

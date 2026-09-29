@@ -1,5 +1,6 @@
 // main.js: phase 1 (the lab), the shared tick and render, wiring, and start().
-const TEST = new URLSearchParams(location.search).has("test");   // tests drive step() by hand: no timers
+const TEST = new URLSearchParams(location.search).has("test");
+let clockOn = false;                                              // set in start()   // tests drive step() by hand: no timers
 // ---------- model ----------
 const needFor = (g) => 100 * Math.pow(10, g - 1);           // GPU-seconds to train generation g
 const quality = () => Math.pow(4, S.gen);                  // each generation quadruples what people want from it
@@ -725,7 +726,7 @@ function wire() {
   $("retrofit").addEventListener("click", () => { retrofit(); render(); });
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
-  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; lastOfferKey = lastContractKey = lastFleetKey = null; render(); });
+  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; lastOfferKey = lastContractKey = lastFleetKey = null; clockOn = false; render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
   wireCampus();
 }
@@ -743,12 +744,17 @@ function start(data) {
   $("split").value = S.split;
   ensureRun(); track("session", { resumedAt: Math.round(S.t) });
   wire();
+  // A new game's clock waits for the first click (saved games keep going).
+  clockOn = S.t > 0;
+  document.addEventListener("click", () => { clockOn = true; }, true);          // capture: runs before button handlers
+  $("split").addEventListener("input", () => { clockOn = true; });
   if (!TEST) {
     setInterval(flush, 20000);
     let last = performance.now();
     setInterval(() => {
       const now = performance.now(), dt = Math.min((now - last) / 1000, 1); last = now;
-      step(dt); render();
+      if (clockOn) step(dt);
+      render();
     }, 100);
     setInterval(save, 5000);
   }

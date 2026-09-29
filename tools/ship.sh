@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ship a change: syntax-check every script, run the whole test suite, and only if both pass
-# commit, push (which redeploys the public site after CI passes too) and update the local play checkout.
+# commit and update the local play checkout (localhost:8777). Publishing is a separate step: tools/publish.sh.
 #   tools/ship.sh "feat: what changed"
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -11,6 +11,5 @@ git add -A
 git commit -q -m "$1
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
-git push -q
 git -C ../more-with-more-play checkout -q --detach main
-echo "shipped: $(git log --oneline -1)"
+echo "shipped locally: $(git log --oneline -1)  (not pushed; run tools/publish.sh when ready for GitHub + the public site)"
