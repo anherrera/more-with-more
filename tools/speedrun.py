@@ -51,6 +51,7 @@ def mmss(x):
 
 
 headless_full = True
+WATCH = False          # --watch: ~30 s of real time per game, small steps, so a person can follow it
 
 
 def run_once(browser, base, seed, county):
@@ -58,14 +59,17 @@ def run_once(browser, base, seed, county):
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.add_init_script(RNG.format(seed=seed) + "if (!sessionStorage.cleared) { sessionStorage.cleared = 1; localStorage.clear(); }")
     pg.goto(base + "?test")
-    for _ in range(60):                           # phase 1, two game-minutes per call
-        if pg.evaluate(PHASE1, 120) != 1: break
+    chunk, pause = (10, 190) if WATCH else (120, 0)
+    for _ in range(12000 // chunk):               # phase 1
+        if pg.evaluate(PHASE1, chunk) != 1: break
+        if pause: pg.evaluate("() => render()"); pg.wait_for_timeout(pause)
         pg.evaluate("() => render()")
     ground = pg.evaluate("() => S.endedAt")
     if pg.evaluate("() => S.phase") == 2:
         pg.click(f"button[data-county='{county}']")
-        for _ in range(45):
-            pg.evaluate(PHASE2, [120, []]); pg.evaluate("() => render()")
+        for _ in range(5400 // chunk):
+            pg.evaluate(PHASE2, [chunk, []]); pg.evaluate("() => render()")
+            if pause: pg.wait_for_timeout(pause)
             if pg.evaluate("() => S.p2.model.endedAt") is not None: break
     s = pg.evaluate("""() => ({t: S.t, gen: S.gen, ended: S.p2 && S.p2.model && S.p2.model.endedAt, ipo: S.p2 && S.p2.ipo && S.p2.ipo.at,
       fires: firesOf().n, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
@@ -77,7 +81,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=3); ap.add_argument("--headless", action="store_true")
     ap.add_argument("--one", type=int, help="internal: run only this run number (used for parallel runs)")
+    ap.add_argument("--watch", action="store_true", help="one visible game paced to ~30 s")
     a = ap.parse_args()
+    global WATCH
+    if a.watch: WATCH = True; a.runs = 1
     if a.one is None and a.runs > 1:              # run each in its own process, side by side, at the same time
         import subprocess
         procs = [subprocess.Popen([sys.executable, __file__, "--one", str(r)] + (["--headless"] if a.headless else []),
