@@ -32,7 +32,7 @@ TRIGGERS = {
     "nuclearppa": "S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false}",
     "securitize": "S.p2.contracts.push({id: 'cx', n: 99, who: 'A lab', mw: 250, minGen: 0, start: S.t + 999, end: S.t + 2000, fee: 1, upfront: 1, status: 'waiting'})",
     "silicon": "S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false}",
-    "pledge2": "for (let i = 0; i < 10; i++) S.p2.builds.push({kind: 'hall', done: 0})",
+    "pledge2": "for (let i = 0; i < 20; i++) S.p2.builds.push({kind: 'hall', done: 0})",
 }
 
 
@@ -44,8 +44,11 @@ def test_project_appears_only_when_triggered(game, pid, trigger):
     assert has(pg, pid)
 
 
-def test_rebrand_is_available_from_the_start(game):
-    assert has(campus(game), "rebrand")
+def test_rebrand_comes_after_series_e(game):
+    pg = campus(game)
+    assert not has(pg, "rebrand")
+    pg.evaluate("() => { S.p2.round = 1; }")
+    assert has(pg, "rebrand")
 
 
 def buy(pg, pid, trigger=None):
@@ -117,7 +120,7 @@ def test_money_and_hype_projects(game):
     buy(pg, "securitize", TRIGGERS["securitize"])
     assert pg.evaluate("() => drawSize()") == pytest.approx(0.8 * 250 * 300000 * 1.5, rel=0.01)
     hype = pg.evaluate("() => S.hype")
-    buy(pg, "rebrand")
+    buy(pg, "rebrand", "S.p2.round = 1")
     assert pg.evaluate("() => S.hype") == pytest.approx(hype + 30)
 
 

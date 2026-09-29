@@ -438,6 +438,21 @@ function renderCampus() {
       (p.landN ? ` (${p.landN} parcel${p.landN > 1 ? "s" : ""} bought)` : "");
   }
   $("p2cap").textContent = `${mwText(leasedKW() / 1000)} leased + ${mwText(energizedAt())} campus; ${mwText(usedKW() / 1000)} of GPUs racked, room for ${mwText(Math.max(0, capKW() - usedKW()) / 1000)} more`;
+  {
+    // Meters: green with headroom, amber when nearly used, red when it's the bottleneck.
+    const meter = (id, used, cap, limiting) => {
+      const r = cap > 0 ? used / cap : 1;
+      $(id).firstElementChild.style.width = Math.min(100, 100 * r) + "%";
+      $(id).className = "meter " + (limiting || r > 1 ? "bad" : r > 0.85 ? "warn" : "good");
+    };
+    const hallMW = hallMWAt(), pw = powerAt(), wa = waterMWAt(), built = doneBuilds("hall");
+    const lit = Math.min(built, Math.floor(Math.min(pw, wa) / hallSize()));
+    meter("mHalls", lit, Math.max(built, 1), built > lit);
+    meter("mPower", hallMW, pw, hallMW > pw && pw <= wa);
+    meter("mWater", hallMW, wa, hallMW > wa && wa < pw);
+    const acres = countyOf().acres + (p.landN || 0) * LAND.acres + extraAcres();
+    meter("mLand", acres - acresFree(), acres, acresFree() < HALL.acres);
+  }
   $("p2limit").textContent = campusLimit();
   $("buildHall").textContent = `Build a hall (${hallSize()} MW, ${HALL.acres} acres, ${time(HALL.secs * (S.done.prefab ? 0.6 : 1))}): ${money(buildCost("hall"))}`;
   $("buildHall").disabled = S.funds < buildCost("hall") || acresFree() < HALL.acres;
@@ -516,6 +531,8 @@ function nextMove() {
   const good = S.p2.offers.find((o) => forecast(o).ok);
   if (good) return `Sign ${first(good.who)}'s offer: ${forecast(good).text.replace("\u2713 ", "")}`;
   // The goal, counting what's already under construction and queued.
+  if (S.p2.model && S.p2.model.endedAt == null && energizedAt() >= GOAL_MW && !isPublic())
+    return "The campus is done. Ring the bell (IPO) under Investors to finish phase 2.";
   if (S.p2.model && S.p2.model.endedAt == null && energizedAt() < GOAL_MW) {
     const halls = Math.ceil(Math.max(0, GOAL_MW - hallMWAt(Infinity)) / hallSize());
     const power = Math.max(0, GOAL_MW - powerAt(Infinity));

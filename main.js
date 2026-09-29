@@ -280,6 +280,23 @@ function rentRival() {
   say(RENT_LINES[(S.rentals - 1) % RENT_LINES.length].replace("{p}", Math.round(bump * 100)));
 }
 
+// Periodic nonsense that gives you hype, because the discourse never sleeps.
+const BUZZ = [
+  ["A podcast called you \u201cthe Switzerland of compute.\u201d", 8],
+  ["A sell-side analyst initiated coverage: Strong Buy. He has never seen a data center.", 10],
+  ["Your CEO wore a black turtleneck on stage.", 6],
+  ["A viral thread explained your company using a diagram with eleven arrows. Nine point at you.", 9],
+  ["You were named to a \u201c30 under 30\u201d list. Nobody checked.", 7],
+  ["A conference renamed its main stage after you. You paid for the conference.", 12],
+  ["An influencer unboxed one of your GPUs. It was not your GPU.", 6],
+  ["A think tank called you \u201ccritical infrastructure.\u201d It is funded by Parallax.", 11],
+];
+function buzz() {
+  const [line, dh] = BUZZ[Math.floor(Math.random() * BUZZ.length)];
+  S.hype += dh; S.nextBuzz = S.t + 100 + Math.random() * 60;
+  track("buzz", { dh }); say(`${line} +${dh} hype.`);
+}
+
 function releaseChip() {
   S.chipIdx += 1; S.nextChip = S.t + (S.phase === 2 ? CHIP_EVERY_P2 : CHIP_EVERY);
   const c = newest(), prev = chip(S.chipIdx - 1);
@@ -362,6 +379,8 @@ function step(dt) {
   if (S.block && S.t >= S.block.until) S.block = null;
   if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
   stepFires(dt);
+  if (S.nextBuzz == null) S.nextBuzz = S.t + 120;
+  if (S.phase <= 2 && S.gen >= 1 && S.t >= S.nextBuzz) buzz();
   if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
   if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200

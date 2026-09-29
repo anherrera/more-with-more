@@ -49,13 +49,13 @@ def test_points_at_the_goal_when_close(game):
 
 def test_suggests_an_affordable_project_when_the_goal_is_out_of_reach(game):
     pg = campus(game)
-    pg.evaluate("() => { S.p2.offers = []; S.funds = 6e6; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
+    pg.evaluate("() => { S.p2.offers = []; S.funds = 6e6; S.p2.round = 1; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
     assert "Rebrand as a neocloud" in move(pg)
 
 
 def test_hype_projects_are_suggested_only_in_froth(game):
     pg = campus(game)
-    pg.evaluate("() => { S.p2.offers = []; S.funds = 6e6; S.hype = 60; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
+    pg.evaluate("() => { S.p2.offers = []; S.funds = 6e6; S.hype = 60; S.p2.round = 1; S.fleet = {3: Math.floor(capKW() / chip(3).kw)}; S.gpus = S.fleet[3]; }")
     assert "hype" not in move(pg).split("(")[1].split(")")[0]            # suggests a money project, not a hype one
     pg.evaluate("() => { S.hype = 130; }")
     text = move(pg)

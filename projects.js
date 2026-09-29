@@ -48,7 +48,7 @@ const PROJECTS = [
     when: () => Object.keys(S.fleet).some((g) => +g < S.chipIdx && S.fleet[g] > 0), buy: () => { S.hype += 20; } },
   // ---- phase 2: an infrastructure company buys infrastructure-company things ----
   { id: "rebrand", phase: 2, title: "Rebrand as a neocloud", cost: 5e6, desc: "New logo, same GPUs. +30 hype.",
-    when: () => !!S.p2 && !!S.p2.county, buy: () => { S.hype += 30; } },
+    when: () => !!S.p2 && (S.p2.round || 0) >= 1, buy: () => { S.hype += 30; } },   // after Series E
   { id: "resdesk", phase: 2, title: "Reserved pricing desk", cost: 25e6, desc: "Three people and a spreadsheet. New contracts pay 20% more up front.",
     when: () => S.p2.contractN >= 1, buy: () => {} },
   { id: "sales2", phase: 2, title: "Enterprise sales, again", cost: 40e6, desc: "They find labs you have never heard of. Offers arrive 30% more often.",
@@ -78,7 +78,7 @@ const PROJECTS = [
   { id: "silicon", phase: 2, title: "Announce custom silicon", cost: 100e6, desc: "A render and a codename. Nothing ships. +50 hype.",
     when: () => isPublic(), buy: () => { S.hype += 50; } },
   { id: "pledge2", phase: 2, title: "Pledge: water-positive by 2045", cost: 0, desc: "The 2040 pledge, extended. +15 hype.",
-    when: () => acresUsed() >= 200, buy: () => { S.hype += 15; } },
+    when: () => acresUsed() >= 400, buy: () => { S.hype += 15; } },
   { id: "robots", phase: 2, title: "Campus expansion robots", cost: 300e6,
     desc: "They pour concrete, set transformers and never unionize. Halls and turbines build themselves whenever you're short and have cash.",
     when: () => isPublic(), buy: () => { S.p2.robotsAt = 0; } },

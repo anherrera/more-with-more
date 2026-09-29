@@ -12,7 +12,7 @@ def campus(game, **extra):
 
 
 def gigawatt(pg):
-    pg.evaluate("() => { S.p2.grid = 99999; S.p2.extraWater = 999; for (let i = 0; i < 20; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
+    pg.evaluate("() => { S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false}; S.p2.grid = 99999; S.p2.extraWater = 999; for (let i = 0; i < 20; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
 
 
 def test_goal_line(game):

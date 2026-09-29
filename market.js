@@ -47,7 +47,8 @@ const stockPrice = () => {
 };
 const marketCap = () => (isPublic() ? stockPrice() * capOf().shares : fundamentalCap());
 
-const ipoGap = () => backlogMW() < IPO_BACKLOG ? `${mwText(IPO_BACKLOG)} of signed backlog (have ${mwText(backlogMW())})`
+// Signed capacity (delivered + waiting), so a finished campus can always go public.
+const ipoGap = () => backlogMW() + deliveredMW() < IPO_BACKLOG ? `${mwText(IPO_BACKLOG)} of signed contracts (have ${mwText(backlogMW() + deliveredMW())})`
   : energizedAt() < IPO_CAMPUS ? `${mwText(IPO_CAMPUS)} of campus (have ${mwText(energizedAt())})` : null;
 
 function ringTheBell() {

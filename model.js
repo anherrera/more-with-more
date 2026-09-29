@@ -61,7 +61,7 @@ function stepModel() {
   const m = modelOf();
   for (const g of S.p2.pendingGrid || []) if (!g.done && S.t >= g.at) { g.done = true; S.p2.grid += g.mw; say(g.what); }
   if (m.endedAt != null) return;
-  if (!m.final && energizedAt() >= GOAL_MW) {
+  if (!m.final && energizedAt() >= GOAL_MW && isPublic()) {   // the ending needs the campus AND the IPO
     m.current = null;
     m.final = { at: m.autonomy >= SELF_APPROVE_AT ? S.t + FINAL_COUNTDOWN : null };
     milestone("1 GW campus");
@@ -122,7 +122,8 @@ function renderModel() {
   const m = modelOf();
   const en = energizedAt();
   $("goalLine").textContent = m.endedAt != null ? `Done: a ${mwText(en)} campus. The model is building the next one.`
-    : `Goal: a 1 GW campus (now ${mwText(en)}). The model has plans for it.`;
+    : en >= GOAL_MW && !isPublic() ? `Goal: a 1 GW campus \u2713 (${mwText(en)}). Now go public: ring the bell (IPO) under Investors.`
+    : `Goal: a 1 GW campus (now ${mwText(en)})${isPublic() ? "" : ", and an IPO"}. The model has plans for it.`;
   $("goalMeter").firstElementChild.style.width = Math.min(100, 100 * en / GOAL_MW) + "%";
   $("autonomy").textContent = `The model's autonomy: ${AUTONOMY_TEXT[autonomyTier()]}`;
   const show = !!(m.final || m.current) && m.endedAt == null;
