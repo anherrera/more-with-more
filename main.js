@@ -1,5 +1,7 @@
 // main.js: phase 1 (the lab), the shared tick and render, wiring, and start().
 const TEST = new URLSearchParams(location.search).has("test");
+// Playtesting fast-forward: ?speed=10 runs the game 10x (1-50). Off unless the URL asks.
+const SPEED = Math.max(1, Math.min(50, Number(new URLSearchParams(location.search).get("speed")) || 1));
 let clockOn = false;                                              // set in start()   // tests drive step() by hand: no timers
 // ---------- model ----------
 const needFor = (g) => 100 * Math.pow(10, g - 1);           // GPU-seconds to train generation g
@@ -772,7 +774,7 @@ function start(data) {
     let last = performance.now();
     setInterval(() => {
       const now = performance.now(), dt = Math.min((now - last) / 1000, 1); last = now;
-      if (clockOn) step(dt);
+      if (clockOn) for (let left = dt * SPEED; left > 1e-9; left -= 1) step(Math.min(1, left));   // sub-steps of at most 1 s
       render();
     }, 100);
     setInterval(save, 5000);

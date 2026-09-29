@@ -90,3 +90,10 @@ def test_answer_is_clickable_before_the_clock_starts_even_with_no_queries(game):
     pg.click("#answer")
     pg.wait_for_timeout(1500)
     assert pg.evaluate("() => S.t") > 0.5                                   # the click started the clock: no deadlock
+
+
+def test_speed_param_fast_forwards_play(page, server):
+    page.goto(server + "?speed=10")
+    page.click("#answer")                               # starts the clock
+    page.wait_for_timeout(1000)
+    assert page.evaluate("() => S.t") > 6               # ~10 game-seconds per real second
