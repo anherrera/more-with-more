@@ -12,7 +12,17 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Syntax-check every script
+        run: for f in *.js; do node --check "$f"; done
+      - name: Run the test suite (headless Chrome)
+        run: uv run --with pytest --with playwright pytest -q
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
