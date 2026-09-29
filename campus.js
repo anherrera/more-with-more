@@ -599,11 +599,19 @@ function renderContracts() {
     fc.textContent = `${f.text} Offer good for ${Math.ceil(o.expires - S.t)}s.`;
     d.querySelector("[data-accept]").textContent = `Sign: ${money(o.upfront)} up front`;
   }
-  const shown = p.contracts.filter((c) => c.status !== "done" && c.status !== "defaulted");
+  // Running contracts collapse into one line; only contracts that can still need you are listed.
+  const running = p.contracts.filter((c) => c.status === "active");
+  $("runningSummary").hidden = !running.length;
+  if (running.length) {
+    const soonest = Math.min(...running.map((c) => c.end - S.t));
+    $("runningSummary").textContent = `${running.length} contract${running.length > 1 ? "s" : ""} delivering ${mwText(running.reduce((a, c) => a + c.mw, 0))} \u00b7 ` +
+      `${money(running.reduce((a, c) => a + c.fee, 0))}/s \u00b7 next ends in ${time(Math.max(0, soonest))}`;
+  }
+  const shown = p.contracts.filter((c) => c.status === "waiting" || c.status === "late");
   const cKey = shown.map((c) => `${c.id}:${c.status}:${c.reneg}`).join(",");
   if (cKey !== lastContractKey) {
     lastContractKey = cKey;
-    $("contracts").innerHTML = shown.length ? "" : `<div class="empty">Nothing signed.</div>`;
+    $("contracts").innerHTML = shown.length || running.length ? "" : `<div class="empty">Nothing signed.</div>`;
     for (const c of shown) {
       const d = document.createElement("div"); d.className = "deal"; d.dataset.contract = c.id;
       d.innerHTML = `<div class="line st"></div>` + (!c.reneg && c.status !== "active"
