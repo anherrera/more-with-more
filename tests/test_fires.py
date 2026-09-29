@@ -75,3 +75,13 @@ def test_fire_survives_reload(game):
     pg.evaluate("() => save()")
     pg.reload()
     assert pg.evaluate("() => JSON.stringify(S.fires)") == before
+
+
+def test_fire_projects_are_priced_for_the_phase(game):
+    pg = game({**MID, "gen": 2, "funds": 30000, "debt": 0})
+    pg.evaluate("() => { firesOf().n = 1; render(); }")
+    b = pg.query_selector("button[data-id='suppression']")
+    assert "$10.0K" in b.inner_text() and b.is_enabled()
+    assert pg.evaluate("() => projectCost(PROJECTS.find((p) => p.id === 'ups'))") == 25000
+    pg.evaluate("() => { S.gen = 7; S.phase = 2; }")
+    assert pg.evaluate("() => projectCost(PROJECTS.find((p) => p.id === 'suppression'))") == 2e6

@@ -547,14 +547,16 @@ function render() {
     for (const p of avail) {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.id = p.id;
-      b.innerHTML = `<span class="t">${p.title} (${p.hype ? `\u2212${p.hype} hype` : p.cost ? money(p.cost) : "free"})</span><span class="c">${p.desc}</span>`;
+      b.innerHTML = `<span class="t"></span><span class="c">${p.desc}</span>`;
       $("projects").appendChild(b);
     }
   }
   for (const b of $("projects").querySelectorAll("button[data-id]")) {
     const p = PROJECTS.find((x) => x.id === b.dataset.id);
     const missing = p.needs ? p.needs() : [];
-    b.disabled = S.funds < p.cost || (p.hype && S.hype < p.hype + 5) || missing.length > 0;   // hype projects need hype to spare
+    const cost = projectCost(p);
+    b.querySelector(".t").textContent = `${p.title} (${p.hype ? `\u2212${p.hype} hype` : cost ? money(cost) : "free"})`;
+    b.disabled = S.funds < cost || (p.hype && S.hype < p.hype + 5) || missing.length > 0;   // hype projects need hype to spare
     if (p.needs) b.querySelector(".c").textContent = p.desc + (missing.length ? ` Still need to: ${missing.join(", ")}.` : " Ready.");
   }
   $("clock").textContent = `${time(S.t)} played · ${fmt(S.gpuSeconds)} GPU-seconds used`;
@@ -707,8 +709,8 @@ function renderLeases() {
 }
 function buyProject(id) {
   const p = PROJECTS.find((x) => x.id === id);
-  if (!p || S.done[p.id] || S.funds < p.cost || (p.hype && S.hype < p.hype + 5) || (p.needs && p.needs().length)) return;
-  S.funds -= p.cost; if (p.hype) S.hype -= p.hype; S.done[p.id] = true; p.buy(); milestone(`project: ${p.title}`); render();
+  if (!p || S.done[p.id] || S.funds < projectCost(p) || (p.hype && S.hype < p.hype + 5) || (p.needs && p.needs().length)) return;
+  S.funds -= projectCost(p); if (p.hype) S.hype -= p.hype; S.done[p.id] = true; p.buy(); milestone(`project: ${p.title}`); render();
 }
 function renderRacks(racks, fill) {
   const shown = Math.min(racks, 60), filled = fill * shown;

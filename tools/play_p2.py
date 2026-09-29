@@ -31,8 +31,8 @@ POLICY = """(args) => {
     // the model's proposals and projects
     if (m && m.current && S.funds >= proposalCost(m.current) + reserve()) { approveProposal(); acted++; }
     if (m && m.final && m.final.at == null) { approveProposal(); acted++; }
-    for (const p of PROJECTS.filter((p) => (p.phase === 0 || (p.phase || 1) === 2) && !S.done[p.id] && !banned.includes(p.id) && p.when()).sort((a, b) => a.cost - b.cost)) {
-      if (S.funds - p.cost > reserve()) { buyProject(p.id); acted++; }
+    for (const p of PROJECTS.filter((p) => (p.phase === 0 || (p.phase || 1) === 2) && !S.done[p.id] && !banned.includes(p.id) && p.when()).sort((a, b) => projectCost(a) - projectCost(b))) {
+      if (S.funds - projectCost(p) > reserve()) { buyProject(p.id); acted++; }
     }
     // contracts: sign what we can deliver; buy GPUs for what's due
     for (const o of [...S.p2.offers]) if (forecast(o).ok) { acceptOffer(o.id); acted++; }

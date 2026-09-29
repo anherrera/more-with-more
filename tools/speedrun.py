@@ -23,8 +23,8 @@ PHASE1 = """(secs) => {
     if (dealReady()) takeDeal();
     raise();
     if (spotReady() && spotMult() > 2) sellSpot();
-    for (const p of PROJECTS.filter((p) => (p.phase === 0 || (p.phase || 1) === 1) && !S.done[p.id] && p.when()).sort((a, b) => a.cost - b.cost))
-      if (S.funds >= p.cost && (!p.needs || !p.needs().length) && (!p.hype || S.hype > p.hype + 50)) buyProject(p.id);
+    for (const p of PROJECTS.filter((p) => (p.phase === 0 || (p.phase || 1) === 1) && !S.done[p.id] && p.when()).sort((a, b) => projectCost(a) - projectCost(b)))
+      if (S.funds >= projectCost(p) && (!p.needs || !p.needs().length) && (!p.hype || S.hype > p.hype + 50)) buyProject(p.id);
     if (S.phase !== 1) break;
     const k = maxBuy(); if (k > 0) buy(k);
     if (roomNewest() < 1) {

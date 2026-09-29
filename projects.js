@@ -1,4 +1,8 @@
 // projects.js: every project in the game. Phase 2 projects carry phase: 2.
+// A cost can be a number or a function (priced for where you are in the game).
+const projectCost = (p) => (typeof p.cost === "function" ? p.cost() : p.cost);
+// Phase 1 prices that grow with the model generation, capped at the phase 2 price.
+const scaledCost = (k, full) => () => (S.phase === 2 ? full : Math.min(full, k * Math.pow(5, S.gen)));
 // ---------- projects ----------
 const PROJECTS = [
   { id: "dynprice", title: "Dynamic pricing", desc: "The price sets itself to wherever demand meets capacity.", cost: 250,
@@ -83,10 +87,10 @@ const PROJECTS = [
     desc: "They pour concrete, set transformers and never unionize. Halls and turbines build themselves whenever you're short and have cash.",
     when: () => (S.p2.round || 0) >= 1, buy: () => { S.p2.robotsAt = 0; } },   // after Series E
   // ---- fires, any phase ----
-  { id: "suppression", phase: 0, title: "Inert-gas fire suppression", cost: 2e6,
+  { id: "suppression", phase: 0, title: "Inert-gas fire suppression", cost: scaledCost(400, 2e6),
     desc: "It removes the oxygen from the room. Please leave the room first. Fires happen half as often.",
     when: () => firesOf().n >= 1, buy: () => {} },
-  { id: "ups", phase: 0, title: "Replace the UPS batteries", cost: 5e6,
+  { id: "ups", phase: 0, title: "Replace the UPS batteries", cost: scaledCost(1000, 5e6),
     desc: "The old ones came from a crypto miner's garage sale. Fires are half as big.",
     when: () => firesOf().n >= 1, buy: () => {} },
   // ---- honesty costs hype (and lets froth down gently) ----
@@ -111,6 +115,6 @@ const PROJECTS = [
     when: () => doneBuilds("hall", Infinity) >= 1, buy: () => {} },
   { id: "golfcourse", phase: 2, title: "Buy the golf course's water rights", cost: 30e6,
     desc: "It was exempt from the drought. It is not exempt from you. +2 MGD.", when: () => S.p2.drought != null, buy: () => {} },
-  { id: "firecrew", phase: 0, title: "A 24/7 on-site fire crew", cost: 10e6, desc: "They have their own chili cook-off. Fires are out in 1 minute instead of 2.",
+  { id: "firecrew", phase: 0, title: "A 24/7 on-site fire crew", cost: scaledCost(2000, 10e6), desc: "They have their own chili cook-off. Fires are out in 1 minute instead of 2.",
     when: () => firesOf().n >= 1, buy: () => {} },
 ];

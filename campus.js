@@ -554,8 +554,8 @@ function nextMove() {
     const calm = PROJECTS.find((p) => p.phase === 2 && p.hype && !S.done[p.id] && p.when() && S.hype >= p.hype + 5);
     if (calm) return `Froth: spend hype on \u201c${calm.title}\u201d (\u2212${calm.hype} hype) before a reality check does it for you. ${calm.desc}`;
   }
-  const project = PROJECTS.filter((p) => p.phase === 2 && !p.hype && !S.done[p.id] && p.when() && S.funds >= p.cost).sort((a, b) => a.cost - b.cost)[0];
-  if (project) return `Buy the \u201c${project.title}\u201d project (${project.cost ? money(project.cost) : "free"}): ${project.desc}`;
+  const project = PROJECTS.filter((p) => p.phase === 2 && !p.hype && !S.done[p.id] && p.when() && S.funds >= projectCost(p)).sort((a, b) => projectCost(a) - projectCost(b))[0];
+  if (project) return `Buy the \u201c${project.title}\u201d project (${projectCost(project) ? money(projectCost(project)) : "free"}): ${project.desc}`;
   const room = roomMWAt(S.t);
   if (room < 5) {
     const oldGens = Object.keys(S.fleet).map(Number).some((g) => !contractReady(g) && tradeCount(g) > 0);
