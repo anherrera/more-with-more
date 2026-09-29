@@ -230,3 +230,14 @@ def test_signed_contract_forecasts_see_each_other(game):
         o.mw = 30; o.minGen = 0; o.start = S.t + 100 + i; acceptOffer(o.id); } render(); }""")
     rows = pg.inner_text("#contracts")
     assert rows.count("✓ covered") == 1, rows
+
+
+def test_contracts_needing_gpus_are_amber_not_white(game):
+    pg = campus(game)
+    no_gpus(pg)
+    sign_first(pg)
+    pg.evaluate("() => render()")
+    assert "hot" in pg.get_attribute("#contracts .st", "class")                 # needs GPUs bought: act
+    assert "hot" in pg.evaluate("() => { makeOffer(); render(); return document.querySelector('#offers .fc').className; }")
+    pg.evaluate("() => { S.fleet = {3: 40000}; S.gpus = 40000; render(); }")
+    assert "good" in pg.get_attribute("#contracts .st", "class")                # covered: fine

@@ -175,6 +175,9 @@ const pendingBefore = (o) => S.p2.contracts
     (o.end != null ? c.start < o.start || (c.start === o.start && c.n < o.n) : c.start < o.start + o.term))
   .reduce((a, c) => a + c.mw, 0);
 
+// Green: covered. Amber: you have to act (buy GPUs, trade in first). Red: short of space.
+const forecastClass = (f) => (!f.ok ? "bad" : f.kind === "hand" ? "good" : "hot");
+
 // Can you deliver this? From GPUs on hand, by buying GPUs into space you'll have, or not without more space.
 function forecast(o) {
   const eligible = eligibleFreeMW(o.minGen), pending = pendingBefore(o), onHand = eligible - pending;
@@ -588,7 +591,7 @@ function renderContracts() {
     const f = forecast(o);
     d.querySelector(".what").textContent = `${o.who}: ${mwText(o.mw)} of ${genName(o.minGen)} for ${time(o.term)}, starts in ${time(o.start - S.t)}. ${money(o.fee)}/s while delivered.`;
     const fc = d.querySelector(".fc");
-    fc.className = "line sub fc " + (f.ok ? "good" : "bad");
+    fc.className = "line sub fc " + forecastClass(f);
     fc.textContent = `${f.text} Offer good for ${Math.ceil(o.expires - S.t)}s.`;
     d.querySelector("[data-accept]").textContent = `Sign: ${money(o.upfront)} up front`;
   }
@@ -614,7 +617,7 @@ function renderContracts() {
         (late < LATE_FREE ? "Free for now." : `Paying penalties. Walks in ${time(Math.max(0, LATE_DEFAULT - late))}.`);
     } else {
       const f = forecast(c);
-      st.className = "line st " + (f.ok ? "" : "bad");
+      st.className = "line st " + forecastClass(f);
       st.textContent = `${who}: ${mwText(c.mw)}, starts in ${time(c.start - S.t)}. ` +
         (f.kind === "hand" ? "✓ covered" : f.ok ? `✓ buy ${mwText(f.buy)} of GPUs` : f.text);
     }
