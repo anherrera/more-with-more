@@ -491,14 +491,15 @@ function renderFleet() {
   const ready = gens.filter(contractReady), old = gens.filter((g) => !contractReady(g));
   const sum = (list, f) => list.reduce((a, g) => a + f(g), 0);
   $("fleetSummary").textContent = `Contract-ready: ${kwText(sum(ready, kwOf))} (${kwText(sum(ready, (g) => free[g] || 0))} free) \u00b7 ` +
-    `Old: ${kwText(sum(old, kwOf))} earning on-demand \u00b7 Room: ${kwText(Math.max(0, capKW() - usedKW()))}`;
-  const key = gens.map((g) => `${g}:${contractReady(g)}:${tradeCount(g) > 0}`).join(",");
+    `Old: ${kwText(sum(old, (g) => free[g] || 0))} free, earning on-demand \u00b7 Room: ${kwText(Math.max(0, capKW() - usedKW()))}`;
+  const tradeable = (g) => g < S.chipIdx && tradeCount(g) > 0;   // any chip older than the newest, if some are free
+  const key = gens.map((g) => `${g}:${contractReady(g)}:${tradeable(g)}`).join(",");
   if (key !== lastFleetKey) {
     lastFleetKey = key;
     $("fleetRows").innerHTML = gens.length ? "" : `<div class="empty">No GPUs. Buy some under Compute.</div>`;
     for (const g of gens) {
       const d = document.createElement("div"); d.className = "deal"; d.dataset.gen = g;
-      d.innerHTML = `<div class="line fl"></div>` + (!contractReady(g) && tradeCount(g) > 0
+      d.innerHTML = `<div class="line fl"></div>` + (tradeable(g)
         ? `<div class="btns"><button type="button" data-tradegen="${g}"></button></div>` : "");
       $("fleetRows").appendChild(d);
     }
@@ -506,7 +507,8 @@ function renderFleet() {
   for (const d of $("fleetRows").querySelectorAll("[data-gen]")) {
     const g = Number(d.dataset.gen); if (!S.fleet[g]) continue;
     const under = kwOf(g) - (free[g] || 0);
-    const status = contractReady(g) ? `contract-ready${under > 0 ? `, ${kwText(under)} under contract` : ""}` : "old: on-demand only";
+    const status = (contractReady(g) ? "contract-ready" : "old") + (under > 1 ? `, ${kwText(under)} under contract` : "") +
+      (contractReady(g) ? "" : under >= kwOf(g) - 1 ? "" : ", the rest on-demand");
     const fl = d.querySelector(".fl");
     fl.className = "line fl " + (contractReady(g) ? "good" : "");
     fl.textContent = `${chip(g).name} \u00b7 ${S.fleet[g].toLocaleString("en-US")} GPUs \u00b7 ${kwText(kwOf(g))} \u00b7 ${status} \u00b7 ` +
@@ -574,7 +576,7 @@ function renderContracts() {
   $("countLabel").textContent = "Delivered";
   $("gpuCount").textContent = `${mwText(deliveredMW())}`;
   $("backlog").textContent = `${mwText(backlogMW())}`;
-  $("delivered").textContent = `${fmt(deliveredMW())} of ${mwText(usedKW() / 1000)} of GPUs`;
+  $("delivered").textContent = `${mwText(deliveredMW())} of ${mwText(usedKW() / 1000)} of GPUs`;
   $("p2rev").textContent = `${money(campusRevenue())}/s (${money(onDemandRevenue())}/s of it on-demand)`;
   // Rebuild rows only when the set changes, so a click never lands on a button that was just replaced.
   const oKey = p.offers.map((o) => o.id).join(",");
