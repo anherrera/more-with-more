@@ -50,23 +50,25 @@ def mmss(x):
     return f"{int(x) // 60}:{int(x) % 60:02d}" if x is not None else "never"
 
 
+headless_full = True
+
+
 def run_once(browser, base, seed, county):
-    ctx = browser.new_context(viewport={"width": 1500, "height": 950}); pg = ctx.new_page(); errs = []
+    ctx = browser.new_context(viewport={"width": 1500, "height": 950} if headless_full else None); pg = ctx.new_page(); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.add_init_script(RNG.format(seed=seed) + "if (!sessionStorage.cleared) { sessionStorage.cleared = 1; localStorage.clear(); }")
     pg.goto(base + "?test")
-    for _ in range(120):                          # phase 1, one game-minute per call
-        if pg.evaluate(PHASE1, 60) != 1: break
+    for _ in range(60):                           # phase 1, two game-minutes per call
+        if pg.evaluate(PHASE1, 120) != 1: break
         pg.evaluate("() => render()")
     ground = pg.evaluate("() => S.endedAt")
     if pg.evaluate("() => S.phase") == 2:
         pg.click(f"button[data-county='{county}']")
-        for _ in range(90):
-            pg.evaluate(PHASE2, [60, []]); pg.evaluate("() => render()")
+        for _ in range(45):
+            pg.evaluate(PHASE2, [120, []]); pg.evaluate("() => render()")
             if pg.evaluate("() => S.p2.model.endedAt") is not None: break
     s = pg.evaluate("""() => ({t: S.t, gen: S.gen, ended: S.p2 && S.p2.model && S.p2.model.endedAt, ipo: S.p2 && S.p2.ipo && S.p2.ipo.at,
       fires: firesOf().n, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
-    pg.wait_for_timeout(1500)
     ctx.close()
     return ground, s, errs
 
@@ -74,15 +76,25 @@ def run_once(browser, base, seed, county):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=3); ap.add_argument("--headless", action="store_true")
+    ap.add_argument("--one", type=int, help="internal: run only this run number (used for parallel runs)")
     a = ap.parse_args()
+    if a.one is None and a.runs > 1:              # run each in its own process, side by side, at the same time
+        import subprocess
+        procs = [subprocess.Popen([sys.executable, __file__, "--one", str(r)] + (["--headless"] if a.headless else []),
+                                  stdout=subprocess.PIPE, text=True) for r in range(a.runs)]
+        outs = [pr.communicate()[0] for pr in procs]
+        for o in outs: print(o.strip().splitlines()[0])
+        ok = all(pr.returncode == 0 for pr in procs)
+        print("ALL CLEAN" if ok else "PROBLEMS FOUND"); sys.exit(0 if ok else 1)
     httpd = socketserver.TCPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(ROOT)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{httpd.server_address[1]}/"
     counties = ["strong", "incent", "cheap"]
     ok = True
     with sync_playwright() as p:
-        b = p.chromium.launch(channel="chrome", headless=a.headless)
-        for r in range(a.runs):
+        b = p.chromium.launch(channel="chrome", headless=a.headless,
+                              args=[] if a.one is None else [f"--window-position={40 + 520 * (a.one % 3)},40", "--window-size=520,900"])
+        for r in ([a.one] if a.one is not None else range(a.runs)):
             county = counties[r % 3]
             ground, s, errs = run_once(b, base, r + 1, county)
             p2 = (s["ended"] - ground) if s["ended"] and ground else None
