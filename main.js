@@ -508,6 +508,7 @@ function render() {
 
   for (const id of ["p1biz", "trainingBox", "answer"]) $(id).hidden = S.phase !== 1;
   $("colDeals").hidden = $("fleetBox").hidden = $("coloBox").hidden = S.phase !== 2;
+  if (S.phase !== 2) $("ending2").hidden = true;          // e.g. after a reset
   $("leases").hidden = S.phase === 2;
   renderPhase1();                                   // compute and leased space work in both phases
   if (S.phase === 1) $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true;
@@ -724,7 +725,7 @@ function wire() {
   $("retrofit").addEventListener("click", () => { retrofit(); render(); });
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
-  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; render(); });
+  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; lastOfferKey = lastContractKey = lastFleetKey = null; render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
   wireCampus();
 }

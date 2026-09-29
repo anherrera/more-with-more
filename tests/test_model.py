@@ -115,3 +115,15 @@ def test_unaffordable_proposal_steps_aside(game):
     m = pg.evaluate("() => S.p2.model")
     assert m["current"] == "utility" and m["rejected"] == {}           # rezone parked, not rejected; next one offered
     assert "It can wait" in pg.inner_text("#console")
+
+
+def test_reset_clears_the_phase2_banner(game):
+    pg = campus(game)
+    gigawatt(pg)
+    run(pg, 1)
+    pg.click("#propYes")
+    assert pg.is_visible("#ending2")
+    pg.click("#reset")
+    pg.click("#resetYes")
+    assert pg.evaluate("() => S.phase") == 1
+    assert not pg.is_visible("#ending2")
