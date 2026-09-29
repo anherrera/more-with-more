@@ -360,6 +360,7 @@ function step(dt) {
   if (Math.floor(S.t) !== Math.floor(S.t - dt)) { S.spotHist.push(spotMult()); if (S.spotHist.length > 90) S.spotHist.shift(); }
   if (S.block && S.t >= S.block.until) S.block = null;
   if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
+  stepFires(dt);
   if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
   if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
@@ -514,7 +515,7 @@ function render() {
 
   // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.
   // (Rebuilding every tick swaps buttons out mid-click and the click never lands.)
-  const avail = PROJECTS.filter((p) => (p.phase || 1) === S.phase && !S.done[p.id] && p.when());
+  const avail = PROJECTS.filter((p) => (p.phase === 0 || (p.phase || 1) === S.phase) && !S.done[p.id] && p.when());   // phase 0: any phase
   const key = avail.map((p) => p.id).join(",");
   if (key !== lastProjectKey) {
     lastProjectKey = key;

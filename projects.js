@@ -82,4 +82,11 @@ const PROJECTS = [
   { id: "robots", phase: 2, title: "Campus expansion robots", cost: 300e6,
     desc: "They pour concrete, set transformers and never unionize. Halls and turbines build themselves whenever you're short and have cash.",
     when: () => (S.p2.round || 0) >= 2, buy: () => { S.p2.robotsAt = 0; } },
+  // ---- fires, any phase ----
+  { id: "suppression", phase: 0, title: "Inert-gas fire suppression", cost: 2e6,
+    desc: "It removes the oxygen from the room. Please leave the room first. Fires happen half as often.",
+    when: () => firesOf().n >= 1, buy: () => {} },
+  { id: "ups", phase: 0, title: "Replace the UPS batteries", cost: 5e6,
+    desc: "The old ones came from a crypto miner's garage sale. Fires are half as big.",
+    when: () => firesOf().n >= 1, buy: () => {} },
 ];
