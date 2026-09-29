@@ -81,7 +81,7 @@ const PROJECTS = [
     when: () => acresUsed() >= 400, buy: () => { S.hype += 15; } },
   { id: "robots", phase: 2, title: "Campus expansion robots", cost: 300e6,
     desc: "They pour concrete, set transformers and never unionize. Halls and turbines build themselves whenever you're short and have cash.",
-    when: () => isPublic(), buy: () => { S.p2.robotsAt = 0; } },
+    when: () => (S.p2.round || 0) >= 1, buy: () => { S.p2.robotsAt = 0; } },   // after Series E
   // ---- fires, any phase ----
   { id: "suppression", phase: 0, title: "Inert-gas fire suppression", cost: 2e6,
     desc: "It removes the oxygen from the room. Please leave the room first. Fires happen half as often.",

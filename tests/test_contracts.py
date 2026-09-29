@@ -241,3 +241,10 @@ def test_contracts_needing_gpus_are_amber_not_white(game):
     assert "hot" in pg.evaluate("() => { makeOffer(); render(); return document.querySelector('#offers .fc').className; }")
     pg.evaluate("() => { S.fleet = {3: 40000}; S.gpus = 40000; render(); }")
     assert "good" in pg.get_attribute("#contracts .st", "class")                # covered: fine
+
+
+def test_offers_ignore_land_you_have_not_built_on(game):
+    pg = campus(game, county="cheap")                      # 3,000 acres of empty land
+    pg.evaluate("""() => { S.p2.market = 0; S.leases = {rack: 1}; S.leaseCool = {rack: {0: 1}}; S.fleet = {}; S.gpus = 0; }""")
+    sizes = pg.evaluate("() => { const out = []; for (let i = 0; i < 30; i++) { S.p2.offers = []; makeOffer(); out.push(S.p2.offers[0].mw); } return out; }")
+    assert max(sizes) <= 10                                 # nothing is deliverable by the start date yet

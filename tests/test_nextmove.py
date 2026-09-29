@@ -60,3 +60,13 @@ def test_hype_projects_are_suggested_only_in_froth(game):
     pg.evaluate("() => { S.hype = 130; }")
     text = move(pg)
     assert text.startswith("Next: Froth:") and "hype" in text
+
+
+def test_due_soon_counts_contracts_ahead_in_line(game):
+    pg = campus(game)
+    pg.evaluate("""() => { S.p2.offers = []; S.fleet = {3: Math.round(40000 / chip(3).kw)}; S.gpus = S.fleet[3];
+      for (let i = 0; i < 2; i++) { makeOffer(); const o = S.p2.offers[S.p2.offers.length - 1];
+        o.mw = 30; o.minGen = 0; o.start = S.t + 60 + i; acceptOffer(o.id); } }""")
+    text = move(pg)
+    assert "needs 0 MW" not in text
+    assert "needs 20 MW more" in text

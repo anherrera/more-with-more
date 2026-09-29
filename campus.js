@@ -165,9 +165,9 @@ const eligibleFreeMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, 
 const roomMWAt = (at) => Math.max(0, (leasedKW() + campusKWAt(at) - usedKW()) / 1000);
 // Older chips not under contract: trading them in frees their space for newer ones.
 const tradeableMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g < minGen ? kw : 0), 0) / 1000;
-// The most you could deliver of this generation: on hand, free room, the lease market, trade-ins, and land left for halls.
-const deliverableMW = (minGen) => eligibleFreeMW(minGen) + roomMWAt(S.t) + Math.max(0, S.p2.market) + tradeableMW(minGen) +
-  (S.p2.county ? Math.floor(acresFree() / HALL.acres) * hallSize() : 0);
+// The most you could deliver of this generation by the start date: on hand, free room, the lease market and
+// trade-ins. Empty land doesn't count: halls also need power, water, money and build time.
+const deliverableMW = (minGen) => eligibleFreeMW(minGen) + roomMWAt(S.t) + Math.max(0, S.p2.market) + tradeableMW(minGen);
 // Signed contracts that get GPUs before this one: for a signed contract, those ahead of it in line;
 // for an offer (last in line if signed), everything that starts during its term.
 const pendingBefore = (o) => S.p2.contracts
@@ -520,12 +520,14 @@ function renderFleet() {
 function nextMove() {
   const first = (who) => who.split(" (")[0];
   const cap = (x) => x[0].toUpperCase() + x.slice(1);
-  const late = S.p2.contracts.find((c) => c.status === "late");
+  // What a contract still needs, after the contracts ahead of it in line take their share.
+  const needOf = (c) => Math.max(0, c.mw - Math.max(0, eligibleFreeMW(c.minGen || 0) - pendingBefore(c)));
+  const late = S.p2.contracts.find((c) => c.status === "late" && needOf(c) > 0.01);
   const soon = S.p2.contracts.filter((c) => c.status === "waiting" && c.start - S.t < 120).sort((a, b) => a.start - b.start)
-    .find((c) => forecast(c).kind !== "hand");
+    .find((c) => needOf(c) > 0.01);
   const target = late || soon;
   if (target) {
-    const need = Math.max(0, target.mw - eligibleFreeMW(target.minGen || 0));
+    const need = needOf(target);
     const how = roomMWAt(S.t) >= need ? `buy ${mwText(need)} of ${newest().name}s under Compute`
       : tradeableMW(target.minGen || 0) > 0 ? "trade in old chips under Fleet, then buy new ones"
       : S.p2.market >= COLO_MW ? "lease colo, then buy GPUs" : "build halls and power, or push the date";
