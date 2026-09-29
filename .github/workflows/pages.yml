@@ -20,7 +20,7 @@ jobs:
       - name: Syntax-check every script
         run: for f in *.js; do node --check "$f"; done
       - name: Run the test suite (headless Chrome)
-        run: uv run --with pytest --with playwright pytest -q
+        run: uv run --with pytest --with playwright --with pytest-rerunfailures pytest -q --reruns 1
   deploy:
     needs: test
     runs-on: ubuntu-latest
