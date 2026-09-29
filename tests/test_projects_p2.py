@@ -29,9 +29,9 @@ TRIGGERS = {
     "prefab": "S.p2.builds.push({kind: 'hall', done: 0})",
     "lawyer": "S.p2.queueN = 1",
     "btm": "S.p2.builds.push({kind: 'turbine', done: 0}, {kind: 'turbine', done: 0})",
-    "nuclearppa": "S.p2.round = 2",
+    "nuclearppa": "S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false}",
     "securitize": "S.p2.contracts.push({id: 'cx', n: 99, who: 'A lab', mw: 250, minGen: 0, start: S.t + 999, end: S.t + 2000, fee: 1, upfront: 1, status: 'waiting'})",
-    "silicon": "S.p2.round = 2",
+    "silicon": "S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false}",
     "pledge2": "for (let i = 0; i < 10; i++) S.p2.builds.push({kind: 'hall', done: 0})",
 }
 
@@ -124,7 +124,7 @@ def test_money_and_hype_projects(game):
 def test_campus_robots_build_on_their_own(game):
     pg = campus(game)
     assert not has(pg, "robots")
-    pg.evaluate("() => { S.p2.round = 2; S.p2.grid = 60; }")
+    pg.evaluate("() => { S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false}; S.p2.grid = 60; }")
     assert has(pg, "robots")
     pg.click("button[data-id='robots']")
     before = pg.evaluate("() => S.p2.builds.length")
@@ -137,7 +137,7 @@ def test_campus_robots_build_on_their_own(game):
 def test_robots_say_what_they_are_doing(game):
     pg = campus(game)
     assert not pg.is_visible("#robotLine")
-    pg.evaluate("() => { S.p2.round = 2; S.p2.grid = 60; render(); }")
+    pg.evaluate("() => { S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false}; S.p2.grid = 60; render(); }")
     pg.click("button[data-id='robots']")
     run(pg, 25)
     line = pg.inner_text("#robotLine")
