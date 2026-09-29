@@ -1,3 +1,5 @@
+import pytest
+
 from conftest import MID, READY
 
 
@@ -97,3 +99,12 @@ def test_speed_param_fast_forwards_play(page, server):
     page.click("#answer")                               # starts the clock
     page.wait_for_timeout(1000)
     assert page.evaluate("() => S.t") > 6               # ~10 game-seconds per real second
+
+
+def test_answer_never_greys_out(game):
+    pg = game(MID)
+    pg.evaluate("() => { S.queue = 0; clockOn = true; render(); }")
+    assert pg.is_enabled("#answer")
+    funds, price = pg.evaluate("() => [S.funds, S.price]")
+    pg.click("#answer")
+    assert pg.evaluate("() => S.funds") == pytest.approx(funds + price)

@@ -85,7 +85,8 @@ function endPhase() {
 }
 
 // ---------- actions ----------
-function answer() { answerClicks++; if (S.queue >= 1) { S.queue -= 1; S.served += 1; S.funds += S.price; } }
+// Every click answers someone: from the queue if anyone's waiting, otherwise someone who was about to give up.
+function answer() { answerClicks++; S.queue = Math.max(0, S.queue - 1); S.served += 1; S.funds += S.price; }
 // Parallax invests in you; the money can only buy Parallax GPUs; Parallax books it as revenue.
 const dealSize = () => S.phase === 2 ? campusDealSize() : 800 * Math.pow(5, S.gen) * (1 + S.deals * 0.15);
 const dealReady = () => S.gen >= 1 && S.t >= S.nextDeal;
@@ -569,7 +570,6 @@ function renderPhase1() {
   $("demand").textContent = fmt(d) + " /s";
   $("serving").textContent = fmt(sv) + " /s";
   $("revenue").textContent = money(sv * S.price) + " /s";
-  $("answer").disabled = S.queue < 1 && clockOn;   // before the clock starts it stays clickable: the click starts it
   const mix = Object.keys(S.fleet).map(Number).sort((a, b) => b - a).filter((c) => S.fleet[c] > 0)
     .map((c) => `${chip(c).name} ${S.fleet[c].toLocaleString("en-US")}`).join(", ");
   $("gpus").textContent = `${S.gpus.toLocaleString("en-US")}${mix && Object.keys(S.fleet).length > 1 ? ` (${mix})` : ""}, room for ${roomNewest().toLocaleString("en-US")} more`;
