@@ -36,7 +36,7 @@ function startFire() {
   }
   if (!n) return;
   S.gpus -= n;
-  f.out = { gens, n, value, until: S.t + FIRE_DOWN }; f.n += 1;
+  f.out = { gens, n, value, until: S.t + (S.done.firecrew ? 60 : FIRE_DOWN) }; f.n += 1;   // an on-site crew halves the downtime
   track("fire", { n });
   say(`Fire in ${fireWhere()}: ${n.toLocaleString("en-US")} GPUs down for about ${time(FIRE_DOWN)}. Everyone is fine. The GPUs are less fine.`);
 }

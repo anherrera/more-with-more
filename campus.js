@@ -73,9 +73,9 @@ const turbineMW = () => (S.done.btm ? 70 : POWER.turbine.mw);   // behind-the-me
 const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * turbineMW() + doneBuilds("solar", at) * POWER.solar.mw;
 const hallMWAt = (at = S.t) => doneBuilds("hall", at) * hallSize();
 const droughtOn = (at = S.t) => !!(S.p2.drought && at < S.p2.drought.until);
-const waterAt = (at = S.t) => countyOf().water * (droughtOn(at) ? DROUGHT_CUT : 1)
+const waterAt = (at = S.t) => countyOf().water * (S.done.disclosewater ? 1.2 : 1) * (droughtOn(at) ? DROUGHT_CUT : 1) + (S.done.golfcourse ? 2 : 0)
   + (S.p2.aquifer > 0 ? doneBuilds("well", at) * WATER.well.mgd : 0) + doneBuilds("reclaimed", at) * WATER.reclaimed.mgd + (S.p2.extraWater || 0);
-const waterMWAt = (at = S.t) => waterAt(at) / WATER_PER_MW;
+const waterMWAt = (at = S.t) => waterAt(at) / (WATER_PER_MW * (S.done.drycooling ? 0.5 : 1));   // dry cooling halves the water per MW
 const energizedAt = (at = S.t) => (S.p2 && S.p2.county ? Math.min(hallMWAt(at), powerAt(at), waterMWAt(at)) : 0);
 const campusKWAt = (at = S.t) => (S.p2 && S.p2.county ? energizedAt(at) * 1000 : 0);
 const coloCost = () => COLO_RACKS * COLO_SLOT * rentIndex();
@@ -114,7 +114,7 @@ const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) =>
 const specOf = (kind) => (kind === "hall" ? HALL : POWER[kind] || WATER[kind]);
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + specOf(b.kind).acres, 0);
 const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
-const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0);
+const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0) * (S.done.paytaxes ? 0.8 : 1);   // the county likes taxpayers
 function buyLand() {
   if (!S.p2.county || S.funds < landCost()) return;
   S.funds -= landCost(); S.p2.landN = (S.p2.landN || 0) + 1;
@@ -202,7 +202,7 @@ function makeOffer(first = false) {
   const term = 480 + Math.floor(Math.random() * 420);
   const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
   S.p2.offers.push({ id: `o${n}`, n, who, mw, minGen, start: S.t + startsIn, term,
-    upfront: mw * term * UPFRONT_RATE * genPrice(minGen) * (modelDone("pricing") ? 1.3 : 1) * (S.done.resdesk ? 1.2 : 1), fee: mw * FEE_RATE * genPrice(minGen) * (S.done.sovereign2 && who === "A sovereign AI fund" ? 1.3 : 1), expires: S.t + (first ? 280 : OFFER_TTL) });
+    upfront: mw * term * UPFRONT_RATE * genPrice(minGen) * (modelDone("pricing") ? 1.3 : 1) * (S.done.resdesk ? 1.2 : 1), fee: mw * FEE_RATE * genPrice(minGen) * (S.done.sovereign2 && who === "A sovereign AI fund" ? 1.3 : 1) * (S.done.benchmarks ? 1.1 : 1), expires: S.t + (first ? 280 : OFFER_TTL) });
   track("contract", { ev: "offer", mw });
 }
 
@@ -372,7 +372,7 @@ function stepCampus(dt) {
   }
   if (S.t >= S.p2.nextColo) openColo();
   S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
-  if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + (60 + Math.random() * 60) * (S.done.sales2 ? 0.7 : 1); }
+  if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + (60 + Math.random() * 60) * (S.done.sales2 ? 0.7 : 1) * (S.done.opensource ? 0.8 : 1); }
   stepContracts(dt);
   stepRobots();
   stepMarket(dt);
@@ -527,7 +527,12 @@ function nextMove() {
       return `Goal: ${what} reach the 1 GW goal (\u2248${money(cost)}). Build them under Campus.`;
     }
   }
-  const project = PROJECTS.filter((p) => p.phase === 2 && !S.done[p.id] && p.when() && S.funds >= p.cost).sort((a, b) => a.cost - b.cost)[0];
+  // In froth, spending hype on honesty lets the bubble down before a reality check pops it.
+  if (S.hype > 100) {
+    const calm = PROJECTS.find((p) => p.phase === 2 && p.hype && !S.done[p.id] && p.when() && S.hype >= p.hype + 5);
+    if (calm) return `Froth: spend hype on \u201c${calm.title}\u201d (\u2212${calm.hype} hype) before a reality check does it for you. ${calm.desc}`;
+  }
+  const project = PROJECTS.filter((p) => p.phase === 2 && !p.hype && !S.done[p.id] && p.when() && S.funds >= p.cost).sort((a, b) => a.cost - b.cost)[0];
   if (project) return `Buy the \u201c${project.title}\u201d project (${project.cost ? money(project.cost) : "free"}): ${project.desc}`;
   const room = roomMWAt(S.t);
   if (room < 5) {

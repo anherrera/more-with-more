@@ -58,3 +58,9 @@ def test_projects_list_never_moves_what_is_below_it(game):
     before = top()
     pg.evaluate("() => { for (const p of PROJECTS) p._when = p.when; for (const p of PROJECTS) p.when = () => true; S.done = {}; render(); }")
     assert top() == before
+
+
+def test_new_games_start_training_at_half(game):
+    pg = game()
+    assert pg.evaluate("() => S.split") == 50
+    assert pg.input_value("#split") == "50"

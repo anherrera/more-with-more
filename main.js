@@ -184,7 +184,7 @@ function realityCheck() {
   const rev = S.phase === 1 ? Math.min(servingGPUs(), demand()) * S.price : campusRevenue();
   // Leverage: debt measured against ten minutes of revenue. The more borrowed, the harder the fall.
   const leverage = S.debt / (rev * 600 + S.debt + 1e-9);
-  const severity = 0.3 + 0.5 * leverage;
+  const severity = (0.3 + 0.5 * leverage) * (S.done.hallucinate ? 0.5 : 1);   // admitting it in the docs takes the sting out
   const loss = Math.round(froth() * severity);
   S.hype -= loss; S.checks = (S.checks || 0) + 1;
   const pool = S.done.depr6 ? [...REALITY, "A short-seller read your depreciation footnote."] : REALITY;
@@ -523,14 +523,14 @@ function render() {
     for (const p of avail) {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.id = p.id;
-      b.innerHTML = `<span class="t">${p.title} (${p.cost ? money(p.cost) : "free"})</span><span class="c">${p.desc}</span>`;
+      b.innerHTML = `<span class="t">${p.title} (${p.hype ? `\u2212${p.hype} hype` : p.cost ? money(p.cost) : "free"})</span><span class="c">${p.desc}</span>`;
       $("projects").appendChild(b);
     }
   }
   for (const b of $("projects").querySelectorAll("button[data-id]")) {
     const p = PROJECTS.find((x) => x.id === b.dataset.id);
     const missing = p.needs ? p.needs() : [];
-    b.disabled = S.funds < p.cost || missing.length > 0;
+    b.disabled = S.funds < p.cost || (p.hype && S.hype < p.hype + 5) || missing.length > 0;   // hype projects need hype to spare
     if (p.needs) b.querySelector(".c").textContent = p.desc + (missing.length ? ` Still need to: ${missing.join(", ")}.` : " Ready.");
   }
   $("clock").textContent = `${time(S.t)} played · ${fmt(S.gpuSeconds)} GPU-seconds used`;
@@ -684,8 +684,8 @@ function renderLeases() {
 }
 function buyProject(id) {
   const p = PROJECTS.find((x) => x.id === id);
-  if (!p || S.done[p.id] || S.funds < p.cost || (p.needs && p.needs().length)) return;
-  S.funds -= p.cost; S.done[p.id] = true; p.buy(); milestone(`project: ${p.title}`); render();
+  if (!p || S.done[p.id] || S.funds < p.cost || (p.hype && S.hype < p.hype + 5) || (p.needs && p.needs().length)) return;
+  S.funds -= p.cost; if (p.hype) S.hype -= p.hype; S.done[p.id] = true; p.buy(); milestone(`project: ${p.title}`); render();
 }
 function renderRacks(racks, fill) {
   const shown = Math.min(racks, 60), filled = fill * shown;
@@ -724,7 +724,7 @@ function wire() {
   $("retrofit").addEventListener("click", () => { retrofit(); render(); });
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
-  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = 0; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; render(); });
+  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
   wireCampus();
 }
