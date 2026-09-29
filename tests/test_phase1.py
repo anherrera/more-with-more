@@ -108,3 +108,17 @@ def test_answer_never_greys_out(game):
     funds, price = pg.evaluate("() => [S.funds, S.price]")
     pg.click("#answer")
     assert pg.evaluate("() => S.funds") == pytest.approx(funds + price)
+
+
+@pytest.mark.parametrize("hype,cls", [(20, "bad"), (60, "good"), (120, "warn"), (170, "bad")])
+def test_hype_meter_colors(game, hype, cls):
+    pg = game({**MID, "hype": hype})
+    pg.evaluate("() => render()")
+    assert cls in pg.get_attribute("#hypeMeter", "class").split()
+
+
+@pytest.mark.parametrize("fill,cls", [(0.5, "good"), (0.9, "warn"), (1.0, "bad")])
+def test_power_meter_colors(game, fill, cls):
+    pg = game(MID)
+    pg.evaluate(f"() => {{ S.fleet = {{3: Math.floor(capKW() * {fill} / chip(3).kw)}}; S.gpus = S.fleet[3]; render(); }}")
+    assert cls in pg.get_attribute("#powerMeter", "class").split()

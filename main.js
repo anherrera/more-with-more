@@ -511,7 +511,8 @@ function render() {
     : `Vague-post again in ${Math.ceil(S.nextPost - S.t)}s`;
   $("hypeNum").className = S.hype > 100 ? "hot" : S.hype >= HYPE_TO_RAISE ? "good" : "";
   $("hypeMeter").firstElementChild.style.width = Math.min(100, S.hype / 2) + "%";
-  $("hypeMeter").className = "meter" + (S.hype > 100 ? "" : S.hype >= HYPE_TO_RAISE ? " good" : "");
+  // One rule for every meter: green fine, amber act soon, red trouble.
+  $("hypeMeter").className = "meter " + (S.hype < HYPE_TO_RAISE || S.hype > 150 ? "bad" : S.hype > 100 ? "warn" : "good");
   $("hypeExplain").textContent = S.hype > 100
     ? "Froth. Raising and borrowing still work, but reality checks will knock it down. The more you owe, the harder it falls, and a hard fall while in debt is a margin call."
     : S.hype >= DRAW_HYPE && facilityOpen() ? "Investors and the bank will take your call. You can raise and borrow."
@@ -652,7 +653,7 @@ function renderPhase1() {
   $("cooling").textContent = `${cool.name}, ${cool.kw} kW/rack for new leases`;
   $("power").className = used >= cap - 0.5 ? "bad" : "";
   $("powerMeter").firstElementChild.style.width = Math.min(100, 100 * used / Math.max(cap, 1)) + "%";
-  $("powerMeter").className = "meter" + (used >= cap - 0.5 ? " bad" : "");
+  $("powerMeter").className = "meter " + (roomNewest() < 1 ? "bad" : used / Math.max(cap, 1) > 0.85 ? "warn" : "good");
   $("power").textContent = `${kwText(used)} / ${kwText(cap)}`;
   renderLeases();
   renderRacks(totalRacks(), used / Math.max(cap, 1));
