@@ -59,7 +59,7 @@ const PROJECTS = [
     when: () => S.p2.contractN >= 3, buy: () => {} },
   { id: "vp", phase: 2, title: "Hire an ex-hyperscaler VP", cost: 30e6, desc: "They bring their Rolodex and their opinions. Offers are 20% bigger.",
     when: () => (S.p2.round || 0) >= 1, buy: () => {} },
-  { id: "sovereign2", phase: 2, title: "Sovereign cloud region", cost: 150e6, desc: "A flag on the building. Sovereign AI funds pay 30% more.",
+  { id: "sovereign2", phase: 2, title: "Sovereign cloud region", cost: 60e6, desc: "A flag on the building. Sovereign AI funds pay 30% more.",
     when: () => S.p2.contractN >= 5, buy: () => {} },
   { id: "partner", phase: 2, title: "Parallax preferred-partner status", cost: 60e6, desc: "A plaque and an allocation. New GPUs cost 10% less.",
     when: () => S.chipIdx > (S.p2.startChip ?? S.chipIdx), buy: () => {} },
@@ -67,7 +67,7 @@ const PROJECTS = [
     when: () => Object.keys(S.fleet).some((g) => +g < S.chipIdx && S.fleet[g] > 0), buy: () => {} },
   { id: "inference", phase: 2, title: "Inference-only tier", cost: 80e6, desc: "Old chips get a second life. Their on-demand floor doubles.",
     when: () => Object.keys(S.fleet).some((g) => +g < S.chipIdx && S.fleet[g] > 0), buy: () => {} },
-  { id: "liquid", phase: 2, title: "Liquid-cooling standard", cost: 100e6, desc: "Every campus hall holds 75 MW instead of 50. The plumbers are thrilled.",
+  { id: "liquid", phase: 2, title: "Liquid-cooling standard", cost: 50e6, desc: "Every campus hall holds 75 MW instead of 50. The plumbers are thrilled.",
     when: () => doneBuilds("hall", Infinity) >= 2, buy: () => {} },
   { id: "prefab", phase: 2, title: "Prefab data halls", cost: 30e6, desc: "Shipped on trucks, bolted together. Halls build 40% faster.",
     when: () => S.p2.builds.some((b) => b.kind === "hall"), buy: () => {} },
@@ -83,7 +83,7 @@ const PROJECTS = [
     when: () => isPublic(), buy: () => { S.hype += 50; } },
   { id: "pledge2", phase: 2, title: "Pledge: water-positive by 2045", cost: 0, desc: "The 2040 pledge, extended. +15 hype.",
     when: () => acresUsed() >= 400, buy: () => { S.hype += 15; } },
-  { id: "robots", phase: 2, title: "Campus expansion robots", cost: 300e6,
+  { id: "robots", phase: 2, title: "Campus expansion robots", cost: 60e6,
     desc: "They pour concrete, set transformers and never unionize. Halls and turbines build themselves whenever you're short and have cash.",
     when: () => (S.p2.round || 0) >= 1, buy: () => { S.p2.robotsAt = 0; } },   // after Series E
   // ---- fires, any phase ----

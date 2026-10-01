@@ -175,6 +175,19 @@ const pendingBefore = (o) => S.p2.contracts
     (o.end != null ? c.start < o.start || (c.start === o.start && c.n < o.n) : c.start < o.start + o.term))
   .reduce((a, c) => a + c.mw, 0);
 
+// What it takes to add `mw` of energized campus: halls, power and water on top of what's built or coming.
+function buildPlan(mw) {
+  if (!S.p2.county) return { ok: false };
+  const halls = Math.ceil(Math.max(0, mw) / hallSize()), hallsMW = hallMWAt(Infinity) + halls * hallSize();
+  const turbines = Math.ceil(Math.max(0, hallsMW - powerAt(Infinity)) / turbineMW());
+  const plants = Math.ceil(Math.max(0, hallsMW - waterMWAt(Infinity)) * WATER_PER_MW * (S.done.drycooling ? 0.5 : 1) / WATER.reclaimed.mgd);
+  const cost = halls * buildCost("hall") + turbines * buildCost("turbine") + plants * buildCost("reclaimed");
+  const lead = Math.max(halls ? HALL.secs * (S.done.prefab ? 0.6 : 1) : 0, turbines ? POWER.turbine.secs : 0, plants ? WATER.reclaimed.secs : 0);
+  const what = [halls && `${halls} hall${halls > 1 ? "s" : ""}`, turbines && `${mwText(turbines * turbineMW())} of turbines`,
+    plants && `${plants} reclaimed water plant${plants > 1 ? "s" : ""}`].filter(Boolean).join(" + ");
+  return { ok: acresFree() >= halls * HALL.acres, cost, lead, what };
+}
+
 // Green: covered. Amber: you have to act (buy GPUs, trade in first). Red: short of space.
 const forecastClass = (f) => (!f.ok ? "bad" : f.kind === "hand" ? "good" : "hot");
 
@@ -191,6 +204,14 @@ function forecast(o) {
   const short = buy - Math.max(0, room), trade = tradeableMW(o.minGen);
   if (trade >= short) {
     return { ok: true, kind: "trade", buy, text: `\u2713 Trade in older chips to free ${mwText(short)}, then buy ${mwText(buy)} of ${newest().name}s.` };
+  }
+  // Selling capacity you haven't built yet is the business: if the build fits in time and in budget, it's amber, not red.
+  const plan = buildPlan(short - trade);
+  const cash = S.funds + S.credits + (o.end == null ? o.upfront : 0);
+  const gpuCost = buy * 1000 / newest().kw * gpuPrice();
+  if (plan.ok && o.start - S.t > plan.lead + 10 && cash >= plan.cost + gpuCost) {
+    return { ok: true, kind: "build", buy, text: `Build to cover: ${plan.what} (\u2248${money(plan.cost + gpuCost)} with the GPUs` +
+      (o.end == null ? `; the ${money(o.upfront)} upfront ${o.upfront >= plan.cost + gpuCost ? "pays for it" : "covers part of it"}).` : ").") };
   }
   return { ok: false, kind: "space", short, text: `Short ${mwText(short - trade)} of space: lease or build${trade > 0 ? ", or trade in older chips" : ""}.` };
 }

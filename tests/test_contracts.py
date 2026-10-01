@@ -48,6 +48,8 @@ def test_forecast_hand_then_buy_then_space(game):
     no_gpus(pg)
     assert "Covered if you buy 30 MW" in pg.inner_text("#offers")
     pg.evaluate("() => { S.leases = {rack: 1}; S.leaseCool = {rack: {0: 1}}; render(); }")
+    assert "Build to cover: 1 hall" in pg.inner_text("#offers")              # money in the bank: build it
+    pg.evaluate("() => { S.funds = 0; S.credits = 0; render(); }")
     assert "Short 30 MW of space: lease or build" in pg.inner_text("#offers")
 
 
