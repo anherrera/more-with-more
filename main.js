@@ -382,6 +382,7 @@ function step(dt) {
   if (S.block && S.t >= S.block.until) S.block = null;
   if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
   stepFires(dt);
+  stepLeaks();
   if (S.nextBuzz == null) S.nextBuzz = S.t + 120;
   if (S.phase <= 2 && S.gen >= 1 && S.t >= S.nextBuzz) buzz();
   if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);

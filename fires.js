@@ -69,10 +69,62 @@ function stepFires(dt) {
   if (!f.out && S.t >= f.next) { startFire(); f.next = S.t + fireGap(Math.random()); }
 }
 
+// ---------- coolant leaks (phase 2, once anything runs on liquid) ----------
+// A hall goes dark while the plumbers work; some GPUs drown. Insurance excludes water. State lives in S.leaks.
+const LEAK_EVERY = [240, 480], LEAK_DOWN = 60, LEAK_LOSS = 0.1;
+const LEAK_CAUSES = [
+  "a quick-disconnect fitting disconnected, quickly",
+  "the coolant was mixed to the vendor's recipe, which was for margaritas",
+  "a technician hung a jacket on a manifold",
+  "the leak detection rope was still in its box, in the leak",
+  "a bufo sat on a valve and would not be moved",
+  "someone asked the model whether the pipes were fine and it said yes",
+];
+const leaksOf = () => S.leaks || (S.leaks = { next: null, out: null, n: 0, lost: 0 });
+const leaksOn = () => S.phase === 2 && !!S.p2 && !!S.p2.county && ["dlc", "immersion", "twophase", "liquid"].some((k) => S.done[k]);
+
+function startLeak() {
+  const l = leaksOf();
+  const share = Math.min(1, Math.max(0.05, 50000 / Math.max(1, usedKW())));   // about one hall's worth
+  const gens = {}; let n = 0;
+  for (const [g, count] of Object.entries(S.fleet)) {
+    if (count <= 0) continue;
+    const k = Math.min(count, Math.max(1, Math.round(count * share)));
+    gens[g] = k; S.fleet[g] -= k; if (S.fleet[g] <= 0) delete S.fleet[g]; n += k;
+  }
+  if (!n) return;
+  S.gpus -= n;
+  const where = fireWhere(), down = S.done.leakdetect ? LEAK_DOWN / 2 : LEAK_DOWN;   // sensors find it before the floor does
+  l.out = { gens, n, where, until: S.t + down }; l.n += 1;
+  track("leak", { n });
+  say(`Coolant leak in ${where}: ${n.toLocaleString("en-US")} GPUs powered down for about ${time(down)}. The raised floor is now a water feature.`);
+}
+
+function endLeak() {
+  const l = leaksOf(), out = l.out;
+  let lost = 0;
+  for (const [g, k] of Object.entries(out.gens)) {
+    const gone = S.done.driptrays ? 0 : Math.round(k * LEAK_LOSS);
+    lost += gone; S.fleet[g] = (S.fleet[g] || 0) + k - gone; S.gpus += k - gone;
+  }
+  l.out = null; l.lost += lost;
+  say(`Water damage: ${lost.toLocaleString("en-US")} GPUs did not dry out. Root cause: ${LEAK_CAUSES[(l.n - 1) % LEAK_CAUSES.length]}. The insurer pointed at page 214: water is excluded.`);
+}
+
+function stepLeaks() {
+  const l = leaksOf();
+  if (l.out && S.t >= l.out.until) endLeak();
+  if (!leaksOn()) return;
+  if (l.next == null) l.next = S.t + LEAK_EVERY[0] + Math.random() * (LEAK_EVERY[1] - LEAK_EVERY[0]);
+  if (!l.out && S.t >= l.next) { startLeak(); l.next = S.t + LEAK_EVERY[0] + Math.random() * (LEAK_EVERY[1] - LEAK_EVERY[0]); }
+}
+
 // The alert line under the title: things happening right now that the console would scroll away.
 function renderAlerts() {
   const f = firesOf(), out = [];
   if (f.out) out.push(`\ud83d\udd25 Fire in ${f.out.where || "the data center"}: ${f.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, f.out.until - S.t))}`);
+  const l = leaksOf();
+  if (l.out) out.push(`\ud83d\udca7 Coolant leak in ${l.out.where}: ${l.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, l.out.until - S.t))}`);
   if (f.payout) out.push(`Insurance pays ${money(f.payout.amt)} in ${time(Math.max(0, f.payout.at - S.t))}`);
   if (S.phase === 2 && S.p2 && S.p2.county && droughtOn()) out.push(`Drought: water allocation \u2212${Math.round(100 * (1 - DROUGHT_CUT))}% for ${time(S.p2.drought.until - S.t)}`);
   const m = S.phase === 2 && S.p2 && S.p2.model;
