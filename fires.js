@@ -125,6 +125,7 @@ function renderAlerts() {
   if (f.out) out.push(`\ud83d\udd25 Fire in ${f.out.where || "the data center"}: ${f.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, f.out.until - S.t))}`);
   const l = leaksOf();
   if (l.out) out.push(`\ud83d\udca7 Coolant leak in ${l.out.where}: ${l.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, l.out.until - S.t))}`);
+  if (S.phase === 2 && S.p2 && S.p2.town && moratoriumOn()) out.push(`Moratorium on new halls: ${time(S.p2.town.moratorium - S.t)}`);
   if (f.payout) out.push(`Insurance pays ${money(f.payout.amt)} in ${time(Math.max(0, f.payout.at - S.t))}`);
   if (S.phase === 2 && S.p2 && S.p2.county && droughtOn()) out.push(`Drought: water allocation \u2212${Math.round(100 * (1 - DROUGHT_CUT))}% for ${time(S.p2.drought.until - S.t)}`);
   const m = S.phase === 2 && S.p2 && S.p2.model;

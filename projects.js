@@ -119,6 +119,8 @@ const PROJECTS = [
     when: () => firesOf().n >= 1, buy: () => {} },
   { id: "secondshift", phase: 2, title: "Hire a second construction shift", cost: 20e6,
     desc: "Twice the crews, half the overtime. Builds wear people down half as fast.", when: () => !!S.p2.people && S.p2.people.v < 60, buy: () => {} },
+  { id: "cba", phase: 2, title: "Community benefits agreement", cost: 25e6,
+    desc: "A new library, a splash pad and a 40-page PDF. Opposition rises half as fast.", when: () => !!S.p2.town && S.p2.town.v >= 50, buy: () => {} },
   { id: "leakdetect", phase: 2, title: "Leak-detection rope under every manifold", cost: 8e6,
     desc: "It screams when wet, like the facilities team. Leaks are found in 30 s instead of 60.", when: () => leaksOf().n >= 1, buy: () => {} },
   { id: "driptrays", phase: 2, title: "Drip trays", cost: 15e6,

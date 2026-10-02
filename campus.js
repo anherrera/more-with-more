@@ -4,13 +4,13 @@
 const COUNTIES = [
   { id: "cheap", name: "Cheap land, weak grid",
     pitch: "3,000 acres for the price of a parking garage. The grid is two wires and a prayer.",
-    gridMW: 50, acres: 3000, queueMW: 100, queueSecs: 300, cash: 0, water: 12, drought: [600, 900] },
+    gridMW: 50, acres: 3000, queueMW: 100, queueSecs: 300, cash: 0, water: 12, drought: [600, 900], town: 15, rise: 1 },
   { id: "strong", name: "Strong grid, drought county",
     pitch: "A 200 MW connection on day one. The reservoir is a rumor.",
-    gridMW: 200, acres: 1500, queueMW: 150, queueSecs: 200, cash: 0, water: 5, drought: [240, 360] },
+    gridMW: 200, acres: 1500, queueMW: 150, queueSecs: 200, cash: 0, water: 5, drought: [240, 360], town: 20, rise: 1 },
   { id: "incent", name: "Big incentives, organized town",
     pitch: "$20M in tax incentives up front. The town already has a Facebook group about you.",
-    gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6, water: 10, drought: [600, 900] },
+    gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6, water: 10, drought: [600, 900], town: 40, rise: 2 },
 ];
 const MARKET_START_MW = 150, MARKET_CAP_MW = 300;       // leasable colo MW in this market
 const COLO_MW = 20, COLO_RACKS = 240, COLO_SLOT = 35;   // you lease colo in 20 MW blocks (a data hall's worth)
@@ -114,7 +114,7 @@ const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) =>
 const specOf = (kind) => (kind === "hall" ? HALL : POWER[kind] || WATER[kind]);
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + specOf(b.kind).acres, 0);
 const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
-const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0) * (S.done.paytaxes ? 0.8 : 1);   // the county likes taxpayers
+const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0) * (S.done.paytaxes ? 0.8 : 1) * townSlow();   // above 50 opposition, sellers want a premium too   // the county likes taxpayers
 function buyLand() {
   if (!S.p2.county || S.funds < landCost()) return;
   S.funds -= landCost(); S.p2.landN = (S.p2.landN || 0) + 1;
@@ -132,9 +132,10 @@ const buildCost = (kind) => specOf(kind).cost * Math.pow(BUILD_GROWTH, S.p2.buil
 function build(kind) {
   const spec = specOf(kind);
   const cost = buildCost(kind);
-  if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost) return;
+  if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost || (kind === "hall" && moratoriumOn())) return;
   S.funds -= cost;
-  S.p2.builds.push({ kind, done: S.t + spec.secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * moraleSlow() });
+  S.p2.builds.push({ kind, done: S.t + spec.secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * moraleSlow() * townSlow() });
+  townBuilt(kind);
   track("build", { ev: "start", kind, cost: Math.round(cost) });
   say(kind === "hall" ? `Broke ground on hall ${S.p2.builds.filter((b) => b.kind === "hall").length}. Ready in ${time(spec.secs)}.`
     : `Ordered ${spec.name === "gas turbine" ? "a gas turbine" : "a solar farm with batteries"}. Online in ${time(spec.secs)}.`);
@@ -480,7 +481,8 @@ function renderCampus() {
   }
   $("p2limit").textContent = campusLimit();
   $("buildHall").textContent = `Build a hall (${hallSize()} MW, ${HALL.acres} acres, ${time(HALL.secs * (S.done.prefab ? 0.6 : 1))}): ${money(buildCost("hall"))}`;
-  $("buildHall").disabled = S.funds < buildCost("hall") || acresFree() < HALL.acres;
+  if (moratoriumOn()) $("buildHall").textContent = `Moratorium on new halls: ${time(townOf().moratorium - S.t)}`;
+  $("buildHall").disabled = S.funds < buildCost("hall") || acresFree() < HALL.acres || moratoriumOn();
   $("buildTurbine").textContent = `Gas turbine (+${turbineMW()} MW, ${time(POWER.turbine.secs)}): ${money(buildCost("turbine"))}`;
   $("buildTurbine").disabled = S.funds < buildCost("turbine");
   $("buildSolar").textContent = `Solar + batteries (+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}): ${money(buildCost("solar"))}`;
