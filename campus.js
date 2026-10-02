@@ -413,7 +413,7 @@ function renderCampus() {
   const p = S.p2;
   $("coloLine").textContent = `Colo market: ${mwText(Math.max(0, p.market))} available` +
     (p.nextColo ? ` \u00b7 next colo opens in ~${time(Math.max(0, p.nextColo - S.t))}` : "");
-  $("leaseColo").textContent = p.market >= COLO_MW ? `Lease ${mwText(COLO_MW)} of colo space: ${money(coloCost())} (${money(coloCost() / (COLO_MW * 1000))}/kW)`
+  $("leaseColo").textContent = p.market >= COLO_MW ? `Lease ${mwText(COLO_MW)} of colo space: ${money(coloCost())} (${money(coloCost() / (COLO_MW * 1000))}/kW, rent ${rentIndex().toFixed(0)}\u00d7)`
     : `Colo sold out: next one opens in ~${time(Math.max(0, (p.nextColo || S.t) - S.t))}`;
   $("leaseColo").disabled = p.market < COLO_MW || S.funds < coloCost();
   renderFleet();
