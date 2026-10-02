@@ -58,7 +58,7 @@ def test_break_ground_starts_campus(game):
     break_ground(pg)
     assert pg.evaluate("() => [S.phase, S.gpus]") == [2, 40000]
     assert pg.is_visible("#countyBox")
-    for hidden in ["#trainingBox", "#p1biz", "#ending", "#answer"]:
+    for hidden in ["#trainingLive", "#p1biz", "#ending", "#answer"]:      # the Training panel stays, its controls go
         assert not pg.is_visible(hidden), hidden
     for shown in ["#computeBox", "#facilitiesBox", "#hypeNum", "#funds"]:
         assert pg.is_visible(shown), shown
@@ -77,3 +77,11 @@ def test_plan1_save_loads(game):
     assert pg.is_visible("#campusBox")
     assert "NaN" not in pg.inner_text("#contractsBox")
     assert "\u2713 covered" in pg.inner_text("#contracts")
+
+
+def test_training_panel_explains_itself_in_phase2(game):
+    pg = game(READY)
+    break_ground(pg)
+    assert pg.is_visible("#trainingBox")
+    assert "Training is over" in pg.inner_text("#trainingBox")
+    assert not pg.is_visible("#split")

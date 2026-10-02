@@ -203,6 +203,8 @@
       </div>
       <div id="trainingBox">
         <h3>Training</h3>
+        <div class="line sub" id="trainingDone" hidden>Training is over. Gen 7 doesn't need you anymore. It's running the campus now.</div>
+        <div id="trainingLive">
         <label class="line" for="split">Training share: <span id="splitVal">0%</span></label>
         <input id="split" type="range" min="0" max="100" step="5" value="50">
         <div class="line sub" id="splitTrade" hidden></div>
@@ -212,6 +214,7 @@
         <div class="btns"><button id="rollback" type="button" class="primary" hidden>Roll back to checkpoint</button></div>
         <div class="btns"><button id="rentRival" type="button" hidden></button></div>
         <div class="sub">Each generation needs 8&times; the compute of the last.</div>
+        </div>
       </div>
       <div id="spotBox" hidden>
         <h3>Spot market</h3>

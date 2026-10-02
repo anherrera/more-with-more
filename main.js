@@ -531,7 +531,8 @@ function render() {
     $("raise").disabled = gated || S.hype < HYPE_TO_RAISE;
   }
 
-  for (const id of ["p1biz", "trainingBox", "answer"]) $(id).hidden = S.phase !== 1;
+  for (const id of ["p1biz", "answer", "trainingLive"]) $(id).hidden = S.phase !== 1;
+  $("trainingDone").hidden = S.phase === 1;          // the panel stays and says why the slider is gone
   $("colDeals").hidden = $("fleetBox").hidden = $("coloBox").hidden = S.phase !== 2;
   if (S.phase !== 2) $("ending2").hidden = true;          // e.g. after a reset
   $("leases").hidden = S.phase === 2;
