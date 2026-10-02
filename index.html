@@ -123,6 +123,12 @@
         <div class="line">Serving: <span id="serving">0 /s</span></div>
         <div class="line">Revenue: <span id="revenue">$0 /s</span></div>
         </div>
+        <div id="moraleBox" hidden>
+        <div class="line">Morale: <span id="morale">80</span></div>
+        <div class="meter good" id="moraleMeter"><i></i></div>
+        <div class="line sub" id="moraleCause"></div>
+        <div class="btns"><button id="pizza" type="button"></button></div>
+        </div>
       </div>
       <div>
         <h3>Projects</h3>
@@ -147,6 +153,11 @@
     </div>
 
     <div class="col" id="colDeals" hidden>
+      <div id="card" class="deal" hidden>
+        <div class="line hot" id="cardTitle"></div>
+        <div class="line sub" id="cardText"></div>
+        <div class="btns" id="cardBtns"></div>
+      </div>
       <div id="countyBox" hidden>
         <h3>Pick a county</h3>
         <div class="choices" id="counties"></div>
@@ -278,4 +289,5 @@
 <script src="model.js"></script>
 <script src="market.js"></script>
 <script src="fires.js"></script>
+<script src="people.js"></script>
 <script src="main.js"></script>

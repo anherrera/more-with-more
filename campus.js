@@ -134,7 +134,7 @@ function build(kind) {
   const cost = buildCost(kind);
   if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost) return;
   S.funds -= cost;
-  S.p2.builds.push({ kind, done: S.t + spec.secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) });
+  S.p2.builds.push({ kind, done: S.t + spec.secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * moraleSlow() });
   track("build", { ev: "start", kind, cost: Math.round(cost) });
   say(kind === "hall" ? `Broke ground on hall ${S.p2.builds.filter((b) => b.kind === "hall").length}. Ready in ${time(spec.secs)}.`
     : `Ordered ${spec.name === "gas turbine" ? "a gas turbine" : "a solar farm with batteries"}. Online in ${time(spec.secs)}.`);
@@ -398,6 +398,7 @@ function stepCampus(dt) {
   S.p2.offers = S.p2.offers.filter((o) => o.expires > S.t && o.start > S.t);
   if (S.t >= S.p2.nextOffer && S.p2.offers.length < 3) { makeOffer(); S.p2.nextOffer = S.t + (60 + Math.random() * 60) * (S.done.sales2 ? 0.7 : 1) * (S.done.opensource ? 0.8 : 1); }
   stepContracts(dt);
+  stepPeople(dt);
   stepRobots();
   stepMarket(dt);
   stepModel();

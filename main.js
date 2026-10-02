@@ -522,6 +522,7 @@ function render() {
     : "Investors aren't returning calls. Ship a model or post.";
   renderMarket();
   renderAlerts();
+  renderPeople();
   const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
   if (S.phase === 2 && !r) renderPublicRaise();
   const gated = !!r && (S.phase === 2 ? !!roundGap(r) : S.gen < r.gen);
@@ -746,6 +747,8 @@ function wire() {
   $("draw").addEventListener("click", () => { draw(); render(); });
   $("repay").addEventListener("click", () => { repay(); render(); });
   $("swap").addEventListener("click", () => { swapFailed(); render(); });
+  $("pizza").addEventListener("click", () => { pizzaParty(); render(); });
+  $("cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
   $("tradein").addEventListener("click", () => { tradeIn(); render(); });
   $("post").addEventListener("click", () => { vaguePost(); render(); });
   $("spot").addEventListener("click", () => { sellSpot(); render(); });

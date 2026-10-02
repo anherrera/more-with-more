@@ -117,6 +117,8 @@ const PROJECTS = [
     desc: "It was exempt from the drought. It is not exempt from you. +2 MGD.", when: () => S.p2.drought != null, buy: () => {} },
   { id: "firecrew", phase: 0, title: "A 24/7 on-site fire crew", cost: scaledCost(2000, 10e6), desc: "They have their own chili cook-off. Fires are out in 1 minute instead of 2.",
     when: () => firesOf().n >= 1, buy: () => {} },
+  { id: "secondshift", phase: 2, title: "Hire a second construction shift", cost: 20e6,
+    desc: "Twice the crews, half the overtime. Builds wear people down half as fast.", when: () => !!S.p2.people && S.p2.people.v < 60, buy: () => {} },
   { id: "leakdetect", phase: 2, title: "Leak-detection rope under every manifold", cost: 8e6,
     desc: "It screams when wet, like the facilities team. Leaks are found in 30 s instead of 60.", when: () => leaksOf().n >= 1, buy: () => {} },
   { id: "driptrays", phase: 2, title: "Drip trays", cost: 15e6,
