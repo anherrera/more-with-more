@@ -37,3 +37,8 @@ def test_training_advances_deterministically(game):
     rate = pg.evaluate("() => trainingGPUs()")
     assert rate > 0
     assert abs(pg.evaluate("() => S.progress") - (before + rate)) < 1e-6 or pg.evaluate("() => S.gen") > 6
+
+
+def test_project_ids_are_unique(game):
+    pg = game(MID)
+    assert pg.evaluate("() => { const ids = PROJECTS.map((p) => p.id); return ids.filter((x, i) => ids.indexOf(x) !== i); }") == []

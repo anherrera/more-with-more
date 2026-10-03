@@ -77,14 +77,29 @@ const moratoriumOn = () => !!(S.p2.town && S.p2.town.moratorium != null && S.t <
 const townSlow = () => 1 + Math.max(0, (S.p2 && S.p2.town ? S.p2.town.v : 0) - 50) / 50;
 function townBuilt(kind) {
   const t = townOf();
-  t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba ? 0.5 : 1));
+  t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba2 ? 0.5 : 1));
 }
+// Sponsorships: press any time; each costs double the last and helps a bit less. Late-game money still buys goodwill.
+const SPONSORED = ["the county fair", "the Little League team", "a new fire truck", "the library's 3D printer",
+  "the Fourth of July fireworks", "a splash pad", "the high school's prom", "a mural of the model, which the model designed"];
+const sponsorCost = () => 2e6 * Math.pow(2, townOf().sponsors || 0);
+const sponsorGain = () => 12 / (1 + 0.4 * (townOf().sponsors || 0));
+function sponsor() {
+  const t = townOf();
+  if (S.funds < sponsorCost()) return;
+  S.funds -= sponsorCost();
+  const gain = sponsorGain(), what = SPONSORED[(t.sponsors || 0) % SPONSORED.length];
+  t.v = Math.max(0, t.v - gain); t.sponsors = (t.sponsors || 0) + 1;
+  say(`You sponsored ${what}. Your logo is on it now. Opposition −${Math.round(gain)}.`);
+}
+
 function townCause() {
   const t = townOf();
   const jobs = t.jobs ? `Jobs promised: ${Math.round(t.jobs).toLocaleString("en-US")}. Jobs delivered: 41.` : "";
   const mood = t.v >= 90 ? "They're voting on a moratorium." : t.v >= 50 ? `Lawsuits and yard signs: builds take ${townSlow().toFixed(1)}× as long, land costs more.`
     : "Mostly curious. Some yard signs.";
-  return [mood, jobs].filter(Boolean).join(" ");
+  const how = t.v >= 50 ? "Lower it: sponsor something, show up to town halls, or ease off building." : "";
+  return [mood, how, jobs].filter(Boolean).join(" ");
 }
 CARDS.townhall = {
   secs: 20,
@@ -155,6 +170,8 @@ function renderPeople() {
   $("townMeter").firstElementChild.style.width = t.v + "%";
   $("townMeter").className = "meter " + (t.v >= 75 ? "bad" : t.v >= 50 ? "warn" : "good");
   $("townCause").textContent = townCause();
+  $("sponsor").textContent = `Sponsor ${SPONSORED[(t.sponsors || 0) % SPONSORED.length]} (\u2212${Math.round(sponsorGain())}): ${money(sponsorCost())}`;
+  $("sponsor").disabled = S.funds < sponsorCost() || t.v <= 0;
   if (c) {
     const k = CARDS[c.kind];
     $("cardTitle").textContent = `${k.title()} (${Math.max(0, Math.ceil(c.until - S.t))}s)`;

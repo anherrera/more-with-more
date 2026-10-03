@@ -80,3 +80,36 @@ def test_skipping_the_town_hall_makes_it_worse(game):
     run(pg, 21)
     assert pg.evaluate("() => S.p2.card") is None
     assert pg.evaluate("() => townOf().v") > v + 5
+
+
+def test_sponsor_button_lowers_opposition_any_time_with_diminishing_returns(game):
+    pg = campus(game, funds=1e10)
+    pg.evaluate("() => { townOf().v = 80; render(); }")
+    assert pg.is_visible("#sponsor") and pg.is_enabled("#sponsor")
+    pg.click("#sponsor")
+    first = 80 - pg.evaluate("() => townOf().v")
+    pg.evaluate("() => { townOf().v = 80; render(); }")
+    pg.click("#sponsor")
+    second = 80 - pg.evaluate("() => townOf().v")
+    assert first > second > 0
+    assert pg.evaluate("() => sponsorCost()") > 2e6
+
+
+def test_high_opposition_says_how_to_lower_it(game):
+    pg = campus(game)
+    pg.evaluate("() => { townOf().v = 70; render(); }")
+    assert "Lower it" in pg.inner_text("#townCause")
+
+
+def test_community_benefits_agreement_lowers_it_now(game):
+    pg = campus(game, funds=1e10)
+    pg.evaluate("() => { townOf().v = 80; buyProject('cba2'); }")
+    assert pg.evaluate("() => townOf().v") == 60
+
+
+def test_late_game_high_school(game):
+    pg = campus(game, funds=1e10)
+    pg.evaluate("() => { townOf().v = 80; S.p2.round = 1; render(); }")
+    assert pg.query_selector("button[data-id='highschool']")
+    pg.evaluate("() => buyProject('highschool')")
+    assert pg.evaluate("() => townOf().v") == 50

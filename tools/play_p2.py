@@ -28,6 +28,7 @@ POLICY = """(args) => {
     if (S.phase === 2) { const r = campusRound(); if ((r && !roundGap(r)) || (!r && !isPublic() && !ipoGap()) || (isPublic() && S.t >= S.p2.ipo.lastFollowOn + 300 && S.funds < 100e6)) { const f = S.funds; raise(); if (S.funds !== f) acted++; } }
     if (postReady()) { vaguePost(); }
     if (S.p2.card) { chooseCard(0); acted++; }
+    if (S.p2.county && townOf().v >= 60 && S.funds > sponsorCost() + reserve()) { sponsor(); acted++; }
     if (S.p2.county && moraleOf().v < 35 && S.funds > pizzaCost() + reserve()) { pizzaParty(); acted++; }
     if (spotReady() && spotMult() > 2) { sellSpot(); acted++; }
     // the model's proposals and projects
