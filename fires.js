@@ -39,6 +39,7 @@ function startFire() {
   const where = fireWhere();
   f.out = { gens, n, value, where, until: S.t + (S.done.firecrew ? 60 : FIRE_DOWN) }; f.n += 1;   // an on-site crew halves the downtime
   track("fire", { n });
+  if (S.phase === 2) ceoStrike("a fire");
   say(`Fire in ${where}: ${n.toLocaleString("en-US")} GPUs down for about ${time(FIRE_DOWN)}. Everyone is fine. The GPUs are less fine.`);
 }
 
@@ -98,6 +99,7 @@ function startLeak() {
   const where = fireWhere(), down = S.done.leakdetect ? LEAK_DOWN / 2 : LEAK_DOWN;   // sensors find it before the floor does
   l.out = { gens, n, where, until: S.t + down }; l.n += 1;
   track("leak", { n });
+  ceoStrike("a leak");
   say(`Coolant leak in ${where}: ${n.toLocaleString("en-US")} GPUs powered down for about ${time(down)}. The raised floor is now a water feature.`);
 }
 

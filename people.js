@@ -15,7 +15,7 @@ const buildsInFlight = () => S.p2.builds.filter((b) => b.done > S.t).length;
 const lateContracts = () => S.p2.contracts.filter((c) => c.status === "late").length;
 const incidents = () => (firesOf().out ? 1 : 0) + (leaksOf().out ? 1 : 0);
 // Points per second lost to crunch. A second shift halves what construction costs people.
-const moraleDrain = () => 0.03 * buildsInFlight() * (S.done.secondshift ? 0.5 : 1) + 0.12 * lateContracts() + 0.2 * incidents();
+const moraleDrain = () => (0.03 * buildsInFlight() * (S.done.secondshift ? 0.5 : 1) + 0.12 * lateContracts() + 0.2 * incidents()) * ceoDrain();
 // Builds started below 50 morale take longer, up to twice as long at zero.
 const moraleSlow = () => 1 + Math.max(0, 50 - (S.p2 && S.p2.people ? S.p2.people.v : MORALE_START)) / 50;
 const pizzaCost = () => 500000 * Math.pow(2, moraleOf().pizzas);
@@ -128,6 +128,7 @@ function stepTown(dt) {
   }
   if (t.moratorium == null && t.v >= 90) {
     t.moratorium = S.t + MORATORIUM_SECS;
+    ceoStrike("a moratorium");
     say(`The county passed a moratorium on new data center halls. ${time(MORATORIUM_SECS)}, or until the next election, whichever comes first.`);
   }
   if (!S.p2.builds.some((b) => b.kind === "hall")) return;
@@ -179,4 +180,47 @@ function renderPeople() {
     const html = k.choices.map((ch, i) => `<button type="button" data-choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
     if ($("cardBtns").dataset.html !== html) { $("cardBtns").innerHTML = html; $("cardBtns").dataset.html = html; }
   }
+}
+
+// ---------- CEO churn: three crises and the board brings in someone new. New CEO, who dis? ----------
+const CEO_STRIKES = 3, CEO_COOLDOWN = 480;
+const MANDATES = {
+  visionary: { title: "a visionary", build: 1.1, slow: 1, fee: 1, drain: 1, hype: 20,
+    effect: "hype +20, builds cost 10% more (everything is gold-plated)",
+    hello: "says the campus is “a cathedral.” Hype +20. The cathedral has marble floors now." },
+  costcutter: { title: "a cost-cutter", build: 0.85, slow: 1, fee: 1, drain: 1.5, hype: 0,
+    effect: "builds cost 15% less, crunch hits morale 1.5× harder",
+    hello: "cancelled the snack budget on day one. Builds are cheaper. Nobody is smiling." },
+  hyperscaler: { title: "an ex-hyperscaler exec", build: 1, slow: 1.2, fee: 1.1, drain: 1, hype: 0,
+    effect: "contracts pay 10% more, builds 20% slower (process)",
+    hello: "brought 400 slides of process. Customers love it. Every build needs three more sign-offs." },
+};
+const CEO_NAMES = ["Brentley Vance", "Dana Okafor-Reyes", "Chip Hollister", "Margaux Lindqvist", "Tad Pemberton III", "Priya Castellano", "Rex Moldova"];
+const ceoOf = () => S.p2.ceo || (S.p2.ceo = { n: 0, strikes: 0, mandate: null, name: "you", lastAt: -1e9 });
+const mandate = () => (S.phase === 2 && S.p2 && S.p2.ceo && S.p2.ceo.mandate ? MANDATES[S.p2.ceo.mandate] : null);
+const ceoBuild = () => (mandate() ? mandate().build : 1);
+const ceoSlow = () => (mandate() ? mandate().slow : 1);
+const ceoFee = () => (mandate() ? mandate().fee : 1);
+const ceoDrain = () => (mandate() ? mandate().drain : 1);
+function ceoStrike(why) {
+  if (S.phase !== 2 || !S.p2 || !S.p2.county || (S.p2.model && S.p2.model.endedAt != null)) return;
+  const c = ceoOf();
+  if (S.t - c.lastAt < CEO_COOLDOWN) return;   // the board just did this; it needs a quarter to forget
+  c.strikes += 1;
+  if (c.strikes < CEO_STRIKES) { if (c.strikes === CEO_STRIKES - 1) say(`After ${why}, the board scheduled a “quick sync.” Nobody schedules a quick sync.`); return; }
+  const keys = Object.keys(MANDATES).filter((k) => k !== c.mandate), k = keys[Math.floor(Math.random() * keys.length)];
+  const name = CEO_NAMES[c.n % CEO_NAMES.length], old = c.name;
+  c.n += 1; c.strikes = 0; c.mandate = k; c.name = name; c.lastAt = S.t;
+  S.hype += MANDATES[k].hype;
+  track("ceo", { n: c.n, mandate: k });
+  say(`New CEO, who dis? The board replaced ${old === "you" ? "you (you're “Founder & Chief Vibes Officer” now)" : old} with ${name}, ${MANDATES[k].title}.`);
+  say(`${name} ${MANDATES[k].hello}`);
+}
+function renderCeo() {
+  const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
+  $("ceoLine").hidden = !on;
+  if (!on) return;
+  const c = ceoOf(), m = mandate(), left = CEO_STRIKES - c.strikes;
+  const patience = c.strikes ? ` Board patience: ${left} more ${left === 1 ? "crisis" : "crises"}.` : m ? "" : " The board is happy, for now.";
+  $("ceoLine").textContent = (m ? `CEO: ${c.name}, ${m.title}: ${m.effect}.` : "CEO: you, the founder.") + patience;
 }

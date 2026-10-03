@@ -127,14 +127,14 @@ const queueSecs = () => modelDone("utility") ? 0
 
 // Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered.
 const BUILD_GROWTH = 1.03;
-const buildCost = (kind) => specOf(kind).cost * Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length);
+const buildCost = (kind) => specOf(kind).cost * Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length) * ceoBuild();
 
 function build(kind) {
   const spec = specOf(kind);
   const cost = buildCost(kind);
   if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost || (kind === "hall" && moratoriumOn())) return;
   S.funds -= cost;
-  S.p2.builds.push({ kind, done: S.t + spec.secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * moraleSlow() * townSlow() });
+  S.p2.builds.push({ kind, done: S.t + spec.secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * moraleSlow() * townSlow() * ceoSlow() });
   townBuilt(kind);
   track("build", { ev: "start", kind, cost: Math.round(cost) });
   say(kind === "hall" ? `Broke ground on hall ${S.p2.builds.filter((b) => b.kind === "hall").length}. Ready in ${time(spec.secs)}.`
@@ -227,7 +227,7 @@ function makeOffer(first = false) {
   const term = 480 + Math.floor(Math.random() * 420);
   const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
   S.p2.offers.push({ id: `o${n}`, n, who, mw, minGen, start: S.t + startsIn, term,
-    upfront: mw * term * UPFRONT_RATE * genPrice(minGen) * (modelDone("pricing") ? 1.3 : 1) * (S.done.resdesk ? 1.2 : 1), fee: mw * FEE_RATE * genPrice(minGen) * (S.done.sovereign2 && who === "A sovereign AI fund" ? 1.3 : 1) * (S.done.benchmarks ? 1.1 : 1), expires: S.t + (first ? 280 : OFFER_TTL) });
+    upfront: mw * term * UPFRONT_RATE * genPrice(minGen) * (modelDone("pricing") ? 1.3 : 1) * (S.done.resdesk ? 1.2 : 1), fee: mw * FEE_RATE * genPrice(minGen) * (S.done.sovereign2 && who === "A sovereign AI fund" ? 1.3 : 1) * (S.done.benchmarks ? 1.1 : 1) * ceoFee(), expires: S.t + (first ? 280 : OFFER_TTL) });
   track("contract", { ev: "offer", mw });
 }
 
@@ -324,7 +324,7 @@ function stepContracts(dt) {
     }
     const late = S.t - c.start;
     if (c.status === "waiting") {
-      c.status = "late"; track("contract", { ev: "late", mw: c.mw });
+      c.status = "late"; track("contract", { ev: "late", mw: c.mw }); ceoStrike(`missing ${c.who}'s start date`);
       say(`${c.who.split(" (")[0]} wanted ${mwText(c.mw)} today and you are short ${mwText(c.mw - Math.max(0, free))} of ${genName(c.minGen || 0)} (${roomMWAt(S.t) > 0 ? "buy GPUs" : tradeableMW(c.minGen || 0) > 0 ? "trade in older chips, then buy" : "lease or build space"}). The first minute is on the house.`);
     }
     if (late > LATE_FREE) { S.funds -= 0.5 * c.fee * dt; S.hype = Math.max(5, S.hype - 0.05 * dt); }

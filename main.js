@@ -525,6 +525,7 @@ function render() {
   renderPhaseBar();
   renderPeople();
   renderVendors();
+  renderCeo();
   const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
   if (S.phase === 2 && !r) renderPublicRaise();
   const gated = !!r && (S.phase === 2 ? !!roundGap(r) : S.gen < r.gen);
