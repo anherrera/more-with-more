@@ -522,6 +522,7 @@ function render() {
     : "Investors aren't returning calls. Ship a model or post.";
   renderMarket();
   renderAlerts();
+  renderPhaseBar();
   renderPeople();
   renderVendors();
   const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];

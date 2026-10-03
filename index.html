@@ -87,6 +87,9 @@
   .btns { margin: 2px 0; }
   .deal .line.good { color: var(--good); } .deal .line.bad { color: var(--bad); }
   .empty { color: var(--muted); font-size: 13px; }
+  .phasebar { font-size: 13px; color: var(--muted); margin: 2px 0 4px; }
+  .phasebar.go { color: var(--ink); border: 2px solid var(--accent); padding: 8px 10px; margin: 6px 0 10px; font-size: 16px; }
+  .phasebar.go button { margin-left: 8px; font-size: 15px; }
   .ending { border: 2px solid var(--accent); padding: 10px 12px; margin-bottom: 18px; }
   .ending p { font-size: 20px; font-style: italic; margin: 0 0 6px; }
   footer { margin-top: 28px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
@@ -96,6 +99,7 @@
 <div class="wrap">
   <div class="count"><span id="countLabel">GPUs</span>: <span id="gpuCount">0</span></div>
   <div class="ticker" id="ticker"></div>
+  <div class="phasebar" id="phaseBar"><span id="phaseText"></span> <button id="phaseGo" type="button" class="primary" hidden></button></div>
   <div class="line bad" id="alerts" hidden></div>
   <div id="console" aria-live="polite"></div>
 

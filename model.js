@@ -153,5 +153,32 @@ function renderModel() {
 
 function wireModel() {
   $("propYes").addEventListener("click", () => { approveProposal(); render(); });
+  $("phaseGo").addEventListener("click", () => { approveProposal(); render(); });
   $("propNo").addEventListener("click", () => { rejectProposal(); render(); });
+}
+
+// The phase bar under the ticker: which phase you're in, what ends it, and (once the model asks) a big button that does.
+function renderPhaseBar() {
+  const bar = $("phaseBar"), go = $("phaseGo");
+  let text, ask = false;
+  if (S.phase === 1) {
+    text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."
+      : `Phase 1 of 3 · Goal: reach Gen 6 (now Gen ${S.gen}), then break ground on your own campus.`;
+  } else if (!S.p2 || !S.p2.county) {
+    text = "Phase 2 of 3 · Pick a county for the campus.";
+  } else {
+    const m = modelOf(), en = energizedAt();
+    if (m.endedAt != null) text = "Phase 2 complete · The model is building the next one. Phase 3 is coming.";
+    else if (m.final) {
+      ask = true;
+      text = `Phase 2 goal reached. The model asks: “${FINAL.title}.”` + (m.final.at != null ? ` It approves itself in ${Math.max(0, Math.ceil(m.final.at - S.t))}s.` : "");
+      go.textContent = m.final.at != null ? "Approve (it's going ahead anyway)" : "Approve: finish phase 2";
+      go.disabled = m.final.at != null;
+    } else {
+      text = `Phase 2 of 3 · Goal: a 1 GW campus (${mwText(Math.min(en, GOAL_MW))} of 1 GW${en >= GOAL_MW ? " ✓" : ""}) and an IPO${isPublic() ? " ✓" : ""}. Then the model makes its last ask.`;
+    }
+  }
+  $("phaseText").textContent = text;
+  go.hidden = !ask;
+  bar.className = "phasebar" + (ask ? " go" : "");
 }
