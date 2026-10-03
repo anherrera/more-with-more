@@ -39,9 +39,11 @@ def test_growth_projects_are_priced_for_before_the_ipo(game, pid, cost):
     assert pg.evaluate(f"() => projectCost(PROJECTS.find((p) => p.id === '{pid}'))") == cost
 
 
-def test_final_proposal_shows_in_the_alert_line(game):
+def test_reaching_the_goal_puts_the_final_ask_in_the_phase_bar_not_the_alert_line(game):
     pg = campus(game)
     pg.evaluate("""() => { S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false};
       S.p2.grid = 99999; S.p2.extraWater = 999; for (let i = 0; i < 20; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }""")
     run(pg, 1)
-    assert "The model wants to build the next one" in pg.inner_text("#alerts")
+    pg.evaluate("() => render()")
+    assert "Let me build the next one" in pg.inner_text("#phaseBar")
+    assert "build the next one" not in (pg.inner_text("#alerts") if pg.is_visible("#alerts") else "")

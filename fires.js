@@ -129,9 +129,7 @@ function renderAlerts() {
   if (S.phase === 2 && S.p2 && S.p2.town && moratoriumOn()) out.push(`Moratorium on new halls: ${time(S.p2.town.moratorium - S.t)}`);
   if (f.payout) out.push(`Insurance pays ${money(f.payout.amt)} in ${time(Math.max(0, f.payout.at - S.t))}`);
   if (S.phase === 2 && S.p2 && S.p2.county && droughtOn()) out.push(`Drought: water allocation \u2212${Math.round(100 * (1 - DROUGHT_CUT))}% for ${time(S.p2.drought.until - S.t)}`);
-  const m = S.phase === 2 && S.p2 && S.p2.model;
-  if (m && m.final && m.endedAt == null) out.push(m.final.at != null ? `The model is approving its own proposal in ${Math.max(0, Math.ceil(m.final.at - S.t))}s`
-    : "The model wants to build the next one: approve under The Model to finish phase 2");
+  // the model's last ask lives in the phase bar (model.js), not here
   $("alerts").hidden = !out.length;
   $("alerts").textContent = out.join(" \u00b7 ");
 }
