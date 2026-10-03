@@ -17,7 +17,7 @@ const ROOT_CAUSES = [
 const firesOf = () => S.fires || (S.fires = { next: null, out: null, payout: null, premium: 0, n: 0, lost: 0 });
 const firesOn = () => (S.phase === 1 ? S.gen >= 2 : S.phase === 2 && !!S.p2 && !!S.p2.county);
 // r in [0, 1): where in the range this fire lands. Suppression makes them rarer; new UPS batteries make them smaller.
-const fireGap = (r) => (FIRE_EVERY[0] + r * (FIRE_EVERY[1] - FIRE_EVERY[0])) * (S.done.suppression ? 2 : 1);
+const fireGap = (r) => (FIRE_EVERY[0] + r * (FIRE_EVERY[1] - FIRE_EVERY[0])) * (S.done.suppression ? 2 : 1) * vendorOf().fire;
 const fireShare = (r) => (FIRE_SHARE[0] + r * (FIRE_SHARE[1] - FIRE_SHARE[0])) * (S.done.ups ? 0.5 : 1);
 const fireWhere = () => (S.phase === 2 && S.p2.builds.some((b) => b.kind === "hall" && b.done <= S.t)
   ? `hall ${1 + Math.floor(Math.random() * S.p2.builds.filter((b) => b.kind === "hall" && b.done <= S.t).length)}`
@@ -80,6 +80,7 @@ const LEAK_CAUSES = [
   "a bufo sat on a valve and would not be moved",
   "someone asked the model whether the pipes were fine and it said yes",
 ];
+const leakGap = (r) => (LEAK_EVERY[0] + r * (LEAK_EVERY[1] - LEAK_EVERY[0])) * vendorOf().leak;
 const leaksOf = () => S.leaks || (S.leaks = { next: null, out: null, n: 0, lost: 0 });
 const leaksOn = () => S.phase === 2 && !!S.p2 && !!S.p2.county && ["dlc", "immersion", "twophase", "liquid"].some((k) => S.done[k]);
 
@@ -115,8 +116,8 @@ function stepLeaks() {
   const l = leaksOf();
   if (l.out && S.t >= l.out.until) endLeak();
   if (!leaksOn()) return;
-  if (l.next == null) l.next = S.t + LEAK_EVERY[0] + Math.random() * (LEAK_EVERY[1] - LEAK_EVERY[0]);
-  if (!l.out && S.t >= l.next) { startLeak(); l.next = S.t + LEAK_EVERY[0] + Math.random() * (LEAK_EVERY[1] - LEAK_EVERY[0]); }
+  if (l.next == null) l.next = S.t + leakGap(Math.random());
+  if (!l.out && S.t >= l.next) { startLeak(); l.next = S.t + leakGap(Math.random()); }
 }
 
 // The alert line under the title: things happening right now that the console would scroll away.

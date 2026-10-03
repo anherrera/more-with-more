@@ -688,3 +688,29 @@ function wireCampus() {
     if (b) { renegotiate(b.dataset.reneg); render(); }
   });
 }
+
+// ---------- server vendors (phase 2): who racks your GPUs. Made up; any resemblance is a supply-chain coincidence. ----------
+const VENDORS = [
+  { id: "monolith", name: "Monolith Systems", price: 1, fire: 1, leak: 1, blurb: "list price",
+    quip: "Monolith Systems it is. The racks come with a 900-page manual and a sales rep who calls on Sundays." },
+  { id: "gridiron", name: "Gridiron Server Co.", price: 0.85, fire: 0.6, leak: 0.7, blurb: "15% off, more fires",
+    quip: "Switched to Gridiron Server Co. The racks arrive pre-scratched and the cable management is “artisanal.” Fires will happen more often." },
+  { id: "nimbus", name: "Nimbus Assembly", price: 1.15, fire: 1.6, leak: 1.6, blurb: "15% more, fewer incidents",
+    quip: "Switched to Nimbus Assembly. Each rack ships with a white-glove technician who will not stop talking about torque specs." },
+];
+// fire/leak are multipliers on the time between incidents: below 1 means more often.
+const vendorOf = () => (S.phase === 2 && S.p2 && VENDORS.find((v) => v.id === S.p2.vendor)) || VENDORS[0];
+function pickVendor(id) {
+  if (S.phase !== 2 || !VENDORS.some((v) => v.id === id) || vendorOf().id === id) return;
+  S.p2.vendor = id;
+  track("vendor", { id });
+  say(vendorOf().quip);
+}
+function renderVendors() {
+  const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
+  $("vendorRow").hidden = !on;
+  if (!on) return;
+  const cur = vendorOf().id;
+  const html = VENDORS.map((v) => `<button type="button" data-vendor="${v.id}" class="${v.id === cur ? "on" : ""}" title="${v.blurb}">${v.name}: ${v.blurb}</button>`).join("");
+  if ($("vendors").dataset.html !== html) { $("vendors").innerHTML = html; $("vendors").dataset.html = html; }
+}

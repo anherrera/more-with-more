@@ -51,7 +51,7 @@ const fitGPUs = () => Math.floor(capKW() / KW_PER_GPU);
 const PMAX = 500, N0 = 9900;                                         // volume pricing: price stops rising at $500 (~10k GPUs)
 const newest = () => chip(S.chipIdx);
 const basePrice = (n = S.gpus) => Math.min(PMAX, 5 * (1 + n / 100));
-const gpuPrice = (n = S.gpus) => basePrice(n) * newest().priceMult * gpuDiscount();
+const gpuPrice = (n = S.gpus) => basePrice(n) * newest().priceMult * gpuDiscount() * vendorOf().price;
 const usedKW = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).kw, 0);
 const totalPerf = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).perf, 0);
 const avgPerf = () => (S.gpus > 0 ? totalPerf() / S.gpus : newest().perf);
@@ -523,6 +523,7 @@ function render() {
   renderMarket();
   renderAlerts();
   renderPeople();
+  renderVendors();
   const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
   if (S.phase === 2 && !r) renderPublicRaise();
   const gated = !!r && (S.phase === 2 ? !!roundGap(r) : S.gen < r.gen);
@@ -747,6 +748,7 @@ function wire() {
   $("draw").addEventListener("click", () => { draw(); render(); });
   $("repay").addEventListener("click", () => { repay(); render(); });
   $("swap").addEventListener("click", () => { swapFailed(); render(); });
+  $("vendors").addEventListener("click", (e) => { const b = e.target.closest("button[data-vendor]"); if (b) { pickVendor(b.dataset.vendor); render(); } });
   $("pizza").addEventListener("click", () => { pizzaParty(); render(); });
   $("cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
   $("tradein").addEventListener("click", () => { tradeIn(); render(); });
