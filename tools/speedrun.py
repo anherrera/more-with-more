@@ -72,7 +72,7 @@ def run_once(browser, base, seed, county):
             if pause: pg.wait_for_timeout(pause)
             if pg.evaluate("() => S.p2.model.endedAt") is not None: break
     s = pg.evaluate("""() => ({t: S.t, gen: S.gen, ended: S.p2 && S.p2.model && S.p2.model.endedAt, ipo: S.p2 && S.p2.ipo && S.p2.ipo.at,
-      fires: firesOf().n, leaks: leaksOf().n, morale: S.p2 && S.p2.people ? Math.round(S.p2.people.v) : null, pizzas: S.p2 && S.p2.people ? S.p2.people.pizzas : 0, town: S.p2 && S.p2.town ? Math.round(S.p2.town.v) : null, jobs: S.p2 && S.p2.town ? S.p2.town.jobs : 0, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
+      fires: firesOf().n, leaks: leaksOf().n, morale: S.p2 && S.p2.people ? Math.round(S.p2.people.v) : null, pizzas: S.p2 && S.p2.people ? S.p2.people.pizzas : 0, town: S.p2 && S.p2.town ? Math.round(S.p2.town.v) : null, jobs: S.p2 && S.p2.town ? S.p2.town.jobs : 0, ceos: S.p2 && S.p2.ceo ? S.p2.ceo.n : 0, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
     ctx.close()
     return ground, s, errs
 
@@ -106,7 +106,7 @@ def main():
             ground, s, errs = run_once(b, base, r + 1, county)
             p2 = (s["ended"] - ground) if s["ended"] and ground else None
             print(f"run {r + 1} ({county}): phase 1 {mmss(ground)}, phase 2 {mmss(p2)}, IPO at {mmss(s['ipo'])}, "
-                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} pizzas), town {s['town']} ({s['jobs']} jobs promised), you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
+                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} pizzas), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
             ok = ok and not errs and s["ended"] is not None
         b.close()
     httpd.shutdown()
