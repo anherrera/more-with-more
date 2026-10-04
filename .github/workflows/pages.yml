@@ -33,9 +33,12 @@ jobs:
         run: |
           mkdir site
           cp index.html *.js site/
-          # Cache busting: every script link carries the commit, so a browser can never mix old and new files.
+          # Cache busting: the page's script link and every import specifier inside the modules carry the commit,
+          # so a browser can never mix old and new files (module imports don't inherit the page's query string).
           sed -i "s/\.js\"/.js?v=${GITHUB_SHA::7}\"/g" site/index.html
+          sed -i -E "s#from \"\./([a-z]+)\.js\"#from \"./\1.js?v=${GITHUB_SHA::7}\"#g" site/*.js
           grep -c "?v=${GITHUB_SHA::7}" site/index.html
+          test "$(grep -L "?v=${GITHUB_SHA::7}" site/*.js | grep -v globals.js)" = "" && grep -c "from \"./" site/main.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

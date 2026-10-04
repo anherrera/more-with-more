@@ -1,21 +1,24 @@
 // market.js: the cap table, the IPO (right after Series E), the public stock, follow-ons, lockup and secondaries.
 // Ownership = founder shares / all shares. Every raise mints shares; secondaries move your shares into your pocket.
+import { $, HYPE_TO_RAISE, ROUNDS, S, milestone, money, mwText, say, time, track } from "./globals.js";
+import { backlogMW, campusRevenue, deliveredMW, energizedAt } from "./campus.js";
+import { render } from "./main.js";
 
-const DILUTION = { "Pre-seed": 0.10, Seed: 0.15, "Series A": 0.20, "Series B": 0.15, "Series C": 0.12, "Series D": 0.10, "Series E": 0.08 };
-const REV_MULTIPLE = 20000, IPO_FLOAT = 0.10, IPO_DISCOUNT = 0.85, LOCKUP = 120;
-const IPO_BACKLOG = 400, IPO_CAMPUS = 600;
-const FOLLOW_ON_MAX = 3, FOLLOW_ON_MIN = 300e6, FOLLOW_ON_CAP = 3e9;   // the market has limits, eventually
+export const DILUTION = { "Pre-seed": 0.10, Seed: 0.15, "Series A": 0.20, "Series B": 0.15, "Series C": 0.12, "Series D": 0.10, "Series E": 0.08 };
+export const REV_MULTIPLE = 20000, IPO_FLOAT = 0.10, IPO_DISCOUNT = 0.85, LOCKUP = 120;
+export const IPO_BACKLOG = 400, IPO_CAMPUS = 600;
+export const FOLLOW_ON_MAX = 3, FOLLOW_ON_MIN = 300e6, FOLLOW_ON_CAP = 3e9;   // the market has limits, eventually
 // 8% of the company, scaled by the mood: froth buys more, a cold market less.
-const followOnAmt = () => Math.max(FOLLOW_ON_MIN, Math.min(FOLLOW_ON_CAP, FOLLOW_ON * marketCap() * (0.5 + S.hype / 100)));
-const FOLLOW_ON_LINES = [
+export const followOnAmt = () => Math.max(FOLLOW_ON_MIN, Math.min(FOLLOW_ON_CAP, FOLLOW_ON * marketCap() * (0.5 + S.hype / 100)));
+export const FOLLOW_ON_LINES = [
   (m) => `Follow-on offering: ${m}. The stock dipped 5%. The analyst notes say \u201caccretive,\u201d which nobody can define.`,
   (m) => `Second follow-on: ${m}. The roadshow was one Zoom call and a drone video of the campus. Oversubscribed anyway.`,
   (m) => `Third follow-on: ${m}. An analyst asked when you'd stop selling stock. You said \u201cwhen the GPUs stop getting better.\u201d Everyone laughed. You didn't.`,
 ];
-const FOLLOW_ON = 0.08, FOLLOW_ON_EVERY = 300, SECONDARY = 0.01, SECONDARY_EVERY = 60;
+export const FOLLOW_ON = 0.08, FOLLOW_ON_EVERY = 300, SECONDARY = 0.01, SECONDARY_EVERY = 60;
 
 // Saves from before the cap table: rebuild it from the rounds already raised.
-function deriveCap() {
+export function deriveCap() {
   const c = { shares: 1e9, founder: 1e9, liquidity: 0, lastVal: 0 };
   const raised = ROUNDS.slice(0, S.round).map((r) => r.name).concat(S.p2 && S.p2.round ? ["Series E"] : []);
   for (const name of raised) c.shares /= 1 - DILUTION[name];
@@ -23,11 +26,11 @@ function deriveCap() {
   if (last) c.lastVal = last.amount / DILUTION[last.name];
   return c;
 }
-const capOf = () => S.cap;   // created in fresh(); older saves derive it in start()
-const ownership = () => capOf().founder / capOf().shares;
+export const capOf = () => S.cap;   // created in fresh(); older saves derive it in start()
+export const ownership = () => capOf().founder / capOf().shares;
 
 // Mint shares for a raise: the new holders get `fraction` of the company after the round.
-function dilute(fraction, amount, name) {
+export function dilute(fraction, amount, name) {
   const c = capOf(), before = c.shares;
   c.shares = before / (1 - fraction);
   c.lastVal = amount / fraction;
@@ -39,26 +42,26 @@ function dilute(fraction, amount, name) {
 
 // ---- the public company ----
 // Game-scale valuation: ~30,000 seconds of revenue, times hype. (Real multiples would make the IPO dwarf the whole economy.)
-const fundamentalCap = () => Math.max(capOf().lastVal, (S.phase === 2 ? campusRevenue() : 0) * REV_MULTIPLE * (0.5 + S.hype / 100));
+export const fundamentalCap = () => Math.max(capOf().lastVal, (S.phase === 2 ? campusRevenue() : 0) * REV_MULTIPLE * (0.5 + S.hype / 100));
 // The classic arc: priced below range, pops 300% on day one, gives back 60%, settles.
-function ipoArc(tau) {
+export function ipoArc(tau) {
   if (tau < 60) return 0.85 + (3.4 - 0.85) * tau / 60;
   if (tau < 360) return 3.4 - (3.4 - 1.36) * (tau - 60) / 300;
   if (tau < 660) return 1.36 - 0.36 * (tau - 360) / 300;
   return 1;
 }
-const isPublic = () => !!(S.p2 && S.p2.ipo);
-const stockPrice = () => {
+export const isPublic = () => !!(S.p2 && S.p2.ipo);
+export const stockPrice = () => {
   const ipo = S.p2.ipo;
   return fundamentalCap() / capOf().shares * ipoArc(S.t - ipo.at) * ipo.walk * ipo.shock;
 };
-const marketCap = () => (isPublic() ? stockPrice() * capOf().shares : fundamentalCap());
+export const marketCap = () => (isPublic() ? stockPrice() * capOf().shares : fundamentalCap());
 
 // Signed capacity (delivered + waiting), so a finished campus can always go public.
-const ipoGap = () => backlogMW() + deliveredMW() < IPO_BACKLOG ? `${mwText(IPO_BACKLOG)} of signed contracts (have ${mwText(backlogMW() + deliveredMW())})`
+export const ipoGap = () => backlogMW() + deliveredMW() < IPO_BACKLOG ? `${mwText(IPO_BACKLOG)} of signed contracts (have ${mwText(backlogMW() + deliveredMW())})`
   : energizedAt() < IPO_CAMPUS ? `${mwText(IPO_CAMPUS)} of campus (have ${mwText(energizedAt())})` : null;
 
-function ringTheBell() {
+export function ringTheBell() {
   if (isPublic() || ipoGap() || S.hype < HYPE_TO_RAISE) return;
   const c = capOf(), px = IPO_DISCOUNT * fundamentalCap() / c.shares, minted = c.shares * IPO_FLOAT / (1 - IPO_FLOAT);
   S.p2.ipo = { at: S.t, px0: px, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false };
@@ -68,7 +71,7 @@ function ringTheBell() {
   say(`You rang the bell. MORE priced at ${money(px)}, below the range. The bankers call that “leaving room for the pop.” The pop is for their other clients.`);
 }
 
-function followOn() {
+export function followOn() {
   const ipo = S.p2.ipo;
   if (!isPublic() || (ipo.followOns || 0) >= FOLLOW_ON_MAX || S.t < ipo.lastFollowOn + FOLLOW_ON_EVERY || S.hype < HYPE_TO_RAISE) return;
   const amt = followOnAmt();
@@ -79,7 +82,7 @@ function followOn() {
   say(FOLLOW_ON_LINES[(ipo.followOns - 1) % FOLLOW_ON_LINES.length](money(amt)));
 }
 
-function sellSecondary() {
+export function sellSecondary() {
   const ipo = S.p2.ipo, c = capOf();
   if (!isPublic() || S.t < ipo.at + LOCKUP || S.t < ipo.lastSecondary + SECONDARY_EVERY) return;
   const n = c.founder * SECONDARY, px = stockPrice();
@@ -88,7 +91,7 @@ function sellSecondary() {
   say(`Sold ${money(n * px)} of your own stock. The company got nothing. A boat broker has already called.`);
 }
 
-function stepMarket(dt) {
+export function stepMarket(dt) {
   if (!isPublic()) return;
   const ipo = S.p2.ipo;
   ipo.walk = Math.max(0.8, Math.min(1.25, ipo.walk + (Math.random() - 0.5) * 0.02 * (S.done.honestcall ? 0.5 : 1) * dt));
@@ -99,7 +102,7 @@ function stepMarket(dt) {
   }
 }
 
-function renderMarket() {
+export function renderMarket() {
   const c = capOf();
   $("ownLine").textContent = `You own ${(100 * ownership()).toFixed(1)}%` + (c.liquidity > 0 ? ` · your liquidity: ${money(c.liquidity)}` : "");
   const pub = isPublic();
@@ -115,7 +118,7 @@ function renderMarket() {
 }
 
 // Phase 2's raise button after Series E: the IPO, then follow-ons.
-function renderPublicRaise() {
+export function renderPublicRaise() {
   const b = $("raise");
   b.hidden = false;
   if (!isPublic()) {
@@ -130,14 +133,14 @@ function renderPublicRaise() {
     : `Follow-on offering: ${money(followOnAmt())} (dilutes you ${FOLLOW_ON * 100}%, more when hype is high)`;
   b.disabled = wait > 0 || S.hype < HYPE_TO_RAISE;
 }
-const publicRaise = () => (isPublic() ? followOn() : ringTheBell());
+export const publicRaise = () => (isPublic() ? followOn() : ringTheBell());
 
-function wireMarket() {
+export function wireMarket() {
   $("secondary").addEventListener("click", () => { sellSecondary(); render(); });
 }
 
 // Ring the bell: a few seconds of confetti in the page's own colors. Skipped for reduced motion.
-function confetti() {
+export function confetti() {
   if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const cv = document.createElement("canvas");
   cv.id = "confetti";

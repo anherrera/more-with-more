@@ -194,6 +194,8 @@ reversed?" I answer: **"INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more
   disasters, unplugging, kindness, questions, hearings, zooming, space and both endings. There is no separate space.js.
 - `hud.js` renders the HUD for every phase; `people.js` holds the humans shared by both phases (rotating decks, cards,
   moratoriums); `main.js` dispatches through a `PHASES` table {step, render, wire, go}.
+- The files are ES modules with no build step: `index.html` loads `main.js` alone, and each file imports what it uses.
+  `window.game` is the debug surface (every export, live); `?test` mirrors it onto window for the tests and robots.
 - `S.phase = 3`; all phase 3 state in `S.p3`, created complete by `freshP3()`. Phases 1 and 2 never read it. Saves
   carry `S.v`; `MIGRATIONS` in main.js fill older phase 3 saves from `freshP3()`.
 - A phase 2 save at "model ended" shows the final-ask banner again, and the phase bar's button starts phase 3.

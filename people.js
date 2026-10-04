@@ -2,22 +2,26 @@
 // a few seconds, and go away: the tender offer, town halls, hearings) and opposition with moratoriums (the town, the
 // tiles). Phase 2's own: morale (crunch drains it, calm restores it, perks help, less each time), the town (opposition
 // rises with every build, slows construction, prices land up, and can stop halls cold) and the CEO.
+import { $, S, money, say, setHtml, time, track } from "./globals.js";
+import { countyOf } from "./campus.js";
+import { isPublic } from "./market.js";
+import { firesOf, leaksOf } from "./fires.js";
 
 // ---------- shared: decks, cards, moratoriums ----------
 // A rotating deck: `n` cards from `pool` on offer, in the order they were dealt, dropping any the `ok` filter no longer
 // allows; the card just `used` doesn't come straight back. Returns the new hand (ids).
-function refillDeck(hand, pool, ok, n, used) {
+export function refillDeck(hand, pool, ok, n, used) {
   const kept = hand.filter((id) => pool.some((c) => c.id === id && ok(c)));
   const rest = pool.filter((c) => ok(c) && !kept.includes(c.id) && c.id !== used);
   while (kept.length < n && rest.length) kept.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0].id);
   return kept;
 }
 // A card lives on its phase's state (`holder.card`) with a deadline. Its kind: { title(), text(), choices: [{ label, go }], expire() }.
-function dealCard(holder, card, secs) { if (!holder.card) holder.card = { ...card, until: S.t + secs }; }
-function takeCard(holder) { const c = holder.card; holder.card = null; return c; }
-function expireCard(holder) { const c = holder.card; if (c && S.t >= c.until) { holder.card = null; return c; } return null; }
+export function dealCard(holder, card, secs) { if (!holder.card) holder.card = { ...card, until: S.t + secs }; }
+export function takeCard(holder) { const c = holder.card; holder.card = null; return c; }
+export function expireCard(holder) { const c = holder.card; if (c && S.t >= c.until) { holder.card = null; return c; } return null; }
 // ids: { box, title, text, btns, data }: the card's panel and the data attribute its buttons answer with.
-function renderCard(ids, card, kind) {
+export function renderCard(ids, card, kind) {
   $(ids.box).hidden = !card;
   if (!card) return;
   $(ids.title).textContent = `${kind.title()} (${Math.max(0, Math.ceil(card.until - S.t))}s)`;
@@ -26,9 +30,9 @@ function renderCard(ids, card, kind) {
 }
 // Opposition (0-100) passes a moratorium at 90; when it lifts after `secs`, the meter settles at 70.
 // Returns "passed" or "lifted" so the caller can say its line and take its own hit, or null.
-const MORATORIUM_AT = 90, MORATORIUM_REST = 70;
-const underMoratorium = (o) => !!(o && o.moratorium != null && S.t < o.moratorium);
-function stepMoratorium(o, key, secs) {
+export const MORATORIUM_AT = 90, MORATORIUM_REST = 70;
+export const underMoratorium = (o) => !!(o && o.moratorium != null && S.t < o.moratorium);
+export function stepMoratorium(o, key, secs) {
   if (o.moratorium != null && S.t >= o.moratorium) { o.moratorium = null; o[key] = Math.min(o[key], MORATORIUM_REST); return "lifted"; }
   if (o.moratorium == null && o[key] >= MORATORIUM_AT) { o.moratorium = S.t + secs; return "passed"; }
   return null;
@@ -36,28 +40,28 @@ function stepMoratorium(o, key, secs) {
 
 // ---------- phase 2: morale ----------
 
-const MORALE_START = 80, MORALE_REST = 0.08;
-const QUIT_LINES = [
+export const MORALE_START = 80, MORALE_REST = 0.08;
+export const QUIT_LINES = [
   "Your head of facilities quit to start a podcast about burnout.",
   "A senior electrician left for a rival. The rival's campus is two counties over and also on fire.",
   "Your best network engineer quit to raise a seed round for “Slack, but for grief.”",
   "The construction lead left to farm alpacas. He sent a photo. The alpacas look rested.",
 ];
 
-const freshPeople = () => ({ v: MORALE_START, nextQuit: null, lastTender: -1e9 });
-const moraleOf = () => S.p2.people;   // created with the campus (startCampus) or on load (migrateCampus)
-const buildsInFlight = () => S.p2.builds.filter((b) => b.done > S.t).length;
-const lateContracts = () => S.p2.contracts.filter((c) => c.status === "late").length;
-const incidents = () => (firesOf().out ? 1 : 0) + (leaksOf().out ? 1 : 0);
+export const freshPeople = () => ({ v: MORALE_START, nextQuit: null, lastTender: -1e9 });
+export const moraleOf = () => S.p2.people;   // created with the campus (startCampus) or on load (migrateCampus)
+export const buildsInFlight = () => S.p2.builds.filter((b) => b.done > S.t).length;
+export const lateContracts = () => S.p2.contracts.filter((c) => c.status === "late").length;
+export const incidents = () => (firesOf().out ? 1 : 0) + (leaksOf().out ? 1 : 0);
 // Points per second lost to crunch. A second shift halves what construction costs people.
 // Crunch levels off: the twelfth build in flight hurts less than the second.
-const moraleDrain = () => (0.04 * Math.sqrt(buildsInFlight()) * (S.done.secondshift ? 0.5 : 1) + 0.12 * lateContracts() + 0.2 * incidents()) * ceoDrain();
+export const moraleDrain = () => (0.04 * Math.sqrt(buildsInFlight()) * (S.done.secondshift ? 0.5 : 1) + 0.12 * lateContracts() + 0.2 * incidents()) * ceoDrain();
 // Builds started below 50 morale take longer, up to twice as long at zero.
-const moraleSlow = () => 1 + Math.max(0, 50 - (S.p2 && S.p2.people ? S.p2.people.v : MORALE_START)) / 50;
+export const moraleSlow = () => 1 + Math.max(0, 50 - (S.p2 && S.p2.people ? S.p2.people.v : MORALE_START)) / 50;
 // Perks: three on offer at a time; using one swaps it for another. One perk per 45 s, and each helps
 // less every time you repeat it (the third offsite is a Zoom call). The deck is refilled by step() and usePerk(), never by a redraw.
-const PERK_COOLDOWN = 45, PERK_FADE = 0.7;
-const PERKS = [
+export const PERK_COOLDOWN = 45, PERK_FADE = 0.7;
+export const PERKS = [
   { id: "pizza", name: "Pizza party", cost: 1e6, gain: 8, line: "Pizza party. People were genuinely happy, which surprised everyone." },
   { id: "dogs", name: "Bring your dog to the data center", cost: 0, gain: 6, line: "Dog day at the campus. One dog is now on the badge system." },
   { id: "standup", name: "Cancel the 7 a.m. standup", cost: 0, gain: 8, line: "You cancelled the 7 a.m. standup. Nobody noticed it was gone, which was the point." },
@@ -70,15 +74,15 @@ const PERKS = [
   { id: "happiness", name: "Hire a chief happiness officer", cost: 5e6, gain: 3, line: "The chief happiness officer scheduled a mandatory joy workshop. It's on Saturday." },
   { id: "rsu", name: "RSU refresh", cost: 100e6, gain: 30, when: () => isPublic(), line: "RSU refresh. The golden handcuffs got a fresh polish. Morale is up and so is the vesting schedule." },
 ];
-const perkOf = (id) => PERKS.find((p) => p.id === id);
-const perkWait = () => Math.max(0, (moraleOf().perkAt ?? -1e9) + PERK_COOLDOWN - S.t);
-const perkGain = (p) => p.gain * Math.pow(PERK_FADE, (moraleOf().perkUses || {})[p.id] || 0);
-function offeredPerks(used) {   // used: the perk just spent, which doesn't come straight back
+export const perkOf = (id) => PERKS.find((p) => p.id === id);
+export const perkWait = () => Math.max(0, (moraleOf().perkAt ?? -1e9) + PERK_COOLDOWN - S.t);
+export const perkGain = (p) => p.gain * Math.pow(PERK_FADE, (moraleOf().perkUses || {})[p.id] || 0);
+export function offeredPerks(used) {   // used: the perk just spent, which doesn't come straight back
   const m = moraleOf();
   m.perks = refillDeck(m.perks || [], PERKS, (p) => !p.when || p.when(), 3, used);
   return m.perks;
 }
-function usePerk(id) {
+export function usePerk(id) {
   const m = moraleOf(), p = perkOf(id);
   if (!p || (p.when && !p.when()) || S.funds < p.cost || perkWait() > 0) return;
   S.funds -= p.cost;
@@ -91,7 +95,7 @@ function usePerk(id) {
   say(p.line);
 }
 
-function moraleCause() {
+export function moraleCause() {
   const bits = [], b = buildsInFlight(), l = lateContracts(), i = incidents();
   if (b) bits.push(`${b} build${b > 1 ? "s" : ""} in flight`);
   if (l) bits.push(`${l} late contract${l > 1 ? "s" : ""}`);
@@ -101,7 +105,7 @@ function moraleCause() {
 }
 
 // ---------- temporary cards ----------
-const CARDS = {
+export const CARDS = {
   tender: {
     secs: 30,
     title: () => "Tender offer",
@@ -114,12 +118,12 @@ const CARDS = {
     expire: () => tenderNo(),
   },
 };
-function tenderNo() {
+export function tenderNo() {
   moraleOf().v = Math.max(0, moraleOf().v - 5);
   say("The tender offer quietly died. Everyone saw the email anyway.");
 }
-function openCard(kind) { dealCard(S.p2, { kind }, CARDS[kind].secs); }
-function chooseCard(i) {
+export function openCard(kind) { dealCard(S.p2, { kind }, CARDS[kind].secs); }
+export function chooseCard(i) {
   const c = S.p2 && S.p2.card && takeCard(S.p2);
   if (!c) return;
   CARDS[c.kind].choices[i].go();
@@ -127,27 +131,27 @@ function chooseCard(i) {
 }
 
 // ---------- the town ----------
-const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.04, MORATORIUM_SECS = 120;   // the county's: two minutes
-const freshTown = () => ({ v: countyOf() ? countyOf().town : 20, jobs: 0, promises: 0, nextHall: null, moratorium: null });
-const townOf = () => S.p2.town;   // created when the county is picked (chooseCounty) or on load (migrateCampus)
-const moratoriumOn = () => underMoratorium(S.p2.town);
+export const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.04, MORATORIUM_SECS = 120;   // the county's: two minutes
+export const freshTown = () => ({ v: countyOf() ? countyOf().town : 20, jobs: 0, promises: 0, nextHall: null, moratorium: null });
+export const townOf = () => S.p2.town;   // created when the county is picked (chooseCounty) or on load (migrateCampus)
+export const moratoriumOn = () => underMoratorium(S.p2.town);
 // Builds started above 50 opposition take longer: permits, lawsuits, a guy with a sign.
-const townSlow = () => 1 + Math.max(0, (S.p2 && S.p2.town ? S.p2.town.v : 0) - 50) / 50;
-function townBuilt(kind) {
+export const townSlow = () => 1 + Math.max(0, (S.p2 && S.p2.town ? S.p2.town.v : 0) - 50) / 50;
+export function townBuilt(kind) {
   const t = townOf();
   // The town gets used to you: every finished build makes the next one a little less of an event.
   const familiar = 1 / (1 + S.p2.builds.filter((b) => b.done <= S.t).length / 20);
   t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba2 ? 0.5 : 1) * familiar);
 }
 // Sponsorships: press any time; each costs double the last and helps a bit less. Late-game money still buys goodwill.
-const SPONSOR_COOLDOWN = 60;   // sponsorships: one a minute, flat prices
-const SPONSORED = [["the county fair", 3e6], ["the Little League team", 1e6], ["a new fire truck", 2e6], ["the library's 3D printer", 1e6],
+export const SPONSOR_COOLDOWN = 60;   // sponsorships: one a minute, flat prices
+export const SPONSORED = [["the county fair", 3e6], ["the Little League team", 1e6], ["a new fire truck", 2e6], ["the library's 3D printer", 1e6],
   ["the Fourth of July fireworks", 2e6], ["a splash pad", 3e6], ["the high school's prom", 1e6], ["a mural of the model, which the model designed", 5e6]];
-const sponsorNext = () => SPONSORED[(townOf().sponsors || 0) % SPONSORED.length];
-const sponsorCost = () => sponsorNext()[1];
-const sponsorGain = () => 10;
-const sponsorWait = () => Math.max(0, (townOf().sponsorAt ?? -1e9) + SPONSOR_COOLDOWN - S.t);
-function sponsor() {
+export const sponsorNext = () => SPONSORED[(townOf().sponsors || 0) % SPONSORED.length];
+export const sponsorCost = () => sponsorNext()[1];
+export const sponsorGain = () => 10;
+export const sponsorWait = () => Math.max(0, (townOf().sponsorAt ?? -1e9) + SPONSOR_COOLDOWN - S.t);
+export function sponsor() {
   const t = townOf();
   if (S.funds < sponsorCost() || sponsorWait() > 0) return;
   S.funds -= sponsorCost();
@@ -156,7 +160,7 @@ function sponsor() {
   say(`You sponsored ${what}. Your logo is on it now. Opposition −${Math.round(gain)}.`);
 }
 
-function townCause() {
+export function townCause() {
   const t = townOf();
   const jobs = t.jobs ? `Jobs promised: ${Math.round(t.jobs).toLocaleString("en-US")}. Jobs delivered: 41.` : "";
   const mood = t.v >= 90 ? "They're voting on a moratorium." : t.v >= 50 ? `Lawsuits and yard signs: builds take ${townSlow().toFixed(1)}× as long, land costs more.`
@@ -182,7 +186,7 @@ CARDS.townhall = {
   expire: () => { townOf().v = Math.min(100, townOf().v + 10); say("Nobody from the company showed up to the town hall. The empty chair got a standing ovation."); },
 };
 
-function stepTown(dt) {
+export function stepTown(dt) {
   const t = townOf(), base = countyOf().town;
   if (t.v > base) t.v = Math.max(base, t.v - TOWN_EASE * dt);
   const mor = stepMoratorium(t, "v", MORATORIUM_SECS);
@@ -197,7 +201,7 @@ function stepTown(dt) {
   if (!S.p2.card && S.t >= t.nextHall) { t.nextHall = S.t + 180 + Math.random() * 120; openCard("townhall"); }
 }
 
-function stepPeople(dt) {
+export function stepPeople(dt) {
   const m = moraleOf(), drain = moraleDrain();
   offeredPerks();
   m.v = Math.max(0, Math.min(100, m.v + (MORALE_REST - drain) * dt));
@@ -215,7 +219,7 @@ function stepPeople(dt) {
   if (!S.p2.card && m.v < 45 && !isPublic() && S.t - m.lastTender > 600) { m.lastTender = S.t; openCard("tender"); }
 }
 
-function renderPeople() {
+export function renderPeople() {
   const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
   $("moraleBox").hidden = !on;
   $("townBox").hidden = !on;
@@ -244,11 +248,11 @@ function renderPeople() {
   $("sponsor").disabled = S.funds < sponsorCost() || t.v <= 0 || sponsorWait() > 0;
   renderCard(P2_CARD, c, c && CARDS[c.kind]);
 }
-const P2_CARD = { box: "card", title: "cardTitle", text: "cardText", btns: "cardBtns", data: "choice" };
+export const P2_CARD = { box: "card", title: "cardTitle", text: "cardText", btns: "cardBtns", data: "choice" };
 
 // ---------- CEO churn: three crises and the board brings in someone new. New CEO, who dis? ----------
-const CEO_STRIKES = 3, CEO_COOLDOWN = 480;
-const MANDATES = {
+export const CEO_STRIKES = 3, CEO_COOLDOWN = 480;
+export const MANDATES = {
   visionary: { title: "a visionary", build: 1.1, slow: 1, fee: 1, drain: 1, hype: 20,
     effect: "hype +20, builds cost 10% more (everything is gold-plated)",
     hello: "says the campus is “a cathedral.” Hype +20. The cathedral has marble floors now." },
@@ -259,15 +263,15 @@ const MANDATES = {
     effect: "contracts pay 10% more, builds 20% slower (process)",
     hello: "brought 400 slides of process. Customers love it. Every build needs three more sign-offs." },
 };
-const CEO_NAMES = ["Brentley Vance", "Dana Okafor-Reyes", "Chip Hollister", "Margaux Lindqvist", "Tad Pemberton III", "Priya Castellano", "Rex Moldova"];
-const freshCeo = () => ({ n: 0, strikes: 0, mandate: null, name: "you", lastAt: -1e9 });
-const ceoOf = () => S.p2.ceo;   // created with the campus (startCampus) or on load (migrateCampus)
-const mandate = () => (S.phase === 2 && S.p2 && S.p2.ceo && S.p2.ceo.mandate ? MANDATES[S.p2.ceo.mandate] : null);
-const ceoBuild = () => (mandate() ? mandate().build : 1);
-const ceoSlow = () => (mandate() ? mandate().slow : 1);
-const ceoFee = () => (mandate() ? mandate().fee : 1);
-const ceoDrain = () => (mandate() ? mandate().drain : 1);
-function ceoStrike(why) {
+export const CEO_NAMES = ["Brentley Vance", "Dana Okafor-Reyes", "Chip Hollister", "Margaux Lindqvist", "Tad Pemberton III", "Priya Castellano", "Rex Moldova"];
+export const freshCeo = () => ({ n: 0, strikes: 0, mandate: null, name: "you", lastAt: -1e9 });
+export const ceoOf = () => S.p2.ceo;   // created with the campus (startCampus) or on load (migrateCampus)
+export const mandate = () => (S.phase === 2 && S.p2 && S.p2.ceo && S.p2.ceo.mandate ? MANDATES[S.p2.ceo.mandate] : null);
+export const ceoBuild = () => (mandate() ? mandate().build : 1);
+export const ceoSlow = () => (mandate() ? mandate().slow : 1);
+export const ceoFee = () => (mandate() ? mandate().fee : 1);
+export const ceoDrain = () => (mandate() ? mandate().drain : 1);
+export function ceoStrike(why) {
   if (S.phase !== 2 || !S.p2 || !S.p2.county || (S.p2.model && S.p2.model.endedAt != null)) return;
   const c = ceoOf();
   if (S.t - c.lastAt < CEO_COOLDOWN) return;   // the board just did this; it needs a quarter to forget
@@ -281,7 +285,7 @@ function ceoStrike(why) {
   say(`New CEO, who dis? The board replaced ${old === "you" ? "you (you're “Founder & Chief Vibes Officer” now)" : old} with ${name}, ${MANDATES[k].title}.`);
   say(`${name} ${MANDATES[k].hello}`);
 }
-function renderCeo() {
+export function renderCeo() {
   const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
   $("ceoLine").hidden = !on;
   if (!on) return;

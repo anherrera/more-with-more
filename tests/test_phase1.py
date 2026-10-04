@@ -71,18 +71,18 @@ def test_new_games_start_training_at_half(game):
 def test_clock_waits_for_the_first_click(game):
     pg = game(test=False)
     pg.wait_for_timeout(1200)
-    assert pg.evaluate("() => S.t") == 0
+    assert pg.evaluate("() => game.S.t") == 0
     assert pg.inner_text("#clock").startswith("0:00")
     pg.click("#answer")
     pg.wait_for_timeout(1200)
-    assert pg.evaluate("() => S.t") > 0.5
+    assert pg.evaluate("() => game.S.t") > 0.5
 
 
 def test_saved_games_keep_ticking_without_a_click(game):
     pg = game(MID, test=False)
-    t0 = pg.evaluate("() => S.t")
+    t0 = pg.evaluate("() => game.S.t")
     pg.wait_for_timeout(1200)
-    assert pg.evaluate("() => S.t") > t0
+    assert pg.evaluate("() => game.S.t") > t0
 
 
 def test_answer_is_clickable_before_the_clock_starts_even_with_no_queries(game):
@@ -91,14 +91,14 @@ def test_answer_is_clickable_before_the_clock_starts_even_with_no_queries(game):
     assert pg.is_enabled("#answer")
     pg.click("#answer")
     pg.wait_for_timeout(1500)
-    assert pg.evaluate("() => S.t") > 0.5                                   # the click started the clock: no deadlock
+    assert pg.evaluate("() => game.S.t") > 0.5                                   # the click started the clock: no deadlock
 
 
 def test_speed_param_fast_forwards_play(page, server):
     page.goto(server + "?speed=10")
     page.click("#answer")                               # starts the clock
     page.wait_for_timeout(1000)
-    assert page.evaluate("() => S.t") > 6               # ~10 game-seconds per real second
+    assert page.evaluate("() => game.S.t") > 6               # ~10 game-seconds per real second
 
 
 def test_answer_never_greys_out(game):

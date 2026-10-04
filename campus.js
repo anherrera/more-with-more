@@ -1,7 +1,13 @@
 // campus.js: phase 2, "The Campus". You are an infrastructure company now: sell capacity to labs,
 // then scramble to build it. Phase 2 state lives in S.p2; phase 1 state is read only at handoff.
+import { $, HYPE_TO_RAISE, S, chip, fmt, kwText, milestone, money, mwText, rebuildOn, say, setHtml, time, track } from "./globals.js";
+import { PROJECTS, projectCost } from "./projects.js";
+import { GOAL_MW, extraAcres, freshModel, modelDone, renderModel, stepModel, wireModel } from "./model.js";
+import { DILUTION, dilute, isPublic, renderPublicRaise, stepMarket, wireMarket } from "./market.js";
+import { ceoBuild, ceoFee, ceoSlow, ceoStrike, chooseCard, freshCeo, freshPeople, freshTown, moraleSlow, moratoriumOn, offeredPerks, sponsor, stepPeople, townBuilt, townOf, townSlow, usePerk } from "./people.js";
+import { capKW, gpuPrice, leasedKW, newest, render, rentIndex, spotMult, tradeCount, tradeIn, tradeValue, usedKW } from "./main.js";
 
-const COUNTIES = [
+export const COUNTIES = [
   { id: "cheap", name: "Cheap land, weak grid",
     pitch: "3,000 acres for the price of a parking garage. The grid is two wires and a prayer.",
     gridMW: 50, acres: 3000, queueMW: 100, queueSecs: 300, cash: 0, water: 12, drought: [600, 900], town: 15, rise: 1 },
@@ -12,25 +18,25 @@ const COUNTIES = [
     pitch: "$20M in tax incentives up front. The town already has a Facebook group about you.",
     gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6, water: 10, drought: [600, 900], town: 40, rise: 2 },
 ];
-const MARKET_START_MW = 150, MARKET_CAP_MW = 300;       // leasable colo MW in this market
-const COLO_MW = 20, COLO_RACKS = 240, COLO_SLOT = 35;   // you lease colo in 20 MW blocks (a data hall's worth)
-const COLO_EVERY = [120, 180], COLO_OPENS = [40, 80];   // a new colo opens every 2-3 minutes with 40-80 MW
-const OD_RATE = 300, OD_DECAY = 0.7, OD_FLOOR = 0.15, OD_UTIL = 0.8;   // on-demand $/MW/s for the newest chip; older gens earn less but stay busy
-const P2_RATE = 0.25;     // phase 1 debt is refinanced as project finance at a quarter of the facility's rate
-const HALL = { mw: 50, acres: 20, cost: 10e6, secs: 90 };   // a powered shell: GPUs are bought separately and racked in it
-const POWER = {
+export const MARKET_START_MW = 150, MARKET_CAP_MW = 300;       // leasable colo MW in this market
+export const COLO_MW = 20, COLO_RACKS = 240, COLO_SLOT = 35;   // you lease colo in 20 MW blocks (a data hall's worth)
+export const COLO_EVERY = [120, 180], COLO_OPENS = [40, 80];   // a new colo opens every 2-3 minutes with 40-80 MW
+export const OD_RATE = 300, OD_DECAY = 0.7, OD_FLOOR = 0.15, OD_UTIL = 0.8;   // on-demand $/MW/s for the newest chip; older gens earn less but stay busy
+export const P2_RATE = 0.25;     // phase 1 debt is refinanced as project finance at a quarter of the facility's rate
+export const HALL = { mw: 50, acres: 20, cost: 10e6, secs: 90 };   // a powered shell: GPUs are bought separately and racked in it
+export const POWER = {
   turbine: { name: "gas turbine", mw: 50, cost: 25e6, secs: 60, acres: 0 },
   solar: { name: "solar + batteries", mw: 30, cost: 20e6, secs: 180, acres: 150 },
 };
-const LAND = { acres: 200, cost: 15e6, growth: 1.03 };      // adjacent parcels: each one costs 3% more than the last, like builds
+export const LAND = { acres: 200, cost: 15e6, growth: 1.03 };      // adjacent parcels: each one costs 3% more than the last, like builds
 // Water: every MW of energized hall evaporates cooling water. Measured in million gallons a day (MGD).
-const WATER_PER_MW = 0.01, DROUGHT_CUT = 0.6, DROUGHT_SECS = 180, AQUIFER_DRAIN = 0.05;   // aquifer % per second per well
-const WATER = {
+export const WATER_PER_MW = 0.01, DROUGHT_CUT = 0.6, DROUGHT_SECS = 180, AQUIFER_DRAIN = 0.05;   // aquifer % per second per well
+export const WATER = {
   well: { name: "well", mgd: 2, cost: 15e6, secs: 45, acres: 0 },
   reclaimed: { name: "reclaimed water plant", mgd: 3, cost: 40e6, secs: 120, acres: 0 },
 };
-const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.1, QUEUE_MAX_SECS = 600;   // each request waits 10% longer (everyone is in the queue), up to 10 minutes
-const BUILD_DONE = {
+export const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.1, QUEUE_MAX_SECS = 600;   // each request waits 10% longer (everyone is in the queue), up to 10 minutes
+export const BUILD_DONE = {
   hall: () => `Hall ${doneBuilds("hall")} is up. ` +
     (hallMWAt() > powerAt() ? "It has no power yet. It is a very expensive shed." : "Energized. Rack some GPUs in it."),
   turbine: () => "A gas turbine came online. The neighbors can hear it.",
@@ -38,27 +44,27 @@ const BUILD_DONE = {
   well: () => "A new well is pumping. The aquifer has opinions about this, slowly.",
   reclaimed: () => "The reclaimed water plant is online. Nobody asks where the water was before.",
 };
-const UPFRONT_RATE = 550;    // $ per MW-second of the term, paid when you sign
-const FEE_RATE = 275;        // $ per MW per second while delivered
-const OFFER_TTL = 60;        // offers wait at least this long before walking (spec: never under 45 s)
-const LATE_FREE = 60, LATE_DEFAULT = 180, RENEGOTIATE_SECS = 120, RENEGOTIATE_HYPE = 5;
-const CUSTOMERS = [
+export const UPFRONT_RATE = 550;    // $ per MW-second of the term, paid when you sign
+export const FEE_RATE = 275;        // $ per MW per second while delivered
+export const OFFER_TTL = 60;        // offers wait at least this long before walking (spec: never under 45 s)
+export const LATE_FREE = 60, LATE_DEFAULT = 180, RENEGOTIATE_SECS = 120, RENEGOTIATE_HYPE = 5;
+export const CUSTOMERS = [
   "Your old lab (Parallax is paying)", "A lab funded by Parallax", "PivotCloud, subleasing to its own customers",
   "A sovereign AI fund", "A lab you have never heard of with $4B", "A chatbot company that is also a hardware company",
 ];
 // The most each customer can sign for. ~2 kW per GPU all-in, so $4B buys about 20k GPUs: ~50 MW.
-const CUSTOMER_MAX_MW = {
+export const CUSTOMER_MAX_MW = {
   "Your old lab (Parallax is paying)": 1000, "A lab funded by Parallax": 1500, "PivotCloud, subleasing to its own customers": 300,
   "A sovereign AI fund": 500, "A lab you have never heard of with $4B": 50, "A chatbot company that is also a hardware company": 200,
 };
-const ROUNDS2 = [
+export const ROUNDS2 = [
   { name: "Series E", backlog: 100, campus: 150, amount: 100e6 },   // then the IPO (market.js)
 ];
-const campusRound = () => ROUNDS2[S.p2.round || 0];
+export const campusRound = () => ROUNDS2[S.p2.round || 0];
 // Investors fund build-outs: a round needs signed backlog AND a campus to show for it. Returns what's missing, or null.
-const roundGap = (r) => backlogMW() < r.backlog ? `${mwText(r.backlog)} of signed backlog (have ${mwText(backlogMW())})`
+export const roundGap = (r) => backlogMW() < r.backlog ? `${mwText(r.backlog)} of signed backlog (have ${mwText(backlogMW())})`
   : energizedAt() < r.campus ? `${mwText(r.campus)} of campus (have ${mwText(energizedAt())})` : null;
-function raiseCampus() {
+export function raiseCampus() {
   const r = campusRound();
   if (!r || roundGap(r) || S.hype < HYPE_TO_RAISE) return;
   dilute(DILUTION[r.name], r.amount, r.name);
@@ -66,32 +72,32 @@ function raiseCampus() {
   say(`Closed the ${r.name}: ${money(r.amount)}. The deck said “backlog” eleven times. Most of the backlog is labs funded by Parallax.`);
 }
 
-const freshP2 = () => ({
+export const freshP2 = () => ({
   county: null, market: MARKET_START_MW, nextColo: null, colo: 0, coloN: 0, round: 0, grid: 0, queue: null, queueN: 0, builds: [],
   offers: [], contracts: [], nextOffer: 0, offerN: 0, contractN: 0, earned: 0,
 });
-const countyOf = () => COUNTIES.find((c) => c.id === S.p2.county);
-const doneBuilds = (kind, at = S.t) => S.p2.builds.filter((b) => b.kind === kind && b.done <= at).length;
-const gridAt = (at = S.t) => S.p2.grid + (S.p2.queue && S.p2.queue.done <= at ? S.p2.queue.mw : 0);
-const hallSize = () => (S.done.liquid ? 75 : HALL.mw);            // liquid-cooling standard packs more into each hall
-const turbineMW = () => (S.done.btm ? 70 : POWER.turbine.mw);   // behind-the-meter turbines
-const solarMW = () => (S.done.bifacial ? 50 : POWER.solar.mw);   // panels that catch light on both sides
-const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * turbineMW() + doneBuilds("solar", at) * solarMW();
-const hallMWAt = (at = S.t) => doneBuilds("hall", at) * hallSize();
-const droughtOn = (at = S.t) => !!(S.p2.drought && at < S.p2.drought.until);
-const waterAt = (at = S.t) => countyOf().water * (S.done.disclosewater ? 1.2 : 1) * (droughtOn(at) ? DROUGHT_CUT : 1) + (S.done.golfcourse ? 2 : 0)
+export const countyOf = () => COUNTIES.find((c) => c.id === S.p2.county);
+export const doneBuilds = (kind, at = S.t) => S.p2.builds.filter((b) => b.kind === kind && b.done <= at).length;
+export const gridAt = (at = S.t) => S.p2.grid + (S.p2.queue && S.p2.queue.done <= at ? S.p2.queue.mw : 0);
+export const hallSize = () => (S.done.liquid ? 75 : HALL.mw);            // liquid-cooling standard packs more into each hall
+export const turbineMW = () => (S.done.btm ? 70 : POWER.turbine.mw);   // behind-the-meter turbines
+export const solarMW = () => (S.done.bifacial ? 50 : POWER.solar.mw);   // panels that catch light on both sides
+export const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * turbineMW() + doneBuilds("solar", at) * solarMW();
+export const hallMWAt = (at = S.t) => doneBuilds("hall", at) * hallSize();
+export const droughtOn = (at = S.t) => !!(S.p2.drought && at < S.p2.drought.until);
+export const waterAt = (at = S.t) => countyOf().water * (S.done.disclosewater ? 1.2 : 1) * (droughtOn(at) ? DROUGHT_CUT : 1) + (S.done.golfcourse ? 2 : 0)
   + (S.p2.aquifer > 0 ? doneBuilds("well", at) * WATER.well.mgd : 0) + doneBuilds("reclaimed", at) * WATER.reclaimed.mgd + (S.p2.extraWater || 0);
-const waterMWAt = (at = S.t) => waterAt(at) / (WATER_PER_MW * (S.done.drycooling ? 0.5 : 1));   // dry cooling halves the water per MW
-const energizedAt = (at = S.t) => (S.p2 && S.p2.county ? Math.min(hallMWAt(at), powerAt(at), waterMWAt(at)) : 0);
-const campusKWAt = (at = S.t) => (S.p2 && S.p2.county ? energizedAt(at) * 1000 : 0);
-const coloCost = () => COLO_RACKS * COLO_SLOT * rentIndex();
-function leaseColo() {
+export const waterMWAt = (at = S.t) => waterAt(at) / (WATER_PER_MW * (S.done.drycooling ? 0.5 : 1));   // dry cooling halves the water per MW
+export const energizedAt = (at = S.t) => (S.p2 && S.p2.county ? Math.min(hallMWAt(at), powerAt(at), waterMWAt(at)) : 0);
+export const campusKWAt = (at = S.t) => (S.p2 && S.p2.county ? energizedAt(at) * 1000 : 0);
+export const coloCost = () => COLO_RACKS * COLO_SLOT * rentIndex();
+export function leaseColo() {
   if (!S.p2 || S.p2.market < COLO_MW || S.funds < coloCost()) return;
   S.funds -= coloCost(); S.p2.market -= COLO_MW; S.p2.colo = (S.p2.colo || 0) + COLO_MW * 1000; S.p2.coloN = (S.p2.coloN || 0) + 1;
   track("lease", { ev: "colo", mw: COLO_MW });
   say(`Leased ${mwText(COLO_MW)} of colo space. The landlord asked what you were building. You said \u201cthe future.\u201d`);
 }
-function openColo() {
+export function openColo() {
   const mw = Math.min(MARKET_CAP_MW - S.p2.market, COLO_OPENS[0] + Math.floor(Math.random() * ((COLO_OPENS[1] - COLO_OPENS[0]) / 10 + 1)) * 10);
   S.p2.nextColo = S.t + COLO_EVERY[0] + Math.random() * (COLO_EVERY[1] - COLO_EVERY[0]);
   if (mw <= 0) return;
@@ -99,7 +105,7 @@ function openColo() {
   say(`A new colo opened across town: ${mwText(mw)} available at ${money(coloCost() / (COLO_MW * 1000))}/kW. PivotCloud is already on the phone.`);
 }
 // Which GPUs are under contract: active contracts take MW from the oldest generation they accept, in activation order.
-function freeKWByGen() {
+export function freeKWByGen() {
   const free = {};
   for (const [g, n] of Object.entries(S.fleet)) if (n > 0) free[g] = n * chip(+g).kw;
   const active = S.p2 ? S.p2.contracts.filter((k) => k.status === "active") : [];
@@ -112,21 +118,21 @@ function freeKWByGen() {
   }
   return free;
 }
-const genPrice = (g) => (chip(g).priceMult / chip(g).kw) / (chip(3).priceMult / chip(3).kw);   // rates track each chip's launch price per kW (P4 = 1)
-const odRate = (g) => OD_RATE * genPrice(g) * Math.max(S.done.inference ? OD_FLOOR * 2 : OD_FLOOR, Math.pow(OD_DECAY, S.chipIdx - g));
-const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g) * OD_UTIL, 0) * (S.block ? 0.5 : 1);
-const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
-const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
-const specOf = (kind) => (kind === "hall" ? HALL : POWER[kind] || WATER[kind]);
+export const genPrice = (g) => (chip(g).priceMult / chip(g).kw) / (chip(3).priceMult / chip(3).kw);   // rates track each chip's launch price per kW (P4 = 1)
+export const odRate = (g) => OD_RATE * genPrice(g) * Math.max(S.done.inference ? OD_FLOOR * 2 : OD_FLOOR, Math.pow(OD_DECAY, S.chipIdx - g));
+export const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g) * OD_UTIL, 0) * (S.block ? 0.5 : 1);
+export const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
+export const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
+export const specOf = (kind) => (kind === "hall" ? HALL : POWER[kind] || WATER[kind]);
 // Practice: every finished build of a kind makes the next one 5% quicker, down to 40% of the original time.
-const LEARN = 0.95, LEARN_FLOOR = 0.4;
-const practice = (kind) => Math.max(LEARN_FLOOR, Math.pow(LEARN, S.p2.builds.filter((b) => b.kind === kind && b.done <= S.t).length));
+export const LEARN = 0.95, LEARN_FLOOR = 0.4;
+export const practice = (kind) => Math.max(LEARN_FLOOR, Math.pow(LEARN, S.p2.builds.filter((b) => b.kind === kind && b.done <= S.t).length));
 // How long a build started now takes: base time, prefab halls, practice, and the people slowing it down.
-const buildSecs = (kind) => specOf(kind).secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * practice(kind) * (S.done.secondshift ? 0.75 : 1) * moraleSlow() * townSlow() * ceoSlow();
-const acresUsed = () => S.p2.builds.reduce((a, b) => a + specOf(b.kind).acres, 0);
-const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
-const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0) * (S.done.paytaxes ? 0.8 : 1) * townSlow();   // above 50 opposition, sellers want a premium too   // the county likes taxpayers
-function buyLand() {
+export const buildSecs = (kind) => specOf(kind).secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * practice(kind) * (S.done.secondshift ? 0.75 : 1) * moraleSlow() * townSlow() * ceoSlow();
+export const acresUsed = () => S.p2.builds.reduce((a, b) => a + specOf(b.kind).acres, 0);
+export const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
+export const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0) * (S.done.paytaxes ? 0.8 : 1) * townSlow();   // above 50 opposition, sellers want a premium too   // the county likes taxpayers
+export function buyLand() {
   if (!S.p2.county || S.funds < landCost()) return;
   S.funds -= landCost(); S.p2.landN = (S.p2.landN || 0) + 1;
   track("land", { n: S.p2.landN });
@@ -134,15 +140,15 @@ function buyLand() {
     : `Bought another ${LAND.acres} acres. The county assessor has started waving at you.`);
 }
 // Owning the utility skips the line, but energizing still takes 30 s a request.
-const queueSecs = () => modelDone("utility") ? 30
+export const queueSecs = () => modelDone("utility") ? 30
   : Math.min(QUEUE_MAX_SECS, countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN)) * (modelDone("lobbyist") ? 0.5 : 1) * (S.done.lawyer ? 0.7 : 1);
 
 // Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered,
 // ...until 5x the first one: by then the supply chain has caught up with you.
-const BUILD_GROWTH = 1.03, BUILD_MAX = 5;
-const buildCost = (kind) => specOf(kind).cost * Math.min(BUILD_MAX, Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length)) * ceoBuild();
+export const BUILD_GROWTH = 1.03, BUILD_MAX = 5;
+export const buildCost = (kind) => specOf(kind).cost * Math.min(BUILD_MAX, Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length)) * ceoBuild();
 
-function build(kind) {
+export function build(kind) {
   const spec = specOf(kind);
   const cost = buildCost(kind);
   if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost || (kind === "hall" && moratoriumOn())) return;
@@ -155,7 +161,7 @@ function build(kind) {
     : `Ordered ${spec.name === "gas turbine" ? "a gas turbine" : "a solar farm with batteries"}. Online in ${time(spec.secs)}.`);
 }
 
-function requestQueue() {
+export function requestQueue() {
   if (!S.p2.county || S.p2.queue || S.funds < QUEUE_DEPOSIT) return;
   S.funds -= QUEUE_DEPOSIT;
   S.p2.queue = { mw: countyOf().queueMW, done: S.t + queueSecs() };
@@ -163,7 +169,7 @@ function requestQueue() {
   say(`Joined the interconnection queue for ${mwText(S.p2.queue.mw)}. Estimated wait: ${time(queueSecs())}. The utility says estimates are “non-binding.”`);
 }
 
-function campusLimit() {
+export function campusLimit() {
   const halls = hallMWAt(), pw = powerAt(), wa = waterMWAt();
   if (halls > wa && wa <= pw) return `water: ${mwText(halls - wa)} of halls have no cooling water${droughtOn() ? " (drought)" : ""}. Drill wells, build a reclaimed water plant, or wait out the drought`;
   if (acresFree() < HALL.acres && halls <= pw) return "land: buy the adjacent parcel";
@@ -172,26 +178,26 @@ function campusLimit() {
   return "both: build halls and power together";
 }
 
-const live = (c) => c.status !== "done" && c.status !== "defaulted";
-const deliveredMW = () => S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.mw, 0);
-const backlogMW = () => S.p2.contracts.filter((c) => c.status === "waiting" || c.status === "late").reduce((a, c) => a + c.mw, 0);
-const genName = (g) => (g <= 0 ? "any GPUs" : `${chip(g).name}+ GPUs`);
-const eligibleFreeMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g >= minGen ? kw : 0), 0) / 1000;
-const roomMWAt = (at) => Math.max(0, (leasedKW() + campusKWAt(at) - usedKW()) / 1000);
+export const live = (c) => c.status !== "done" && c.status !== "defaulted";
+export const deliveredMW = () => S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.mw, 0);
+export const backlogMW = () => S.p2.contracts.filter((c) => c.status === "waiting" || c.status === "late").reduce((a, c) => a + c.mw, 0);
+export const genName = (g) => (g <= 0 ? "any GPUs" : `${chip(g).name}+ GPUs`);
+export const eligibleFreeMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g >= minGen ? kw : 0), 0) / 1000;
+export const roomMWAt = (at) => Math.max(0, (leasedKW() + campusKWAt(at) - usedKW()) / 1000);
 // Older chips not under contract: trading them in frees their space for newer ones.
-const tradeableMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g < minGen ? kw : 0), 0) / 1000;
+export const tradeableMW = (minGen) => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + (+g < minGen ? kw : 0), 0) / 1000;
 // The most you could deliver of this generation by the start date: on hand, free room, the lease market and
 // trade-ins. Empty land doesn't count: halls also need power, water, money and build time.
-const deliverableMW = (minGen) => eligibleFreeMW(minGen) + roomMWAt(S.t) + Math.max(0, S.p2.market) + tradeableMW(minGen);
+export const deliverableMW = (minGen) => eligibleFreeMW(minGen) + roomMWAt(S.t) + Math.max(0, S.p2.market) + tradeableMW(minGen);
 // Signed contracts that get GPUs before this one: for a signed contract, those ahead of it in line;
 // for an offer (last in line if signed), everything that starts during its term.
-const pendingBefore = (o) => S.p2.contracts
+export const pendingBefore = (o) => S.p2.contracts
   .filter((c) => (c.status === "waiting" || c.status === "late") && c.id !== o.id &&
     (o.end != null ? c.start < o.start || (c.start === o.start && c.n < o.n) : c.start < o.start + o.term))
   .reduce((a, c) => a + c.mw, 0);
 
 // What it takes to add `mw` of energized campus: halls, power and water on top of what's built or coming.
-function buildPlan(mw) {
+export function buildPlan(mw) {
   if (!S.p2.county) return { ok: false };
   const halls = Math.ceil(Math.max(0, mw) / hallSize()), hallsMW = hallMWAt(Infinity) + halls * hallSize();
   const turbines = Math.ceil(Math.max(0, hallsMW - powerAt(Infinity)) / turbineMW());
@@ -204,10 +210,10 @@ function buildPlan(mw) {
 }
 
 // Green: covered. Amber: you have to act (buy GPUs, trade in first). Red: short of space.
-const forecastClass = (f) => (!f.ok ? "bad" : f.kind === "hand" ? "good" : "hot");
+export const forecastClass = (f) => (!f.ok ? "bad" : f.kind === "hand" ? "good" : "hot");
 
 // Can you deliver this? From GPUs on hand, by buying GPUs into space you'll have, or not without more space.
-function forecast(o) {
+export function forecast(o) {
   const eligible = eligibleFreeMW(o.minGen), pending = pendingBefore(o), onHand = eligible - pending;
   if (onHand >= o.mw) return { ok: true, kind: "hand", text: `✓ ${mwText(o.mw)} of ${genName(o.minGen)} on hand.` };
   const buy = o.mw - Math.max(0, onHand);
@@ -231,7 +237,7 @@ function forecast(o) {
   return { ok: false, kind: "space", short, text: `Short ${mwText(short - trade)} of space: lease or build${trade > 0 ? ", or trade in older chips" : ""}.` };
 }
 
-function makeOffer(first = false) {
+export function makeOffer(first = false) {
   const n = ++S.p2.offerN;
   const scale = Math.max(20, 0.3 * (usedKW() / 1000 + 40)) * (S.done.vp ? 1.2 : 1);
   const minGen = first ? 0 : Math.max(0, S.chipIdx - (Math.random() < 0.4 ? 1 : 0));   // labs want current chips
@@ -246,7 +252,7 @@ function makeOffer(first = false) {
   track("contract", { ev: "offer", mw });
 }
 
-function acceptOffer(id) {
+export function acceptOffer(id) {
   const i = S.p2.offers.findIndex((o) => o.id === id);
   if (i < 0) return;
   const o = S.p2.offers.splice(i, 1)[0];
@@ -259,12 +265,12 @@ function acceptOffer(id) {
     (forecast({ ...o, id: `c${n}` }).ok ? "You have the capacity." : "You do not have the capacity yet. Nobody asked."));
 }
 
-function declineOffer(id) {
+export function declineOffer(id) {
   S.p2.offers = S.p2.offers.filter((o) => o.id !== id);
   track("contract", { ev: "decline" });
 }
 
-function renegotiate(id) {
+export function renegotiate(id) {
   const c = S.p2.contracts.find((x) => x.id === id);
   if (!c || c.reneg || (c.status !== "waiting" && c.status !== "late")) return;
   const term = c.end - c.start;
@@ -276,7 +282,7 @@ function renegotiate(id) {
 }
 
 // If GPUs under an active contract disappear (trade-ins, re-rated chips), the contract goes late again with a fresh clock.
-function recheckActive() {
+export function recheckActive() {
   const free = {};
   for (const [g, n] of Object.entries(S.fleet)) if (n > 0) free[g] = n * chip(+g).kw;
   const active = S.p2.contracts.filter((k) => k.status === "active").sort((a, b) => (a.activeAt || 0) - (b.activeAt || 0) || a.n - b.n);
@@ -296,12 +302,12 @@ function recheckActive() {
 
 // Campus expansion robots: every 10 s, if cash allows, build whichever is short: halls, water or power. They read the
 // room: once the town is restless (40+) they put up quiet solar instead of loud turbines, if there's land for it.
-const ROBOT_EVERY = 10, ROBOT_RESERVE = 50e6;
+export const ROBOT_EVERY = 10, ROBOT_RESERVE = 50e6;
 // What the robots would build next, and whether they can: { kind, blocked } where blocked names the reason.
 // What a contract still needs, after the contracts ahead of it in line take their share.
-const contractNeed = (c) => Math.max(0, c.mw - Math.max(0, eligibleFreeMW(c.minGen || 0) - pendingBefore(c)));
+export const contractNeed = (c) => Math.max(0, c.mw - Math.max(0, eligibleFreeMW(c.minGen || 0) - pendingBefore(c)));
 // The soonest contract (due within 5 minutes) that won't have room for its GPUs in time: { c, short }.
-function urgentRoom() {
+export function urgentRoom() {
   const due = S.p2.contracts.filter((c) => (c.status === "waiting" || c.status === "late") && c.start - S.t < 300).sort((a, b) => a.start - b.start);
   let need = 0;
   for (const c of due) {
@@ -311,7 +317,7 @@ function urgentRoom() {
   }
   return null;
 }
-function robotPlan() {
+export function robotPlan() {
   const halls = S.p2.builds.filter((b) => b.kind === "hall").length * hallSize();
   const power = S.p2.grid + (S.p2.queue ? S.p2.queue.mw : 0) + S.p2.builds.filter((b) => b.kind === "turbine").length * turbineMW()
     + S.p2.builds.filter((b) => b.kind === "solar").length * solarMW();
@@ -329,8 +335,8 @@ function robotPlan() {
 }
 // Up to four moves per tick: buy land when they're out, energize from your utility when power is short,
 // otherwise build whatever the plan says. They stop at their cash reserve (or at zero when a deadline is near).
-const ROBOT_MOVES = 4;
-function stepRobots() {
+export const ROBOT_MOVES = 4;
+export function stepRobots() {
   if (!S.done.robots || S.t < (S.p2.robotsAt || 0)) return;
   S.p2.robotsAt = S.t + ROBOT_EVERY;
   for (let i = 0; i < ROBOT_MOVES; i++) {
@@ -348,7 +354,7 @@ function stepRobots() {
   }
 }
 
-function stepContracts(dt) {
+export function stepContracts(dt) {
   recheckActive();
   for (const c of [...S.p2.contracts].sort((a, b) => a.start - b.start || a.n - b.n)) {
     if (c.status === "active") {
@@ -383,11 +389,11 @@ function stepContracts(dt) {
   S.p2.contracts = S.p2.contracts.filter((c) => live(c) || S.t - c.end < 60);
 }
 
-const campusDrawSize = () => (S.hype / 100) * Math.max(backlogMW(), 10) * 300000 * (S.done.securitize ? 1.5 : 1);   // lenders size on signed backlog
-const campusDealSize = () => 20000 / newest().kw * gpuPrice();   // Parallax credits: about 20 MW of the newest GPUs
+export const campusDrawSize = () => (S.hype / 100) * Math.max(backlogMW(), 10) * 300000 * (S.done.securitize ? 1.5 : 1);   // lenders size on signed backlog
+export const campusDealSize = () => 20000 / newest().kw * gpuPrice();   // Parallax credits: about 20 MW of the newest GPUs
 
 // Saves from before chip generations mattered: default missing fields.
-function migrateCampus() {
+export function migrateCampus() {
   if (!S.p2.model) S.p2.model = freshModel();
   if (!S.p2.people) S.p2.people = freshPeople();
   if (!S.p2.ceo) S.p2.ceo = freshCeo();
@@ -397,7 +403,7 @@ function migrateCampus() {
   for (const x of [...S.p2.offers, ...S.p2.contracts]) if (x.minGen == null) x.minGen = 0;
 }
 
-function startCampus() {
+export function startCampus() {
   if (S.phase === 2) return;
   S.phase = 2; S.p2 = freshP2(); S.p2.startChip = S.chipIdx; S.p2.model = freshModel(); S.p2.people = freshPeople(); S.p2.ceo = freshCeo();
   milestone("phase 2: the campus");
@@ -406,7 +412,7 @@ function startCampus() {
   if (S.debt > 0) say(`Lenders love infrastructure. Your ${money(S.debt)} was refinanced as project finance at a quarter of the rate.`);
 }
 
-function chooseCounty(id) {
+export function chooseCounty(id) {
   const c = COUNTIES.find((x) => x.id === id);
   if (!c || S.p2.county) return;
   S.p2.county = c.id; S.p2.grid = c.gridMW; S.funds += c.cash; S.p2.town = freshTown(); offeredPerks();
@@ -416,9 +422,9 @@ function chooseCounty(id) {
   say("Your old lab spun out. It wants 30 MW in five minutes. Parallax is paying for it, which means Parallax is paying you.");
 }
 
-const campusRevenue = () => (S.p2 ? S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) + onDemandRevenue() : 0);
+export const campusRevenue = () => (S.p2 ? S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) + onDemandRevenue() : 0);
 
-function stepCampus(dt) {
+export function stepCampus(dt) {
   S.funds += onDemandRevenue() * dt;
   if (!S.p2.county) return;
   const q = S.p2.queue;
@@ -450,13 +456,13 @@ function stepCampus(dt) {
   stepModel();
 }
 
-const campusSnap = () => ({ county: S.p2.county, fleetMW: Math.round(usedKW() / 1000), leasedMW: Math.round(leasedKW() / 1000), market: Math.round(S.p2.market), grid: S.p2.grid, queue: !!S.p2.queue,
+export const campusSnap = () => ({ county: S.p2.county, fleetMW: Math.round(usedKW() / 1000), leasedMW: Math.round(leasedKW() / 1000), market: Math.round(S.p2.market), grid: S.p2.grid, queue: !!S.p2.queue,
   halls: doneBuilds("hall"), turbines: doneBuilds("turbine"), solar: doneBuilds("solar"),
   energizedMW: energizedAt(), acresFree: acresFree(),
   deliveredMW: deliveredMW(), backlogMW: backlogMW(), offers: S.p2.offers.length,
   late: S.p2.contracts.filter((c) => c.status === "late").length, earned: Math.round(S.p2.earned) });
 
-function renderCampus() {
+export function renderCampus() {
   const p = S.p2;
   $("coloLine").textContent = `Colo market: ${mwText(Math.max(0, p.market))} available` +
     (p.nextColo ? ` \u00b7 next colo opens in ~${time(Math.max(0, p.nextColo - S.t))}` : "");
@@ -558,8 +564,8 @@ function renderCampus() {
 }
 
 // The fleet by chip generation: what can serve new contracts, and what is old and only earns on-demand.
-const contractReady = (g) => g >= S.chipIdx - 1;   // offers ask for the newest chip or one behind
-function renderFleet() {
+export const contractReady = (g) => g >= S.chipIdx - 1;   // offers ask for the newest chip or one behind
+export function renderFleet() {
   const free = freeKWByGen();
   const gens = Object.keys(S.fleet).map(Number).filter((g) => S.fleet[g] > 0).sort((a, b) => b - a);
   const kwOf = (g) => S.fleet[g] * chip(g).kw;
@@ -592,7 +598,7 @@ function renderFleet() {
 }
 
 // The single most useful thing to do right now, in plain words.
-function nextMove() {
+export function nextMove() {
   const first = (who) => who.split(" (")[0];
   const cap = (x) => x[0].toUpperCase() + x.slice(1);
   // What a contract still needs, after the contracts ahead of it in line take their share.
@@ -642,7 +648,7 @@ function nextMove() {
   return "Wait for offers. Post to keep hype up: raises and debt draws need it.";
 }
 
-function renderContracts() {
+export function renderContracts() {
   const p = S.p2;
   $("nextMove").textContent = `Next: ${nextMove()}`;
   $("countLabel").textContent = "Delivered";
@@ -707,11 +713,11 @@ function renderContracts() {
 }
 
 // Phase 2's share of the screen, after the company panels (renderCompany in main.js).
-function renderCampusPhase() { $("ending").hidden = true; renderCampus(); }
+export function renderCampusPhase() { $("ending").hidden = true; renderCampus(); }
 // The Investors panel's notes and buttons, dressed for an infrastructure company.
-const roundNoteCampus = () => { const nr = campusRound(); return nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${mwText(nr.backlog)} backlog` : isPublic() ? `follow-ons at ${HYPE_TO_RAISE}` : `IPO at ${HYPE_TO_RAISE}`; };
-const spotLineCampus = (m) => `${money(OD_RATE * genPrice(S.chipIdx) * m)}/MW-s for ${newest().name}s (${m.toFixed(1)}x on-demand)`;
-function renderRaiseCampus() {
+export const roundNoteCampus = () => { const nr = campusRound(); return nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${mwText(nr.backlog)} backlog` : isPublic() ? `follow-ons at ${HYPE_TO_RAISE}` : `IPO at ${HYPE_TO_RAISE}`; };
+export const spotLineCampus = (m) => `${money(OD_RATE * genPrice(S.chipIdx) * m)}/MW-s for ${newest().name}s (${m.toFixed(1)}x on-demand)`;
+export function renderRaiseCampus() {
   const r = campusRound();
   if (!r) return renderPublicRaise();
   const gap = roundGap(r);
@@ -720,7 +726,7 @@ function renderRaiseCampus() {
   $("raise").disabled = !!gap || S.hype < HYPE_TO_RAISE;
 }
 
-function wireCampus() {
+export function wireCampus() {
   wireModel();
   wireMarket();
   $("vendors").addEventListener("click", (e) => { const b = e.target.closest("button[data-vendor]"); if (b) { pickVendor(b.dataset.vendor); render(); } });
@@ -754,7 +760,7 @@ function wireCampus() {
 }
 
 // ---------- server vendors (phase 2): who racks your GPUs. Made up; any resemblance is a supply-chain coincidence. ----------
-const VENDORS = [
+export const VENDORS = [
   { id: "monolith", name: "Monolith Systems", price: 1, fire: 1, leak: 1, blurb: "list price",
     quip: "Monolith Systems it is. The racks come with a 900-page manual and a sales rep who calls on Sundays." },
   { id: "gridiron", name: "Gridiron Server Co.", price: 0.85, fire: 0.6, leak: 0.7, blurb: "15% off, more fires",
@@ -763,18 +769,18 @@ const VENDORS = [
     quip: "Switched to Nimbus Assembly. Each rack ships with a white-glove technician who will not stop talking about torque specs." },
 ];
 // fire/leak are multipliers on the time between incidents: below 1 means more often.
-const vendorOf = () => (S.phase === 2 && S.p2 && VENDORS.find((v) => v.id === S.p2.vendor)) || VENDORS[0];
-function pickVendor(id) {
+export const vendorOf = () => (S.phase === 2 && S.p2 && VENDORS.find((v) => v.id === S.p2.vendor)) || VENDORS[0];
+export function pickVendor(id) {
   if (S.phase !== 2 || !VENDORS.some((v) => v.id === id) || vendorOf().id === id) return;
   S.p2.vendor = id;
   track("vendor", { id });
   say(vendorOf().quip);
 }
 // Campus buttons: name and price on top, the details underneath.
-function buildBtn(id, name, cost, detail) {
+export function buildBtn(id, name, cost, detail) {
   setHtml(id, `<span class="t">${name}${cost != null ? ": " + money(cost) : ""}</span><span class="c">${detail}</span>`);
 }
-function renderVendors() {
+export function renderVendors() {
   const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
   $("vendorRow").hidden = !on;
   if (!on) return;

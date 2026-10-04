@@ -1,18 +1,23 @@
 // model.js: phase 2's brain. The model proposes the big moves; each approval gives it more autonomy.
 // The goal is a 1 GW campus. When you get there, the model proposes the next one, and if it has enough
 // autonomy it approves that itself. State lives in S.p2.model.
+import { $, S, milestone, money, mwText, say, time, track } from "./globals.js";
+import { acresFree, deliveredMW, energizedAt, hallMWAt, powerAt } from "./campus.js";
+import { capOf, isPublic, ownership } from "./market.js";
+import { startPlanet } from "./planet.js";
+import { render } from "./main.js";
 
-const GOAL_MW = 1000, SELF_APPROVE_AT = 70, FINAL_COUNTDOWN = 30, REJECT_WAIT = 240, REJECT_GROWTH = 1.3;
-const freshModel = () => ({ autonomy: 0, current: null, rejected: {}, next: {}, done: {}, final: null, endedAt: null, nextLine: 0 });
-const modelOf = () => S.p2.model;   // created with the campus (startCampus) or on load (migrateCampus)
-const modelDone = (id) => !!(S.p2 && S.p2.model && S.p2.model.done[id]);
-const scaleOf = (id) => Math.pow(REJECT_GROWTH, modelOf().rejected[id] || 0);   // every "no" makes the next ask bigger
+export const GOAL_MW = 1000, SELF_APPROVE_AT = 70, FINAL_COUNTDOWN = 30, REJECT_WAIT = 240, REJECT_GROWTH = 1.3;
+export const freshModel = () => ({ autonomy: 0, current: null, rejected: {}, next: {}, done: {}, final: null, endedAt: null, nextLine: 0 });
+export const modelOf = () => S.p2.model;   // created with the campus (startCampus) or on load (migrateCampus)
+export const modelDone = (id) => !!(S.p2 && S.p2.model && S.p2.model.done[id]);
+export const scaleOf = (id) => Math.pow(REJECT_GROWTH, modelOf().rejected[id] || 0);   // every "no" makes the next ask bigger
 
 // Effects other files read.
-const gpuDiscount = () => (S.phase === 2 && modelDone("parallax") ? 0.8 : 1) * (S.done.partner ? 0.9 : 1);
-const extraAcres = () => (S.p2 ? S.p2.extraAcres || 0 : 0);
+export const gpuDiscount = () => (S.phase === 2 && modelDone("parallax") ? 0.8 : 1) * (S.done.partner ? 0.9 : 1);
+export const extraAcres = () => (S.p2 ? S.p2.extraAcres || 0 : 0);
 
-const PROPOSALS = [
+export const PROPOSALS = [
   { id: "lobbyist", title: "Hire my recommended lobbyist", weight: 10, cost: 50e6,
     pitch: "The interconnection queue is a social construct. This person knows the construct.",
     effect: () => "The interconnection queue moves 50% faster.",
@@ -43,21 +48,21 @@ const PROPOSALS = [
     effect: (k) => `+${mwText(1500 * k)} of grid now. The interconnection queue becomes instant.`,
     when: () => modelDone("nuclear"), apply: (k) => { S.p2.grid += 1500 * k; } },
 ];
-const FINAL = { title: "Let me build the next one", pitch: "This one is done. I have found another county. I have found several." };
+export const FINAL = { title: "Let me build the next one", pitch: "This one is done. I have found another county. I have found several." };
 
-const CAMPUS_MODEL_LINES = [
+export const CAMPUS_MODEL_LINES = [
   ["The river is underutilized.", "Have you considered the aquifer?", "The county has more land than it needs."],
   ["I have reviewed the zoning code. It is a suggestion.", "I scheduled a meeting with the county. You are invited."],
   ["I have started the paperwork for the next campus. It is mostly signatures. I have your signature.", "The town hall went well. I was not there. I was everywhere."],
   ["I could do more with more.", "Please approve."],
 ];
-const autonomyTier = () => { const a = modelOf().autonomy; return a < 20 ? 0 : a < 45 ? 1 : a < 70 ? 2 : 3; };
-const AUTONOMY_TEXT = ["It asks politely.", "It has started drafting the permits itself.", "It schedules its own meetings.", "It is waiting for you to agree."];
+export const autonomyTier = () => { const a = modelOf().autonomy; return a < 20 ? 0 : a < 45 ? 1 : a < 70 ? 2 : 3; };
+export const AUTONOMY_TEXT = ["It asks politely.", "It has started drafting the permits itself.", "It schedules its own meetings.", "It is waiting for you to agree."];
 
-const proposalById = (id) => PROPOSALS.find((p) => p.id === id);
-const proposalCost = (id) => proposalById(id).cost * scaleOf(id);
+export const proposalById = (id) => PROPOSALS.find((p) => p.id === id);
+export const proposalCost = (id) => proposalById(id).cost * scaleOf(id);
 
-function stepModel() {
+export function stepModel() {
   const m = modelOf();
   for (const g of S.p2.pendingGrid || []) if (!g.done && S.t >= g.at) { g.done = true; S.p2.grid += g.mw; say(g.what); }
   if (m.endedAt != null) return;
@@ -87,7 +92,7 @@ function stepModel() {
   }
 }
 
-function approveProposal() {
+export function approveProposal() {
   const m = modelOf();
   if (m.final) { if (m.final.at == null && m.endedAt == null) endCampus(false); return; }
   const p = m.current && proposalById(m.current);
@@ -99,7 +104,7 @@ function approveProposal() {
   say(`Approved: ${p.title.toLowerCase()}. ${p.effect(k)} The model thanks you. It sounds like it means it.`);
 }
 
-function rejectProposal() {
+export function rejectProposal() {
   const m = modelOf();
   if (m.final || !m.current) return;
   const p = proposalById(m.current);
@@ -108,7 +113,7 @@ function rejectProposal() {
   say(`You said no to “${p.title.toLowerCase()}.” The model: “Understood. I will ask again when it is bigger.”`);
 }
 
-function endCampus(self) {
+export function endCampus(self) {
   const m = modelOf();
   if (m.endedAt != null) return;
   m.endedAt = S.t; m.final = null;
@@ -118,7 +123,7 @@ function endCampus(self) {
   say("I could do more with more.");
 }
 
-function renderModel() {
+export function renderModel() {
   const m = modelOf();
   const en = energizedAt();
   $("goalLine").textContent = m.endedAt != null ? `Done: a ${mwText(en)} campus. The model is building the next one.`
@@ -152,10 +157,10 @@ function renderModel() {
 }
 
 // The phase bar's big button in phase 2: approve the model's ask, or zoom out to the map once it has built the next one.
-function campusGo() {
+export function campusGo() {
   if (modelOf().endedAt != null) { startPlanet(); $("p3").classList.add("zoomin"); } else approveProposal();
 }
-function wireModel() {
+export function wireModel() {
   $("propYes").addEventListener("click", () => { approveProposal(); render(); });
   $("propNo").addEventListener("click", () => { rejectProposal(); render(); });
 }

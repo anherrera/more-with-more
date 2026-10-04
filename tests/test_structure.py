@@ -6,11 +6,27 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCRIPTS = ["globals.js", "projects.js", "campus.js", "model.js", "market.js", "fires.js", "people.js", "planet.js", "hud.js", "main.js"]
 
 
-def test_scripts_load_in_order():
+def test_the_module_graph_loads_from_one_entry(game):
     html = (ROOT / "index.html").read_text()
-    srcs = re.findall(r'<script src="([^"]+)"></script>', html)
-    assert srcs == SCRIPTS
+    assert re.findall(r'<script[^>]*src="([^"]+)"', html) == ["main.js"]
+    assert '<script type="module" src="main.js"></script>' in html
     assert not re.search(r"<script>\s*\S", html), "no inline script code left in index.html"
+    for f in SCRIPTS:
+        src = (ROOT / f).read_text()
+        assert "\nexport " in src, f
+        assert f == "globals.js" or re.search(r'^import \{[^}]+\} from "\./\w+\.js";', src, re.M), f
+    pg = game()                                                       # the page fixture fails the test on any page error
+    assert pg.evaluate("() => Object.isFrozen(window.game) && typeof window.game.step === 'function' && typeof window.game.S === 'object'")
+
+
+def test_the_debug_surface_is_explicit_and_nothing_leaks_without_it(game):
+    pg = game(test=False)
+    assert pg.evaluate("() => ['S', 'step', 'render', 'claim', 'fresh', 'PHASES'].every((n) => !(n in window))")
+    assert pg.evaluate("() => ['S', 'step', 'render', 'claim', 'fresh', 'PHASES', 'MIGRATIONS', 'NICE', 'TECH'].every((n) => n in window.game)")
+    pg2 = game()
+    assert pg2.evaluate("() => S === window.game.S && window.game.S === window.game.S")
+    pg2.evaluate("() => { S = fresh(); S.funds = 42; }")               # a reset through the surface reaches every module
+    assert pg2.evaluate("() => [window.game.S.funds, S.funds]") == [42, 42]
 
 
 def test_globals_exposed(game):

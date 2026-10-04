@@ -1,10 +1,16 @@
 // projects.js: every project in the game. Phase 2 projects carry phase: 2.
 // A cost can be a number or a function (priced for where you are in the game).
-const projectCost = (p) => (typeof p.cost === "function" ? p.cost() : p.cost);
+import { GROUND_KW, S, fmt } from "./globals.js";
+import { acresUsed, backlogMW, doneBuilds } from "./campus.js";
+import { isPublic } from "./market.js";
+import { firesOf, leaksOf } from "./fires.js";
+import { townOf } from "./people.js";
+import { endPhase, usedKW } from "./main.js";
+export const projectCost = (p) => (typeof p.cost === "function" ? p.cost() : p.cost);
 // Phase 1 prices that grow with the model generation, capped at the phase 2 price.
-const scaledCost = (k, full) => () => (S.phase === 2 ? full : Math.min(full, k * Math.pow(5, S.gen)));
+export const scaledCost = (k, full) => () => (S.phase === 2 ? full : Math.min(full, k * Math.pow(5, S.gen)));
 // ---------- projects ----------
-const PROJECTS = [
+export const PROJECTS = [
   { id: "dynprice", title: "Dynamic pricing", desc: "The price sets itself to wherever demand meets capacity.", cost: 250,
     when: () => S.gen >= 1, buy: () => {} },
   { id: "hands", title: "Remote hands", desc: "Someone at the colo swaps dead GPUs for you. Bills in 15-minute increments.", cost: 3000,

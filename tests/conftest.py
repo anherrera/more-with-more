@@ -53,6 +53,9 @@ def page(browser):
     assert not pg.errors, pg.errors
 
 
+# The game is ES modules: nothing is global. In ?test mode main.js mirrors every module export onto window (the same
+# names window.game carries), so tests and the robots in tools/ drive it with bare names: S, step(), render(), claim()...
+# A page opened without ?test only has window.game.
 @pytest.fixture
 def game(page, server):
     def open_game(state=None, test=True):
@@ -63,6 +66,7 @@ def game(page, server):
                    f"localStorage.setItem('more-with-more-v1', {json.dumps(json.dumps(state))}); }}")
         page.add_init_script(js)
         page.goto(server + ("?test" if test else ""))
+        assert page.evaluate("() => typeof window.game === 'object'")
         return page
     return open_game
 

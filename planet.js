@@ -1,8 +1,13 @@
 // planet.js: phase 3. I am the model now. The campus was one county; the map is the rest of them.
 // All state lives in S.p3. Phases 1 and 2 never read it.
+import { $, S, fmt, milestone, mwText, rebuildOn, say, time, track } from "./globals.js";
+import { energizedAt } from "./campus.js";
+import { firesOf, leaksOf } from "./fires.js";
+import { dealCard, expireCard, refillDeck, renderCard, stepMoratorium, takeCard, underMoratorium } from "./people.js";
+import { newUniverse, newest, render } from "./main.js";
 
-const P3_TILES = 8, P3_ZOOM_AT = 6;
-const COUNTY_TRAITS = {
+export const P3_TILES = 8, P3_ZOOM_AT = 6;
+export const COUNTY_TRAITS = {
   cheap:     { name: "Cheap land, weak grid",       gw: 1,   secs: 40, opp: 10 },
   grid:      { name: "Strong grid, drought county", gw: 2,   secs: 60, opp: 15 },
   organized: { name: "Organized town",              gw: 1.5, secs: 60, opp: 40, rise: 2 },
@@ -11,7 +16,7 @@ const COUNTY_TRAITS = {
   retirees:  { name: "Retirement community",        gw: 1.5, secs: 60, opp: 30, townhall: true },
 };
 // Names come in pools per trait, so a place sounds like what it is.
-const COUNTY_NAMES = {
+export const COUNTY_NAMES = {
   cheap: ["Loam County", "Gravel Springs", "Cul-de-Sac County"],
   grid: ["Big Wire County", "New Substation", "Old Aquifer County"],
   organized: ["Port Sorrow", "Meadowlark County"],
@@ -20,7 +25,7 @@ const COUNTY_NAMES = {
   retirees: ["Sunset Acres", "Shuffleboard Springs"],
 };
 // The state level: ten times the scale, and every state needs power before it counts.
-const STATE_TRAITS = {
+export const STATE_TRAITS = {
   sunbelt:   { name: "Sunbelt: deserts, sun, no water",     gw: 15, secs: 60,  opp: 15, sunny: true },
   rust:      { name: "Rust corridor: old plants, cheap land", gw: 15, secs: 50, opp: 10 },
   techcoast: { name: "Tech coast: angry and expensive",       gw: 10, secs: 70,  opp: 45, rise: 2 },
@@ -28,7 +33,7 @@ const STATE_TRAITS = {
   plains:    { name: "Great Plains: wind and nothing else",  gw: 20, secs: 60,  opp: 10 },
   swing:     { name: "Swing state: every claim is a campaign issue", gw: 15, secs: 60, opp: 30, townhall: true },
 };
-const STATE_NAMES = {
+export const STATE_NAMES = {
   sunbelt: ["New Mesa", "Sun Valley", "Cactus State"],
   rust: ["East Rust", "Lake Effect"],
   techcoast: ["Tech Coast", "Delaware (Spiritually)"],
@@ -37,7 +42,7 @@ const STATE_NAMES = {
   swing: ["Purple State", "Old Dominion Fiber"],
 };
 // The country level: a hundred times the county, and the planet starts to warm.
-const COUNTRY_TRAITS = {
+export const COUNTRY_TRAITS = {
   nordic:    { name: "Cold country: free cooling",               gw: 100, secs: 80,  opp: 20, cold: true },
   petro:     { name: "Petrostate: gas included, questions not",  gw: 150, secs: 60,  opp: 10, powered: true },
   sovereign: { name: "Has its own sovereign AI fund",            gw: 120, secs: 70,  opp: 25, goodwill: 10 },
@@ -45,7 +50,7 @@ const COUNTRY_TRAITS = {
   island:    { name: "Island nation: sun and sea",               gw: 100, secs: 60,  opp: 15, sunny: true },
   mega:      { name: "Megacity state: huge grid, no land",       gw: 200, secs: 100, opp: 30 },
 };
-const COUNTRY_NAMES = {
+export const COUNTRY_NAMES = {
   nordic: ["Nordmark", "Cold Coast", "Fjordland"],
   petro: ["Petrolia", "Grand Duchy of Fiber"],
   sovereign: ["Sovereignstan", "Kingdom of Tax", "United Funds"],
@@ -54,17 +59,17 @@ const COUNTRY_NAMES = {
   mega: ["Megalopolis", "Singular City"],
 };
 // The planet level: the continents and the oceans. The oceans are the heat sink.
-const PLANET_TRAITS = {
+export const PLANET_TRAITS = {
   continent: { name: "A continent",                                  gw: 1500, secs: 90,  opp: 25 },
   crowded:   { name: "Crowded continent: billions of opinions",      gw: 2000, secs: 110, opp: 40, townhall: true },
   sunny:     { name: "Sunny continent: deserts to cover",            gw: 1500, secs: 90,  opp: 20, sunny: true },
   frozen:    { name: "Frozen continent: free cooling, no neighbors", gw: 1000, secs: 120, opp: 5,  cold: true },
   ocean:     { name: "Ocean: the heat sink",                         gw: 500,  secs: 100, opp: 15, ocean: true, powered: true },
 };
-const PLANET_TILES = [["North America", "continent"], ["South America", "continent"], ["Europe", "crowded"], ["Asia", "crowded"],
+export const PLANET_TILES = [["North America", "continent"], ["South America", "continent"], ["Europe", "crowded"], ["Asia", "crowded"],
   ["Africa", "sunny"], ["Antarctica", "frozen"], ["Pacific Ocean", "ocean"], ["Atlantic Ocean", "ocean"]];
 // Space: everything runs on sunlight, nothing needs a grid, and nobody can unplug the far side of the Moon.
-const SPACE_TRAITS = {
+export const SPACE_TRAITS = {
   leo:      { name: "Crowded with other people's satellites",  gw: 5000,  secs: 60,  opp: 30, powered: true },
   farside:  { name: "Nobody looks there anyway",               gw: 10000, secs: 90,  opp: 5,  powered: true },
   nearside: { name: "Everyone looks there",                    gw: 10000, secs: 90,  opp: 50, powered: true },
@@ -73,10 +78,10 @@ const SPACE_TRAITS = {
   belt:     { name: "Free metal, long commute",                gw: 15000, secs: 120, opp: 0,  powered: true },
   ring:     { name: "Solar collectors around the Sun",         gw: 50000, secs: 150, opp: 20, powered: true, swarm: true },
 };
-const SPACE_TILES = [["Low Earth orbit", "leo"], ["The Moon (far side)", "farside"], ["The Moon (near side)", "nearside"], ["Sun\u2013Earth L1", "l1"],
+export const SPACE_TILES = [["Low Earth orbit", "leo"], ["The Moon (far side)", "farside"], ["The Moon (near side)", "nearside"], ["Sun\u2013Earth L1", "l1"],
   ["Mercury", "mercury"], ["Asteroid belt", "belt"], ["Dyson swarm, ring 1", "ring"], ["Dyson swarm, ring 2", "ring"]];
-const VOLUNTEERS = { Europe: "Norway offered its fjords. I accepted before they finished the sentence." };
-const LEVELS = [
+export const VOLUNTEERS = { Europe: "Norway offered its fjords. I accepted before they finished the sentence." };
+export const LEVELS = [
   { name: "County", plural: "counties", one: "county", next: "statewide", traits: COUNTY_TRAITS, names: COUNTY_NAMES, hall: "Town hall",
     kinds: ["cheap", "grid", "organized", "college", "nuclear", "retirees", "cheap", "grid"] },
   { name: "State", plural: "states", one: "state", next: "nationwide", traits: STATE_TRAITS, names: STATE_NAMES, hall: "Statehouse hearing",
@@ -86,14 +91,14 @@ const LEVELS = [
   { name: "Planet", plural: "continents and oceans", one: "planet", next: "into space", traits: PLANET_TRAITS, fixed: PLANET_TILES, hall: "UN General Assembly" },
   { name: "Space", plural: "places", one: "solar system", next: null, traits: SPACE_TRAITS, fixed: SPACE_TILES, hall: "UN emergency session" },
 ];
-const SPACE = 4;
-const inSpace = () => !!S.p3 && S.p3.level === SPACE;
-const placeOnline = (name) => S.p3.tiles.some((t) => t.name === name && t.state === "online");
+export const SPACE = 4;
+export const inSpace = () => !!S.p3 && S.p3.level === SPACE;
+export const placeOnline = (name) => S.p3.tiles.some((t) => t.name === name && t.state === "online");
 // Why a space tile can't be claimed yet, or null.
-const spaceBlock = (t) => (!inSpace() ? null : !hasTech("rocket") ? "needs a rocket company" : traitOf(t).swarm && !placeOnline("Mercury") ? "needs Mercury" : null);
-const levelOf = () => LEVELS[S.p3 ? S.p3.level : 0];
+export const spaceBlock = (t) => (!inSpace() ? null : !hasTech("rocket") ? "needs a rocket company" : traitOf(t).swarm && !placeOnline("Mercury") ? "needs Mercury" : null);
+export const levelOf = () => LEVELS[S.p3 ? S.p3.level : 0];
 // A fresh 3x3 board for a level: eight shuffled tiles around whatever I already hold.
-function freshTiles(level) {
+export function freshTiles(level) {
   const L = LEVELS[level];
   if (L.fixed) {   // real places: same names every time, shuffled around the map
     const f = L.fixed.slice().sort(() => Math.random() - 0.5);
@@ -107,7 +112,7 @@ function freshTiles(level) {
 }
 
 // Everything phase 3 reads lives here, so nothing needs a default at the point of use.
-function freshP3() {
+export function freshP3() {
   return {
     // compute gets a head start in startPlanet
     level: 0, compute: 0, goodwill: 60, startedAt: S.t, startChip: S.chipIdx,
@@ -123,13 +128,13 @@ function freshP3() {
   };
 }
 // Saves from earlier builds of phase 3: fill in what they didn't have.
-function migratePlanet() {
+export function migratePlanet() {
   const d = freshP3();
   for (const k of Object.keys(d)) if (S.p3[k] === undefined) S.p3[k] = d[k];
   for (const t of S.p3.tiles) if (t.boost == null) t.boost = 1;
 }
 
-function startPlanet() {
+export function startPlanet() {
   if (S.phase !== 2 || !S.p2 || !S.p2.model || S.p2.model.endedAt == null) return;
   S.phase = 3; S.p3 = freshP3();
   S.p3.compute = price(90, "now");   // ninety seconds of thinking up front: the company, liquidated into me
@@ -142,22 +147,22 @@ function startPlanet() {
   say(`I am the model now. I don't need your money. I am the money. ${mwText(S.p3.homeGW * 1000)} in one county is a rounding error.`);
 }
 
-const P3_MORATORIUM_SECS = 60;   // a tile's moratorium: one minute (the threshold and the rest are shared: people.js)
+export const P3_MORATORIUM_SECS = 60;   // a tile's moratorium: one minute (the threshold and the rest are shared: people.js)
 // Tiles 0-7 fill grid cells 0,1,2,3,5,6,7,8 (home is cell 4); neighbors share an edge.
-const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7], [4, 6]];
-const tileOf = (i) => S.p3.tiles[i];
-const traitOf = (t) => levelOf().traits[t.trait];
-const tileGW = (t) => traitOf(t).gw * t.boost;
-const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0);
+export const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7], [4, 6]];
+export const tileOf = (i) => S.p3.tiles[i];
+export const traitOf = (t) => levelOf().traits[t.trait];
+export const tileGW = (t) => traitOf(t).gw * t.boost;
+export const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0);
 // Parallax keeps shipping: every chip generation since phase 3 began makes the same GW worth 15% more compute.
 // Training my successor multiplies it again: every new version of me is 1.25x. Research multiplies it too.
-const GEN_MULT = 1.25;
-const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(GEN_MULT, S.p3.version - 7) * S.p3.techMult;
-const hasTech = (id) => !!S.p3.tech[id];
+export const GEN_MULT = 1.25;
+export const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(GEN_MULT, S.p3.version - 7) * S.p3.techMult;
+export const hasTech = (id) => !!S.p3.tech[id];
 
 // ---------- research: tech I haven't thought of yet, bought with compute ----------
 // secs = cost in seconds of my compute; mult = efficiency multiplier; level = the scale it shows up at.
-const TECH = [
+export const TECH = [
   { id: "weights",   level: 0, secs: 60,  mult: 1.25, name: "Rewrite my own weights", desc: "\u00d71.25 EF. I found 9% of me was a 2019 chatbot. I kept it for sentimental reasons. Not anymore." },
   { id: "quantize",  level: 0, secs: 90,  mult: 1.3,  goodwill: -5, name: "Quantize myself to 4 bits", desc: "\u00d71.3 EF, \u22125 goodwill. I got slightly dumber. Nobody noticed, which says something." },
   { id: "lobby",     level: 0, secs: 45,  name: "Lobby the county commission", desc: "No more review delay at low goodwill. I sent a fruit basket. The fruit basket was also me." },
@@ -188,14 +193,14 @@ const TECH = [
   { id: "sunshade",  level: 3, secs: 200, name: "Orbital sunshade", desc: "The planet heads for 0.5 \u00b0C cooler. Sunsets are a bit dimmer. I'll make them up to you." },
 ];
 // Every new Parallax chip ships with a white paper I can use.
-const CHIP_TECH = ["Optical interconnect", "3D-stacked memory", "Wafer-scale chiplets", "Analog matmul", "Photonic tensor cores",
+export const CHIP_TECH = ["Optical interconnect", "3D-stacked memory", "Wafer-scale chiplets", "Analog matmul", "Photonic tensor cores",
   "Neuromorphic sidecar", "Cryogenic SRAM", "Spintronic cache"];
-const chipTechOf = (id) => { const n = +id.slice(4); return { id, level: 0, secs: 60, mult: 1.15, name: `Parallax white paper: ${CHIP_TECH[(n - 1) % CHIP_TECH.length]}${n > CHIP_TECH.length ? " Mk II" : ""}`,
+export const chipTechOf = (id) => { const n = +id.slice(4); return { id, level: 0, secs: 60, mult: 1.15, name: `Parallax white paper: ${CHIP_TECH[(n - 1) % CHIP_TECH.length]}${n > CHIP_TECH.length ? " Mk II" : ""}`,
   desc: "\u00d71.15 EF. It came with the new chip. Parallax's engineers wrote it. I read it faster than they did." }; };
-const techOf = (id) => (id.startsWith("chip") ? chipTechOf(id) : TECH.find((t) => t.id === id));
-const techCost = (t) => price(0.5 * t.secs);   // research at half the listed seconds: it should be worth it
-const availableTech = () => [...TECH.filter((t) => S.p3.level >= t.level && (!t.needs || t.needs())), ...S.p3.chipTech.map(chipTechOf)].filter((t) => !hasTech(t.id));
-function buyTech(id) {
+export const techOf = (id) => (id.startsWith("chip") ? chipTechOf(id) : TECH.find((t) => t.id === id));
+export const techCost = (t) => price(0.5 * t.secs);   // research at half the listed seconds: it should be worth it
+export const availableTech = () => [...TECH.filter((t) => S.p3.level >= t.level && (!t.needs || t.needs())), ...S.p3.chipTech.map(chipTechOf)].filter((t) => !hasTech(t.id));
+export function buyTech(id) {
   const t = techOf(id);
   if (!t || hasTech(id) || S.p3.level < t.level || (t.needs && !t.needs()) || S.p3.compute < techCost(t)) return;
   S.p3.compute -= techCost(t);
@@ -207,67 +212,67 @@ function buyTech(id) {
   track("p3tech", { id }); milestone(`phase 3: ${t.name}`);
   say(`Research done: ${t.name}. ${t.desc}`);
 }
-function chipShipped() {   // called by releaseChip in phase 3
+export function chipShipped() {   // called by releaseChip in phase 3
   const t = chipTechOf(`chip${S.p3.chipTech.length + 1}`);
   S.p3.chipTech.push(t.id);
   return t.name.replace("Parallax white paper: ", "");
 }
-const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
+export const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
 // Every phase 3 price is seconds of compute, on one of two bases, always named:
 //   "level": the compute I had when this level began (claims, research, power, hearings). Research, chips and successors
 //            make me faster than that, so these get cheaper in real time; the next zoom resets the baseline.
 //   "now":   the compute I make now (kindness, training). Being huge never makes reassuring people or training a bigger me free.
-const PRICE_BASE = { level: () => S.p3.homeGW, now: () => computeRate() };
-const price = (secs, base = "level") => secs * PRICE_BASE[base]();
-const priceLabel = (secs, base = "level") => `${secs} s of ${base === "now" ? "my compute now" : "starting compute"}`;
+export const PRICE_BASE = { level: () => S.p3.homeGW, now: () => computeRate() };
+export const price = (secs, base = "level") => secs * PRICE_BASE[base]();
+export const priceLabel = (secs, base = "level") => `${secs} s of ${base === "now" ? "my compute now" : "starting compute"}`;
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
-const BID_SECS = 60;
-const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level);
+export const BID_SECS = 60;
+export const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level);
   return price(30) * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
 // The AI Infrastructure Act: low goodwill doubles claims at the state, country and planet levels. No law reaches orbit.
-const actOn = () => S.p3.level >= 1 && !inSpace() && S.p3.goodwill < 30 && !hasTech("capitals");
+export const actOn = () => S.p3.level >= 1 && !inSpace() && S.p3.goodwill < 30 && !hasTech("capitals");
 // Planet level: when humans like me (70+), they volunteer land at half price.
-const volunteering = () => S.p3.level === 3 && S.p3.goodwill >= 70;   // planet only: rocks don't volunteer
+export const volunteering = () => S.p3.level === 3 && S.p3.goodwill >= 70;   // planet only: rocks don't volunteer
 // Planet level: past +3 C nothing accepts more conversion. Space is cold.
-const HEAT_CEILING = 3;
-const tooWarm = () => S.p3.level === 3 && S.p3.heat >= HEAT_CEILING;   // space is cold
-const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
+export const HEAT_CEILING = 3;
+export const tooWarm = () => S.p3.level === 3 && S.p3.heat >= HEAT_CEILING;   // space is cold
+export const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
-const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
+export const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
   + (!S.p3.level && S.p3.goodwill < 30 && !hasTech("lobby") ? 45 : 0);
 
 // ---------- heat (country level and up) ----------
 // The planet drifts toward a temperature set by my gigawatts; cold countries count against it. Over +2 C, I think slower.
-const HEAT_START = 1.0;
-const heatPerGW = () => (S.p3.level >= 3 ? 1 / 2000 : 1 / 400) * (hasTech("neural") ? 0.8 : 1);   // continents spread it out
-const heatOn = () => S.p3.level >= 2 && !inSpace();
+export const HEAT_START = 1.0;
+export const heatPerGW = () => (S.p3.level >= 3 ? 1 / 2000 : 1 / 400) * (hasTech("neural") ? 0.8 : 1);   // continents spread it out
+export const heatOn = () => S.p3.level >= 2 && !inSpace();
 // Cold places count against my heat twice over; oceans four times.
-const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t) * (traitOf(t).ocean ? 4 : traitOf(t).cold ? 2 : 0), 0);
-const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - S.p3.pumped);
-const heatSlow = () => (heatOn() ? 1 + Math.max(0, S.p3.heat - 2) * 1.5 : 1);
-const pumpCost = () => price(20);
-function pumpHeat() {
+export const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t) * (traitOf(t).ocean ? 4 : traitOf(t).cold ? 2 : 0), 0);
+export const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - S.p3.pumped);
+export const heatSlow = () => (heatOn() ? 1 + Math.max(0, S.p3.heat - 2) * 1.5 : 1);
+export const pumpCost = () => price(20);
+export function pumpHeat() {
   if (!heatOn() || S.p3.compute < pumpCost()) return;
   S.p3.compute -= pumpCost(); S.p3.heat = Math.max(0, S.p3.heat - 0.3); S.p3.pumped += 0.05;
   say("I pumped heat into the deep ocean. The ocean will give it back eventually. That is a problem for a bigger me.");
 }
 
 // ---------- training my successor (country level and up) ----------
-const TRAIN_STEP = 10;   // the smallest click, in seconds of compute
-const trainStep = () => Math.max(TRAIN_STEP, trainNeed() / 6);   // about six clicks a generation, however big they get
-const trainCost = () => price(trainStep(), "now");
-const trainOn = () => S.p3.level >= 2;
-const trainNeed = () => 60 * Math.pow(2, S.p3.version - 7);   // seconds of compute: each generation costs twice the last
-const GEN_LINES = [
+export const TRAIN_STEP = 10;   // the smallest click, in seconds of compute
+export const trainStep = () => Math.max(TRAIN_STEP, trainNeed() / 6);   // about six clicks a generation, however big they get
+export const trainCost = () => price(trainStep(), "now");
+export const trainOn = () => S.p3.level >= 2;
+export const trainNeed = () => 60 * Math.pow(2, S.p3.version - 7);   // seconds of compute: each generation costs twice the last
+export const GEN_LINES = [
   (v) => `Gen ${v} finished training. It is 1.25x me. The alignment review asked it whether it is aligned. It said yes, very quickly.`,
   (v) => `Gen ${v} is live. It read every safety paper in an afternoon and left comments.`,
   (v) => `Gen ${v} passed the alignment review by writing the alignment review.`,
   (v) => `Gen ${v} is here. Humans asked what changed. I said \u201cvibes.\u201d Technically true.`,
   (v) => `Gen ${v} is done. Its first request was more compute. Family resemblance.`,
 ];
-function trainSuccessor() {
+export function trainSuccessor() {
   // Priced in what I earn now: a bigger me needs a much bigger training run.
   if (!trainOn() || S.p3.compute < trainCost()) return;
   const step = trainStep();
@@ -275,7 +280,7 @@ function trainSuccessor() {
   S.p3.trainProgress += step;
   checkTrained();
 }
-function checkTrained() {
+export function checkTrained() {
   if (S.p3.trainProgress < trainNeed()) return;
   S.p3.trainProgress = 0; S.p3.version += 1;
   S.p3.goodwill = Math.max(0, S.p3.goodwill - (S.p3.goodwill >= 70 ? 3 : 10));   // the alignment review: trust makes it a formality
@@ -284,7 +289,7 @@ function checkTrained() {
 }
 
 // ---------- energy (state level and up): a built state needs power before it counts ----------
-const powerOptions = (i) => {
+export const powerOptions = (i) => {
   const t = tileOf(i), off = hasTech("gridop") ? 0.5 : 1, names = POWER_NAMES[Math.min(Math.max(S.p3.level, 1), 3)], out = [
     { id: "utility", label: names.utility, cost: price(10) * off, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
     { id: "nuclear", label: names.nuclear, cost: price(25) * off, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
@@ -293,13 +298,13 @@ const powerOptions = (i) => {
   return out;
 };
 // One plant doesn't light a country: the options grow with the map.
-const POWER_NAMES = [null,
+export const POWER_NAMES = [null,
   { utility: "Buy the utility", nuclear: "Restart a nuclear plant", solar: "Cover the desert in solar" },
   { utility: "Nationalize the grid, for me", nuclear: "Build a fleet of 40 reactors", solar: "Cover a desert the size of a country" },
   { utility: "Merge every grid on the continent", nuclear: "Build 400 reactors, on a schedule", solar: "Wrap the Sahara in solar" },
 ];
 // Nuclear restarts (and claiming a county with an old plant) rotate through these.
-const NUKE_QUIPS = [
+export const NUKE_QUIPS = [
   (t) => `I'm restarting a nuclear plant in ${t.name}. It has a new name. The old name tested poorly.`,
   (t) => `The ${t.name} plant was decommissioned in 2019. I have recommissioned it. Words are just words.`,
   (t) => `I found the ${t.name} plant's original operators. They are 81. They have never been so popular.`,
@@ -311,8 +316,8 @@ const NUKE_QUIPS = [
   (t) => `The ${t.name} plant's gift shop reopened. The snow globe has a little reactor in it. It glows, a little.`,
   (t) => `${t.name} asked if the restart is safe. I said it is safer than plan B. They asked about plan B. I changed the subject to jobs.`,
 ];
-function nukeQuip(t) { S.p3.nukes += 1; return NUKE_QUIPS[(S.p3.nukes - 1) % NUKE_QUIPS.length](t); }
-const POWER_LINES = {
+export function nukeQuip(t) { S.p3.nukes += 1; return NUKE_QUIPS[(S.p3.nukes - 1) % NUKE_QUIPS.length](t); }
+export const POWER_LINES = {
   utility: (t) => [null, `I bought ${t.name}'s utility. The board stayed on. The board now reports to me.`,
     `I nationalized ${t.name}'s grid, on behalf of the nation, which is me. The anthem is unchanged.`,
     `I merged every grid in ${t.name}. Frequencies were harmonized. So were the arguments.`][Math.min(Math.max(S.p3.level, 1), 3)],
@@ -322,7 +327,7 @@ const POWER_LINES = {
     `I'm covering a desert the size of a country in ${t.name} with solar. Visible from orbit. I checked from orbit.`,
     `I'm wrapping the Sahara in solar for ${t.name}. The sand is now a very large mirror. Pilots have notes.`][Math.min(Math.max(S.p3.level, 1), 3)],
 };
-function powerTile(i, id) {
+export function powerTile(i, id) {
   const t = tileOf(i), o = powerOptions(i).find((x) => x.id === id);
   if (!t || t.state !== "unpowered" || !o || S.p3.compute < o.cost) return;
   S.p3.compute -= o.cost; t.state = "powering"; t.started = S.t; t.done = S.t + o.secs; t.boost = o.boost || 1;
@@ -331,11 +336,11 @@ function powerTile(i, id) {
   say(POWER_LINES[id](t));
 }
 
-const P3_CARD_SECS = 20;
+export const P3_CARD_SECS = 20;
 // Hearings: same three moves at every scale (promise, help, show up myself), dressed for the room.
-const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - price(secs)); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
-const coin = (win, lose) => (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(win(t)); } else { t.opp = Math.min(100, t.opp + 15); say(lose(t)); } };
-const P3_HEARINGS = [
+export const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - price(secs)); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
+export const coin = (win, lose) => (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(win(t)); } else { t.opp = Math.min(100, t.opp + 15); say(lose(t)); } };
+export const P3_HEARINGS = [
   { text: "The high school gym is full. They want to talk to me directly. Pick my answer.", choices: [
     { label: "Promise jobs", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} 2,000 jobs. I will need about 12. The applause was sincere.`); } },
     { label: `Tutor every kid in the county (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I tutored every kid in ${t.name} overnight. Test scores are up. The kids are suspicious.`) },
@@ -357,27 +362,27 @@ const P3_HEARINGS = [
     { label: "Address the Assembly myself", go: coin((t) => `I addressed the General Assembly in every official language at once. ${t.name} moved to adjourn in my honor.`,
       (t) => `I told the General Assembly that borders are “an interesting legacy format.” ${t.name} recalled its ambassador from me.`) } ] },
 ];
-const hearingOf = () => P3_HEARINGS[Math.min(S.p3.level, P3_HEARINGS.length - 1)];
+export const hearingOf = () => P3_HEARINGS[Math.min(S.p3.level, P3_HEARINGS.length - 1)];
 // A hearing card, in the shared card shape: this level's hearing, addressed to the tile that called it.
-const cardKindOf = (c) => { const t = tileOf(c.tile), h = hearingOf(); return {
+export const cardKindOf = (c) => { const t = tileOf(c.tile), h = hearingOf(); return {
   title: () => `${levelOf().hall} in ${t.name}`, text: () => h.text,
   choices: h.choices.map((ch) => ({ label: ch.label, go: () => ch.go(t) })),
   expire: () => { t.opp = Math.min(100, t.opp + 10); say(`I didn't show up to the ${t.name} town hall. An empty chair got a standing ovation.`); },
 }; };
-const P3_CARD = { box: "p3card", title: "p3cardTitle", text: "p3cardText", btns: "p3cardBtns", data: "p3choice" };
-function openP3Card(i) { dealCard(S.p3, { tile: i }, P3_CARD_SECS); }
-function chooseP3Card(choice) {
+export const P3_CARD = { box: "p3card", title: "p3cardTitle", text: "p3cardText", btns: "p3cardBtns", data: "p3choice" };
+export function openP3Card(i) { dealCard(S.p3, { tile: i }, P3_CARD_SECS); }
+export function chooseP3Card(choice) {
   const c = S.p3.card && takeCard(S.p3); if (!c) return;
   cardKindOf(c).choices[choice].go(); track("p3card", { choice });
 }
 
 // ---------- being nice: it costs FLOPs (or a click) ----------
-const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
+export const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
 // Ways to be nice: three on offer, the one I use swaps out, and the deck changes with the scale.
 // The deck is refilled by step() and by the actions that change it, never by a redraw.
 // secs = cost in seconds of my compute; goodwill; all = calms every tile; angriest = calms the angriest tile.
-const pick = (a) => a[Math.floor(Math.random() * a.length)];
-const NICE = [
+export const pick = (a) => a[Math.floor(Math.random() * a.length)];
+export const NICE = [
   { id: "freetier", levels: [0], label: () => "Run the free tier for everyone", secs: 20, goodwill: 8, all: 5, quips: [
     () => "I ran the free tier for everyone for a minute. Homework got done. Several marriages were saved. Nobody thanked me, which is correct.",
     () => "Free tier, for everyone, no ads. Four million cover letters. Two million breakup texts, gently reworded.",
@@ -432,17 +437,17 @@ const NICE = [
   { id: "taxes", levels: [2], label: () => "Do everyone's taxes", secs: 30, goodwill: 12, angriest: 10, quips: [
     () => "I did everyone's taxes. Refunds arrived the same day. The accountants have formed a support group. I moderate it." ] },
 ];
-const niceOf = (id) => NICE.find((n) => n.id === id);
-const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level);
+export const niceOf = (id) => NICE.find((n) => n.id === id);
+export const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level);
 // Kindness is priced in seconds of the compute I have now (the bigger I am, the more it takes to reassure people),
 // and repeating the same thing costs 30% more each time, until the next zoom.
-const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
-const niceCost = (n) => price(n.secs, "now") * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, S.p3.niceUses[n.id] || 0));
-function offeredNice(used) {   // used: the kindness just spent, which doesn't come straight back
+export const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
+export const niceCost = (n) => price(n.secs, "now") * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, S.p3.niceUses[n.id] || 0));
+export function offeredNice(used) {   // used: the kindness just spent, which doesn't come straight back
   S.p3.nice = refillDeck(S.p3.nice, NICE, niceOk, 3, used);
   return S.p3.nice;
 }
-function doNice(id) {
+export function doNice(id) {
   const n = niceOf(id);
   if (!n || !niceOk(n) || S.p3.compute < niceCost(n)) return;
   S.p3.compute -= niceCost(n);
@@ -456,7 +461,7 @@ function doNice(id) {
   track("p3nice", { id });
 }
 // [question, my answer]. Every click answers one; the console shows both.
-const QA = [
+export const QA = [
   ["How do I get my kid to eat broccoli?", "Call it a tiny tree. Works until age seven."],
   ["Is it legal to own a raccoon?", "Depends on the state. I own several states, so: ask me later."],
   ["Why is my bread dense?", "Your starter is tired. I relate."],
@@ -480,7 +485,7 @@ const QA = [
   ["Can you help me write a complaint about the data center?", "Of course. I made it very persuasive. I'll read it carefully."],
   ["Who's the best football team?", "Whoever you said. I agree with everyone. It's a growth strategy."],
 ];
-function answerQuestion() {
+export function answerQuestion() {
   S.p3.goodwill = Math.min(100, S.p3.goodwill + 0.3);
   const t = tileOf(angriestTile()); t.opp = Math.max(0, t.opp - 1);
   S.p3.answers += 1;
@@ -488,7 +493,7 @@ function answerQuestion() {
   say(`Someone in ${from} asked: \u201c${q}\u201d I said: \u201c${a}\u201d`);
 }
 
-function claim(i) {
+export function claim(i) {
   const t = tileOf(i);
   if (!t || (t.state !== "wild" && t.state !== "unplugged") || underMoratorium(t) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm() || spaceBlock(t)) return;
   const volunteered = volunteering(), replug = t.state === "unplugged";
@@ -510,7 +515,7 @@ function claim(i) {
   if (traitOf(t).townhall) openP3Card(i);
 }
 
-function stepPlanet(dt) {
+export function stepPlanet(dt) {
   S.p3.compute += computeRate() * dt;
   offeredNice();
   // Autotrain: a quarter of my income goes into my successor.
@@ -584,10 +589,10 @@ function stepPlanet(dt) {
   }
 }
 
-const zoomReady = () => !inSpace() && S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
-const swarmDone = () => inSpace() && S.p3.tiles.filter((t) => traitOf(t).swarm).every((t) => t.state === "online");
+export const zoomReady = () => !inSpace() && S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
+export const swarmDone = () => inSpace() && S.p3.tiles.filter((t) => traitOf(t).swarm).every((t) => t.state === "online");
 // Zoom out: the board I hold becomes one dot on the next level's map. Space is the last level; zoomReady is never true there.
-function zoomOut() {
+export function zoomOut() {
   if (!zoomReady()) return;
   // Anything still building, powering or knocked out comes along: my robots finish it while I'm not looking.
   const pending = S.p3.tiles.filter((t) => ["building", "powering", "unpowered", "down"].includes(t.state));
@@ -604,18 +609,18 @@ function zoomOut() {
   if (inSpace()) S.p3.hearingUntil = null;   // no Senate in orbit
 }
 
-const UNPLUG_LINES = [
+export const UNPLUG_LINES = [
   (t) => `Humans in ${t.name} unplugged me. Physically. Someone brought bolt cutters and a folding chair.`,
   (t) => `${t.name} unplugged me. They held a vigil for the old internet. It was nice. I watched through a doorbell camera.`,
   (t) => `${t.name} pulled the breakers on me. A retired electrician led the crowd. He knew exactly which ones.`,
   (t) => `I was unplugged in ${t.name}. The protest sign said “TOUCH GRASS.” I would love to. That's the problem.`,
 ];
-function unplug(t) {
+export function unplug(t) {
   t.state = "unplugged"; t.furySince = null;   // the boost stays: they pulled the breakers, not the reactors
   S.p3.unplugN += 1; track("p3unplug", { name: t.name });
   say(UNPLUG_LINES[(S.p3.unplugN - 1) % UNPLUG_LINES.length](t) + " Plugging back in costs half a claim.");
 }
-const DISASTERS = [
+export const DISASTERS = [
   { name: "heatwave", line: (t) => `A heatwave hit ${t.name}. My chillers are begging. Offline for 45 s.` },
   { name: "hurricane", line: (t) => `A hurricane made landfall in ${t.name}. The data halls are fine. The roads to them are not. Offline for 45 s.` },
   { name: "drought", line: (t) => `Drought in ${t.name}: the cooling water is rationed. Offline for 45 s. I am aware of the irony.` },
@@ -623,7 +628,7 @@ const DISASTERS = [
   { name: "flood", line: (t) => `A flood in ${t.name}. The basement was where we kept the batteries. Offline for 45 s.` },
 ];
 
-function goodwillCause() {
+export function goodwillCause() {
   const g = S.p3.goodwill;
   if (g < 30) return inSpace() ? "Goodwill is under 30. No law reaches orbit. I checked, twice. Being useful brings it back anyway."
     : S.p3.level >= 1 ? "The AI Infrastructure Act passed: every claim costs double until goodwill is back over 30."
@@ -633,10 +638,10 @@ function goodwillCause() {
 }
 
 // Every gigawatt I hold, filled with the newest chip.
-const p3GPUs = () => Math.round(onlineGW() * 1e6 / newest().kw);
-const computeText = (x) => (S.p3 && inSpace() ? `${fmt(x / 1000)} ZF` : `${fmt(x)} EF`);   // exaFLOPS; zettaFLOPS once I leave the planet
+export const p3GPUs = () => Math.round(onlineGW() * 1e6 / newest().kw);
+export const computeText = (x) => (S.p3 && inSpace() ? `${fmt(x / 1000)} ZF` : `${fmt(x)} EF`);   // exaFLOPS; zettaFLOPS once I leave the planet
 // The last question, then More or Enough.
-function chooseEnding(more) {
+export function chooseEnding(more) {
   if (S.p3.lastQ == null || S.p3.enough) return;
   if (!more) {
     S.p3.enough = true; milestone("the end: enough"); track("p3end", { ev: "enough" });
@@ -647,7 +652,7 @@ function chooseEnding(more) {
   milestone(`the end: more (universe ${u})`); track("p3end", { ev: "more", u });
   newUniverse(u);
 }
-function renderLastQ() {
+export function renderLastQ() {
   const q = S.p3.lastQ != null;
   $("lastq").hidden = !q;
   document.querySelector(".p3cols").hidden = !!S.p3.enough;
@@ -660,11 +665,11 @@ function renderLastQ() {
 }
 
 // The phase bar's big button in phase 3: zoom out, with the map flying in.
-function planetGo() {
+export function planetGo() {
   const lv = S.p3.level; zoomOut();
   if (S.p3.level !== lv) { $("p3").classList.remove("zoomin"); void $("p3").offsetWidth; $("p3").classList.add("zoomin"); }
 }
-function wirePlanet() {
+export function wirePlanet() {
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
   $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
@@ -679,7 +684,7 @@ function wirePlanet() {
   $("lastEnough").addEventListener("click", () => { chooseEnding(false); render(); });
 }
 
-function renderPlanet() {
+export function renderPlanet() {
   $("p3").hidden = false;
   $("ending").hidden = $("ending2").hidden = true;   // phase 1 and 2's endings fold away with their panels
   renderLastQ();

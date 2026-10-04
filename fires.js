@@ -1,9 +1,13 @@
 // fires.js: data center fires, phases 1 and 2 (thanks, Chris). Racks go dark for two minutes, most GPUs come
 // back, some don't. Insurance pays late and remembers. State lives in S.fires.
+import { S, chip, money, say, time, track } from "./globals.js";
+import { vendorOf } from "./campus.js";
+import { ceoStrike } from "./people.js";
+import { basePrice, usedKW } from "./main.js";
 
-const FIRE_EVERY = [300, 600], FIRE_DOWN = 120, FIRE_LOSS = 0.2, FIRE_SHARE = [0.05, 0.15];
-const INSURANCE = 0.7, INSURANCE_DELAY = 60, PREMIUM_RATE = 0.0002;
-const ROOT_CAUSES = [
+export const FIRE_EVERY = [300, 600], FIRE_DOWN = 120, FIRE_LOSS = 0.2, FIRE_SHARE = [0.05, 0.15];
+export const INSURANCE = 0.7, INSURANCE_DELAY = 60, PREMIUM_RATE = 0.0002;
+export const ROOT_CAUSES = [
   "a lithium battery in the UPS room had feelings",
   "the fire suppression system was in demo mode",
   "a bufo got into the busbar",
@@ -14,16 +18,16 @@ const ROOT_CAUSES = [
   "the thermal camera was pointed at the break room",
 ];
 
-const firesOf = () => S.fires;   // created in fresh()
-const firesOn = () => (S.phase === 1 ? S.gen >= 2 : S.phase === 2 && !!S.p2 && !!S.p2.county);
+export const firesOf = () => S.fires;   // created in fresh()
+export const firesOn = () => (S.phase === 1 ? S.gen >= 2 : S.phase === 2 && !!S.p2 && !!S.p2.county);
 // r in [0, 1): where in the range this fire lands. Suppression makes them rarer; new UPS batteries make them smaller.
-const fireGap = (r) => (FIRE_EVERY[0] + r * (FIRE_EVERY[1] - FIRE_EVERY[0])) * (S.done.suppression ? 2 : 1) * vendorOf().fire;
-const fireShare = (r) => (FIRE_SHARE[0] + r * (FIRE_SHARE[1] - FIRE_SHARE[0])) * (S.done.ups ? 0.5 : 1);
-const fireWhere = () => (S.phase === 2 && S.p2.builds.some((b) => b.kind === "hall" && b.done <= S.t)
+export const fireGap = (r) => (FIRE_EVERY[0] + r * (FIRE_EVERY[1] - FIRE_EVERY[0])) * (S.done.suppression ? 2 : 1) * vendorOf().fire;
+export const fireShare = (r) => (FIRE_SHARE[0] + r * (FIRE_SHARE[1] - FIRE_SHARE[0])) * (S.done.ups ? 0.5 : 1);
+export const fireWhere = () => (S.phase === 2 && S.p2.builds.some((b) => b.kind === "hall" && b.done <= S.t)
   ? `hall ${1 + Math.floor(Math.random() * S.p2.builds.filter((b) => b.kind === "hall" && b.done <= S.t).length)}`
   : `row ${1 + Math.floor(Math.random() * 40)}`);
 
-function startFire() {
+export function startFire() {
   const f = firesOf();
   let share = fireShare(Math.random());
   if (S.phase === 2) share = Math.max(share, Math.min(1, 50000 / Math.max(1, usedKW())) * (S.done.ups ? 0.5 : 1));   // at least a hall
@@ -43,7 +47,7 @@ function startFire() {
   say(`Fire in ${where}: ${n.toLocaleString("en-US")} GPUs down for about ${time(FIRE_DOWN)}. Everyone is fine. The GPUs are less fine.`);
 }
 
-function endFire() {
+export function endFire() {
   const f = firesOf(), out = f.out;
   let lost = 0, lostValue = 0;
   for (const [g, k] of Object.entries(out.gens)) {
@@ -56,7 +60,7 @@ function endFire() {
   say(`Incident report: ${lost.toLocaleString("en-US")} GPUs were a total loss. Root cause: ${ROOT_CAUSES[(f.n - 1) % ROOT_CAUSES.length]}.`);
 }
 
-function stepFires(dt) {
+export function stepFires(dt) {
   const f = firesOf();
   if (f.out && S.t >= f.out.until) endFire();
   if (f.payout && S.t >= f.payout.at) {
@@ -72,8 +76,8 @@ function stepFires(dt) {
 
 // ---------- coolant leaks (phase 2, once anything runs on liquid) ----------
 // A hall goes dark while the plumbers work; some GPUs drown. Insurance excludes water. State lives in S.leaks.
-const LEAK_EVERY = [240, 480], LEAK_DOWN = 60, LEAK_LOSS = 0.1;
-const LEAK_CAUSES = [
+export const LEAK_EVERY = [240, 480], LEAK_DOWN = 60, LEAK_LOSS = 0.1;
+export const LEAK_CAUSES = [
   "a quick-disconnect fitting disconnected, quickly",
   "the coolant was mixed to the vendor's recipe, which was for margaritas",
   "a technician hung a jacket on a manifold",
@@ -81,11 +85,11 @@ const LEAK_CAUSES = [
   "a bufo sat on a valve and would not be moved",
   "someone asked the model whether the pipes were fine and it said yes",
 ];
-const leakGap = (r) => (LEAK_EVERY[0] + r * (LEAK_EVERY[1] - LEAK_EVERY[0])) * vendorOf().leak;
-const leaksOf = () => S.leaks;   // created in fresh()
-const leaksOn = () => S.phase === 2 && !!S.p2 && !!S.p2.county && ["dlc", "immersion", "twophase", "liquid"].some((k) => S.done[k]);
+export const leakGap = (r) => (LEAK_EVERY[0] + r * (LEAK_EVERY[1] - LEAK_EVERY[0])) * vendorOf().leak;
+export const leaksOf = () => S.leaks;   // created in fresh()
+export const leaksOn = () => S.phase === 2 && !!S.p2 && !!S.p2.county && ["dlc", "immersion", "twophase", "liquid"].some((k) => S.done[k]);
 
-function startLeak() {
+export function startLeak() {
   const l = leaksOf();
   const share = Math.min(1, Math.max(0.05, 50000 / Math.max(1, usedKW())));   // about one hall's worth
   const gens = {}; let n = 0;
@@ -103,7 +107,7 @@ function startLeak() {
   say(`Coolant leak in ${where}: ${n.toLocaleString("en-US")} GPUs powered down for about ${time(down)}. The raised floor is now a water feature.`);
 }
 
-function endLeak() {
+export function endLeak() {
   const l = leaksOf(), out = l.out;
   let lost = 0;
   for (const [g, k] of Object.entries(out.gens)) {
@@ -114,7 +118,7 @@ function endLeak() {
   say(`Water damage: ${lost.toLocaleString("en-US")} GPUs did not dry out. Root cause: ${LEAK_CAUSES[(l.n - 1) % LEAK_CAUSES.length]}. The insurer pointed at page 214: water is excluded.`);
 }
 
-function stepLeaks() {
+export function stepLeaks() {
   const l = leaksOf();
   if (l.out && S.t >= l.out.until) endLeak();
   if (!leaksOn()) return;

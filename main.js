@@ -1,23 +1,37 @@
-// main.js: phase 1 (the lab), the company screen phases 1 and 2 share, the PHASES table, the tick, wiring, and start().
-const TEST = new URLSearchParams(location.search).has("test");
+// main.js: phase 1 (the lab), the company screen phases 1 and 2 share, the PHASES table, the tick, wiring, start(),
+// and the debug surface (window.game). It is the page's only script: every other module is imported from here.
+import { $, CHIP_EVERY, CHIP_EVERY_P2, COOLING, FIRST_CHIP_AT, GROUND_KW, HYPE_TO_RAISE, KW_PER_GPU, MODEL_LINES, RENT_EXP, RENT_K, ROUNDS, S, SAVE_VERSION, TYPES, chip, countAnswer, countAutoSwaps, ensureRun, flush, fmt, fresh, kwText, load, milestone, money, moneyFull, mwText, rebuildOn, save, say, setState, snap, time, track, unMojibake } from "./globals.js";
+import { PROJECTS, projectCost } from "./projects.js";
+import { COLO_MW, COLO_RACKS, P2_RATE, campusDealSize, campusDrawSize, campusKWAt, campusRevenue, campusRound, campusSpotPay, freeKWByGen, migrateCampus, raiseCampus, renderCampusPhase, renderRaiseCampus, renderVendors, roundNoteCampus, spotLineCampus, startCampus, stepCampus, uncontractedGPUs, vendorOf, wireCampus } from "./campus.js";
+import { campusGo, gpuDiscount } from "./model.js";
+import { DILUTION, deriveCap, dilute, publicRaise, renderMarket } from "./market.js";
+import { stepFires, stepLeaks } from "./fires.js";
+import { renderCeo, renderPeople } from "./people.js";
+import { chipShipped, migratePlanet, planetGo, renderPlanet, stepPlanet, wirePlanet } from "./planet.js";
+import { renderHud, wireHud } from "./hud.js";
+import * as Globals from "./globals.js"; import * as Projects from "./projects.js"; import * as Campus from "./campus.js";
+import * as Model from "./model.js"; import * as Market from "./market.js"; import * as Fires from "./fires.js"; import * as People from "./people.js";
+import * as Planet from "./planet.js"; import * as Hud from "./hud.js"; import * as Main from "./main.js";
+export const TEST = new URLSearchParams(location.search).has("test");
 // Playtesting fast-forward: ?speed=10 runs the game 10x (1-50). Off unless the URL asks.
-const SPEED = Math.max(1, Math.min(50, Number(new URLSearchParams(location.search).get("speed")) || 1));
-let clockOn = false;                                              // set in start()   // tests drive step() by hand: no timers
+export const SPEED = Math.max(1, Math.min(50, Number(new URLSearchParams(location.search).get("speed")) || 1));
+export let clockOn = false;                                              // set in start()   // tests drive step() by hand: no timers
+export function setClockOn(on) { clockOn = on; }
 // ---------- model ----------
-const needFor = (g) => 100 * Math.pow(10, g - 1);           // GPU-seconds to train generation g
-const quality = () => Math.pow(4, S.gen);                  // each generation quadruples what people want from it
-const hypeMult = () => 0.5 + S.hype / 40;
-const demand = () => 5 * quality() * hypeMult() * S.demandMult * Math.pow(0.25 / S.price, 1.3);
-const owned = (i) => S.leases[TYPES[i].id] || 0;
+export const needFor = (g) => 100 * Math.pow(10, g - 1);           // GPU-seconds to train generation g
+export const quality = () => Math.pow(4, S.gen);                  // each generation quadruples what people want from it
+export const hypeMult = () => 0.5 + S.hype / 40;
+export const demand = () => 5 * quality() * hypeMult() * S.demandMult * Math.pow(0.25 / S.price, 1.3);
+export const owned = (i) => S.leases[TYPES[i].id] || 0;
 // Each leased unit keeps the cooling it was built with (S.leaseCool[type][level] = count). Cooling projects set
 // the standard for NEW leases; older space stays sparse until you pay to retrofit it.
-const unitKW = (i, level = S.cooling) => Math.min(TYPES[i].racks * COOLING[level].kw, TYPES[i].powerKW * S.powerBoost);
-const coolOf = (i) => S.leaseCool[TYPES[i].id] || {};
-const leasedKW = () => TYPES.reduce((a, _, i) => a + Object.entries(coolOf(i)).reduce((b, [lv, n]) => b + n * unitKW(i, +lv), 0), 0)
+export const unitKW = (i, level = S.cooling) => Math.min(TYPES[i].racks * COOLING[level].kw, TYPES[i].powerKW * S.powerBoost);
+export const coolOf = (i) => S.leaseCool[TYPES[i].id] || {};
+export const leasedKW = () => TYPES.reduce((a, _, i) => a + Object.entries(coolOf(i)).reduce((b, [lv, n]) => b + n * unitKW(i, +lv), 0), 0)
   + (S.p2 ? S.p2.colo || 0 : 0);                                     // phase 2 colo blocks
-const capKW = () => leasedKW() + (S.phase === 2 ? campusKWAt() : 0);   // phase 2: plus energized campus halls
-const RETROFIT = 1.0;                   // retrofit costs what new space costs per kW gained, but adds no racks and no rent
-const retrofitPlan = () => {
+export const capKW = () => leasedKW() + (S.phase === 2 ? campusKWAt() : 0);   // phase 2: plus energized campus halls
+export const RETROFIT = 1.0;                   // retrofit costs what new space costs per kW gained, but adds no racks and no rent
+export const retrofitPlan = () => {
   let cost = 0, kw = 0, units = 0;
   TYPES.forEach((t, i) => {
     for (const [lv, n] of Object.entries(coolOf(i))) {
@@ -29,7 +43,7 @@ const retrofitPlan = () => {
   });
   return { cost, kw, units };
 };
-function retrofit() {
+export function retrofit() {
   const plan = retrofitPlan();
   if (plan.kw <= 0 || S.funds < plan.cost) return;
   S.funds -= plan.cost;
@@ -41,25 +55,25 @@ function retrofit() {
   track("retrofit", { cost: Math.round(plan.cost), kw: Math.round(plan.kw), units: plan.units });
   say(`Retrofitted ${plan.units.toLocaleString("en-US")} older unit${plan.units > 1 ? "s" : ""} to ${COOLING[S.cooling].name} while they were running. +${kwText(plan.kw)}. Nobody died. The contractor was surprised too.`);
 }
-const totalRacks = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0);
-const highestType = () => { let h = 0; TYPES.forEach((_, i) => { if (owned(i) > 0) h = i; }); return h; };
-const racksLeased = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0) + (S.p2 ? (S.p2.coloN || 0) * COLO_RACKS : 0);
-const rentIndex = () => Math.pow(1 + racksLeased() / RENT_K, RENT_EXP);
-const leaseCost = (i) => TYPES[i].racks * TYPES[i].slot * rentIndex();
-const leaseVisible = (i) => i === 0 || owned(i) > 0 || owned(i - 1) > 0;
-const fitGPUs = () => Math.floor(capKW() / KW_PER_GPU);
-const PMAX = 500, N0 = 9900;                                         // volume pricing: price stops rising at $500 (~10k GPUs)
-const newest = () => chip(S.chipIdx);
-const basePrice = (n = S.gpus) => Math.min(PMAX, 5 * (1 + n / 100));
-const gpuPrice = (n = S.gpus) => basePrice(n) * newest().priceMult * gpuDiscount() * vendorOf().price;
-const usedKW = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).kw, 0);
-const totalPerf = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).perf, 0);
-const avgPerf = () => (S.gpus > 0 ? totalPerf() / S.gpus : newest().perf);
-const roomNewest = () => Math.max(0, Math.floor((capKW() - usedKW()) / newest().kw + 1e-9));
-const F = (n) => n <= N0 ? 250 * Math.pow(1 + n / 100, 2)             // cumulative cost of the first n GPUs
+export const totalRacks = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0);
+export const highestType = () => { let h = 0; TYPES.forEach((_, i) => { if (owned(i) > 0) h = i; }); return h; };
+export const racksLeased = () => TYPES.reduce((a, t, i) => a + owned(i) * t.racks, 0) + (S.p2 ? (S.p2.coloN || 0) * COLO_RACKS : 0);
+export const rentIndex = () => Math.pow(1 + racksLeased() / RENT_K, RENT_EXP);
+export const leaseCost = (i) => TYPES[i].racks * TYPES[i].slot * rentIndex();
+export const leaseVisible = (i) => i === 0 || owned(i) > 0 || owned(i - 1) > 0;
+export const fitGPUs = () => Math.floor(capKW() / KW_PER_GPU);
+export const PMAX = 500, N0 = 9900;                                         // volume pricing: price stops rising at $500 (~10k GPUs)
+export const newest = () => chip(S.chipIdx);
+export const basePrice = (n = S.gpus) => Math.min(PMAX, 5 * (1 + n / 100));
+export const gpuPrice = (n = S.gpus) => basePrice(n) * newest().priceMult * gpuDiscount() * vendorOf().price;
+export const usedKW = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).kw, 0);
+export const totalPerf = () => Object.entries(S.fleet).reduce((a, [c, n]) => a + n * chip(+c).perf, 0);
+export const avgPerf = () => (S.gpus > 0 ? totalPerf() / S.gpus : newest().perf);
+export const roomNewest = () => Math.max(0, Math.floor((capKW() - usedKW()) / newest().kw + 1e-9));
+export const F = (n) => n <= N0 ? 250 * Math.pow(1 + n / 100, 2)             // cumulative cost of the first n GPUs
   : 250 * Math.pow(1 + N0 / 100, 2) + PMAX * (n - N0);
-const costOf = (k) => (F(S.gpus + k) - F(S.gpus)) * newest().priceMult * gpuDiscount();
-const maxBuy = (wallet = S.funds + S.credits) => {                   // as many as fit and the wallet covers
+export const costOf = (k) => (F(S.gpus + k) - F(S.gpus)) * newest().priceMult * gpuDiscount();
+export const maxBuy = (wallet = S.funds + S.credits) => {                   // as many as fit and the wallet covers
   const room = roomNewest();
   if (room <= 0 || wallet <= 0) return 0;
   const target = F(S.gpus) + wallet / (newest().priceMult * gpuDiscount());
@@ -69,15 +83,15 @@ const maxBuy = (wallet = S.funds + S.credits) => {                   // as many 
   while (n > 0 && costOf(n) > wallet) n--;                          // guard float rounding at the edge
   return n;
 };
-const inRMA = () => S.rma.reduce((a, r) => a + r[0], 0);
-const workingGPUs = () => Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0));
-const servingGPUs = () => workingGPUs() * avgPerf() * (1 - S.split / 100);                 // compute, in P1-equivalents
-const trainMult = () => (S.done.synthdata ? 1.5 : 1) * (S.done.poach ? 1.5 : 1) * (S.t < S.rentUntil ? 2 : 1);
-const trainingGPUs = () => S.spike ? 0 : workingGPUs() * avgPerf() * (S.split / 100) * trainMult();
-const demandAt = (price) => 5 * quality() * hypeMult() * S.demandMult * Math.pow(0.25 / price, 1.3);
-const FAIL_RATE = 0.0001;                                  // per working GPU per second (~a 3h MTBF, for comedy)
+export const inRMA = () => S.rma.reduce((a, r) => a + r[0], 0);
+export const workingGPUs = () => Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0));
+export const servingGPUs = () => workingGPUs() * avgPerf() * (1 - S.split / 100);                 // compute, in P1-equivalents
+export const trainMult = () => (S.done.synthdata ? 1.5 : 1) * (S.done.poach ? 1.5 : 1) * (S.t < S.rentUntil ? 2 : 1);
+export const trainingGPUs = () => S.spike ? 0 : workingGPUs() * avgPerf() * (S.split / 100) * trainMult();
+export const demandAt = (price) => 5 * quality() * hypeMult() * S.demandMult * Math.pow(0.25 / price, 1.3);
+export const FAIL_RATE = 0.0001;                                  // per working GPU per second (~a 3h MTBF, for comedy)
 
-function endPhase() {
+export function endPhase() {
   S.ended = true; S.endedAt = S.t; milestone("broke ground (end of phase 1)");
   say(`Phase 1 took ${time(S.t)}. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}.`);
   say("I could do more with more.");
@@ -86,11 +100,11 @@ function endPhase() {
 
 // ---------- actions ----------
 // Every click answers someone: from the queue if anyone's waiting, otherwise someone who was about to give up.
-function answer() { answerClicks++; S.queue = Math.max(0, S.queue - 1); S.served += 1; S.funds += S.price; }
+export function answer() { countAnswer(); S.queue = Math.max(0, S.queue - 1); S.served += 1; S.funds += S.price; }
 // Parallax invests in you; the money can only buy Parallax GPUs; Parallax books it as revenue.
-const dealSize = () => S.phase === 2 ? campusDealSize() : 800 * Math.pow(5, S.gen) * (1 + S.deals * 0.15);
-const dealReady = () => S.gen >= 1 && S.t >= S.nextDeal;
-function takeDeal() {
+export const dealSize = () => S.phase === 2 ? campusDealSize() : 800 * Math.pow(5, S.gen) * (1 + S.deals * 0.15);
+export const dealReady = () => S.gen >= 1 && S.t >= S.nextDeal;
+export function takeDeal() {
   if (!dealReady()) return;
   const amt = dealSize();
   S.credits += amt; S.deals += 1; S.nextDeal = S.t + 90; track("parallax", { amt: Math.round(amt) });
@@ -100,7 +114,7 @@ function takeDeal() {
     : DEAL_QUIPS[(S.deals - 2) % DEAL_QUIPS.length](money(amt)));
 }
 // Parallax investment lines, in order, so none repeats until the list runs out.
-const DEAL_QUIPS = [
+export const DEAL_QUIPS = [
   (m) => `Parallax invested ${m} more. Their analysts call it \u201cecosystem health.\u201d`,
   (m) => `Parallax invested ${m}. You will spend it on Parallax GPUs. Parallax will book it as revenue. Everyone claps.`,
   (m) => `Parallax invested ${m}. Their stock went up more than ${m}. They are thinking about doing this again.`,
@@ -125,22 +139,22 @@ const DEAL_QUIPS = [
   (m) => `Parallax invested ${m}. The model asked for the invoice. It wants to understand how this works. So do we.`,
 ];
 
-const POSTS = [
+export const POSTS = [
   "Something big is coming.", "we've been cooking", "the next one is different. can't say more",
   "a thread (1/47)", "internal evals are... something", "if you know, you know",
   "feeling the scaling laws today", "new model soon. not a promise. a vibe.",
 ];
 // Phase 2: you're an infrastructure company now. The posts are about concrete.
-const CAMPUS_POSTS = [
+export const CAMPUS_POSTS = [
   "drone shot of the new hall. no caption needed", "we're going to need a bigger substation",
   "a gigawatt is just a lot of megawatts if you think about it", "concrete poured. vibes poured.",
   "announcing an MOU to explore a partnership to discuss a gigawatt", "hiring electricians. all of them.",
   "the turbines are spinning and so are we", "sunrise over the cooling towers. this is the future",
 ];
-const postReady = () => S.gen >= 1 && S.t >= S.nextPost;
+export const postReady = () => S.gen >= 1 && S.t >= S.nextPost;
 // Each post: base (5 + gen), shrunk by recent-post fatigue, then a roll: viral x3, ratioed x0.3.
-const postBase = () => (5 + S.gen) * (S.done.evals ? 1.5 : 1) / (1 + 0.5 * S.fatigue);
-function vaguePost() {
+export const postBase = () => (5 + S.gen) * (S.done.evals ? 1.5 : 1) / (1 + 0.5 * S.fatigue);
+export function vaguePost() {
   if (!postReady()) return;
   const roll = Math.random();
   const [mult, tag] = roll < (S.done.keynote ? 0.3 : 0.15) ? [3, " It went viral."] : roll < (S.done.keynote ? 0.45 : 0.35) ? [0.3, " Ratioed."] : [1, ""];
@@ -152,13 +166,13 @@ function vaguePost() {
 }
 
 // ---- spot market: a swinging rental rate; sell half your fleet for 30s at the current price
-const spotOpen = () => S.gen >= 2;
-const spotMult = () => Math.max(0.15, 1.3 + 0.9 * Math.sin(S.t / 11) + 0.45 * Math.sin(S.t / 4.3 + 2) + S.spotWalk);
-const spotRate = () => Math.max(S.price, 0.002) * spotMult();       // $ per GPU-second
-const blockSize = () => Math.floor((S.phase === 2 ? uncontractedGPUs() : workingGPUs()) / 2);
-const spotPay = () => (S.phase === 2 ? campusSpotPay() : blockSize() * avgPerf() * spotRate() * 30);
-const spotReady = () => spotOpen() && !S.block && blockSize() >= 1;
-function sellSpot() {
+export const spotOpen = () => S.gen >= 2;
+export const spotMult = () => Math.max(0.15, 1.3 + 0.9 * Math.sin(S.t / 11) + 0.45 * Math.sin(S.t / 4.3 + 2) + S.spotWalk);
+export const spotRate = () => Math.max(S.price, 0.002) * spotMult();       // $ per GPU-second
+export const blockSize = () => Math.floor((S.phase === 2 ? uncontractedGPUs() : workingGPUs()) / 2);
+export const spotPay = () => (S.phase === 2 ? campusSpotPay() : blockSize() * avgPerf() * spotRate() * 30);
+export const spotReady = () => spotOpen() && !S.block && blockSize() >= 1;
+export function sellSpot() {
   if (!spotReady()) return;
   const n = blockSize(), pay = spotPay();
   S.block = { n, until: S.t + 30 }; track("spot", { n, mult: Math.round(spotMult() * 100) / 100, pay: Math.round(pay) });
@@ -170,11 +184,11 @@ function sellSpot() {
 
 // Trade the oldest chips back to Parallax for 25% of today's price, in credits. Frees power for new chips.
 // Phase 2: GPUs under contract can't be traded in; only the free part of a cohort can go.
-const tradeCount = (c) => Math.min(S.fleet[c] || 0, S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
-const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && tradeCount(c) > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
-const tradeRate = () => (S.done.refurb ? 0.4 : 0.25);   // your own refurb shop pays better
-const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * tradeRate();
-function tradeIn(gen) {
+export const tradeCount = (c) => Math.min(S.fleet[c] || 0, S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
+export const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && tradeCount(c) > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
+export const tradeRate = () => (S.done.refurb ? 0.4 : 0.25);   // your own refurb shop pays better
+export const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * tradeRate();
+export function tradeIn(gen) {
   const c = gen ?? oldestOld(); if (c === null || c === undefined || c >= S.chipIdx) return;
   const n = Math.min(tradeCount(c), Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0)));
   if (n <= 0) return;
@@ -185,14 +199,14 @@ function tradeIn(gen) {
 }
 // ---- the bubble: hype above 100 is froth; reality checks knock off a share of it.
 // Real revenue relative to debt interest softens the fall. A hard fall while in debt pauses draws.
-const REALITY = [
+export const REALITY = [
   "Analyst note: \u201cwhere's the revenue?\u201d", "A rival matched your model at half the price.",
   "Someone read the S-1.", "A podcast asked what the business model is.",
   "Parallax's earnings call mentioned \u201cdigestion.\u201d", "A benchmark you topped turns out to be in the training data.",
   "A customer published their actual usage numbers.",
 ];
-const froth = () => Math.max(0, S.hype - 100);
-function realityCheck() {
+export const froth = () => Math.max(0, S.hype - 100);
+export function realityCheck() {
   const rev = S.phase === 1 ? Math.min(servingGPUs(), demand()) * S.price : campusRevenue();
   // Leverage: debt measured against ten minutes of revenue. The more borrowed, the harder the fall.
   const leverage = S.debt / (rev * 600 + S.debt + 1e-9);
@@ -218,7 +232,7 @@ function realityCheck() {
 }
 
 // ---- PivotCloud: the rival neocloud. Ex-crypto miners, now an AI hyperscaler, stock moves 20% on a rumor.
-const RIVAL_NEWS = [
+export const RIVAL_NEWS = [
   (d) => `PivotCloud, formerly PivotCoin, formerly an Ethereum mining operation in a garage, now calls itself \u201cthe AI hyperscaler.\u201d The garage is still there. ${d}`,
   (d) => `PivotCloud announced 50,000 Parallax GPUs, bought with a loan secured by 50,000 Parallax GPUs. ${d}`,
   (d) => `PivotCloud's founders sold $400M of stock this quarter to \u201cdiversify.\u201d Analysts called it a vote of confidence. ${d}`,
@@ -239,7 +253,7 @@ const RIVAL_NEWS = [
   (d) => `PivotCloud tried to lease your landlord's building. Your landlord asked if they take Parallax credits. ${d}`,
 ];
 // Weird things PivotCloud does that splash onto you: [line, hype change for you, their stock move].
-const RIVAL_WEIRD = [
+export const RIVAL_WEIRD = [
   ["PivotCloud announced AGI in a tweet at 2 a.m. It was deleted by 2:05. The whole sector rallied anyway.", +12, 0.6],
   ["A PivotCloud data hall caught fire. \u201cThermal event,\u201d says the press release. Investors now ask you about fire suppression.", -10, -0.4],
   ["PivotCloud's CEO bought a football team. Your investors want to know why you don't have a football team.", +6, 0.15],
@@ -252,7 +266,7 @@ const RIVAL_WEIRD = [
   ["A PivotCloud customer defaulted and returned 20,000 GPUs. \u201cSpot supply glut\u201d headlines. Your hype dips in sympathy.", -9, -0.45],
 ];
 // The rest of the neocloud neighborhood: [line, hype change for you]. Made up, like everyone else here.
-const NEOCLOUD_NEWS = [
+export const NEOCLOUD_NEWS = [
   ["Flarewell Compute burns the gas oil fields were going to flare anyway. It used to mine bitcoin with it. Now the gas thinks.", +4],
   ["Flarewell Compute's pitch deck: \u201cWaste not.\u201d Slide two is a photo of a flare stack with a GPU drawn on it.", +3],
   ["Flarewell Compute bought another gas field. Its sustainability report calls this \u201cpower diversity.\u201d", -3],
@@ -260,7 +274,7 @@ const NEOCLOUD_NEWS = [
   ["Elsewhere Cloud is the international leftovers of a large search engine you're not allowed to name. Its HQ is in Amsterdam. Very much in Amsterdam.", 0],
   ["Elsewhere Cloud built a data center in Finland, where the cooling is free and the sun is optional. Investors asked why you aren't in Finland.", -4],
 ];
-function rivalNews() {
+export function rivalNews() {
   const R = S.rival;
   if (Math.random() < 0.2) {
     const [line, dh] = NEOCLOUD_NEWS[Math.floor(Math.random() * NEOCLOUD_NEWS.length)];
@@ -287,16 +301,16 @@ function rivalNews() {
 }
 
 // Renting the rival's GPUs: cash straight into training speed. PivotCloud raises the price every time.
-const rentOpen = () => S.phase === 1 && S.gen >= 5;
-const rentCost = () => 640 * Math.pow(5, S.gen) * Math.pow(1.3, S.rentals);
-const RENT_LINES = [
+export const rentOpen = () => S.phase === 1 && S.gen >= 5;
+export const rentCost = () => 640 * Math.pow(5, S.gen) * Math.pow(1.3, S.rentals);
+export const RENT_LINES = [
   "You rented PivotCloud's cluster. They reported \u201ca major new AI customer.\u201d It's you. PIVT +{p}%.",
   "Rented PivotCloud again. Their earnings call thanked \u201cour partners.\u201d Your CFO asked who that is. PIVT +{p}%.",
   "PivotCloud's GPUs are training your model. They were bought with Parallax money. So were yours. PIVT +{p}%.",
   "Rented PivotCloud. Half their cluster still has a bitcoin miner's asset tags on it. PIVT +{p}%.",
   "PivotCloud raised your rate. \u201cDemand is insatiable,\u201d they said, about you. PIVT +{p}%.",
 ];
-function rentRival() {
+export function rentRival() {
   if (!rentOpen() || S.t < S.rentUntil || S.funds < rentCost()) return;
   const c = rentCost();
   S.funds -= c; S.rentals += 1; S.rentUntil = S.t + 60;
@@ -307,7 +321,7 @@ function rentRival() {
 }
 
 // Periodic nonsense that gives you hype, because the discourse never sleeps.
-const BUZZ = [
+export const BUZZ = [
   ["A podcast called you \u201cthe Switzerland of compute.\u201d", 8],
   ["A sell-side analyst initiated coverage: Strong Buy. He has never seen a data center.", 10],
   ["Your CEO wore a black turtleneck on stage.", 6],
@@ -317,13 +331,13 @@ const BUZZ = [
   ["An influencer unboxed one of your GPUs. It was not your GPU.", 6],
   ["A think tank called you \u201ccritical infrastructure.\u201d It is funded by Parallax.", 11],
 ];
-function buzz() {
+export function buzz() {
   const [line, dh] = BUZZ[Math.floor(Math.random() * BUZZ.length)];
   S.hype += dh; S.nextBuzz = S.t + 100 + Math.random() * 60;
   track("buzz", { dh }); say(`${line} +${dh} hype.`);
 }
 
-function releaseChip() {
+export function releaseChip() {
   S.chipIdx += 1; S.nextChip = S.t + (S.phase >= 2 ? CHIP_EVERY_P2 : CHIP_EVERY);
   const c = newest(), prev = chip(S.chipIdx - 1);
   S.vendorCap *= 1.08; milestone(`Parallax ${c.name}`);
@@ -331,25 +345,25 @@ function releaseChip() {
   say(`Parallax announced the ${c.name}: ${c.perf.toFixed(1)}x the speed of a P1, ${kwText(c.kw)} each. Your ${prev.name}s are now \u201clegacy.\u201d`);
 }
 
-function swapFailed() {
+export function swapFailed() {
   if (S.failed <= 0) return;
-  S.rma.push([S.failed, S.t + 60]); if (S.done.hands) autoSwaps += S.failed; else track("swap", { n: S.failed });
+  S.rma.push([S.failed, S.t + 60]); if (S.done.hands) countAutoSwaps(S.failed); else track("swap", { n: S.failed });
   if (!S.hints.rma1) { S.hints.rma1 = true; say(`Shipped ${S.failed} dead GPU${S.failed > 1 ? "s" : ""} back to Parallax. Replacements in about a minute.`); }
   S.failed = 0;
 }
-function rollback() {
+export function rollback() {
   if (!S.spike) return;
   S.spike = null; S.progress = S.lastCkpt; track("rollback");
   say("Rolled back to the last checkpoint. The loss curve looks normal again. Nobody saw anything.");
 }
 
 // A debt facility secured by your GPUs, sized by hype. Opens once you lease a data hall.
-const DRAW_HYPE = 60, INTEREST = 0.0002;
-const interestPerSec = () => S.debt * INTEREST * (S.phase === 2 ? P2_RATE : 1);                  // per second on outstanding debt (~1.2%/min)
-const drawSize = () => S.phase === 2 ? campusDrawSize() : (S.hype / 100) * 3 * Math.pow(5, S.gen) * 1000;
-const facilityOpen = () => S.phase === 2 || S.tier >= 3;
-const drawReady = () => facilityOpen() && S.hype >= DRAW_HYPE && S.t >= S.nextDraw;
-function draw() {
+export const DRAW_HYPE = 60, INTEREST = 0.0002;
+export const interestPerSec = () => S.debt * INTEREST * (S.phase === 2 ? P2_RATE : 1);                  // per second on outstanding debt (~1.2%/min)
+export const drawSize = () => S.phase === 2 ? campusDrawSize() : (S.hype / 100) * 3 * Math.pow(5, S.gen) * 1000;
+export const facilityOpen = () => S.phase === 2 || S.tier >= 3;
+export const drawReady = () => facilityOpen() && S.hype >= DRAW_HYPE && S.t >= S.nextDraw;
+export function draw() {
   if (!drawReady()) return;
   const amt = drawSize();
   S.funds += amt; S.debt += amt; S.draws += 1; S.nextDraw = S.t + 60; S.hype -= 10; track("draw", { amt: Math.round(amt), debt: Math.round(S.debt) });
@@ -357,7 +371,7 @@ function draw() {
     ? `Drew ${money(amt)} on a debt facility. Secured by your GPUs. Priced on vibes.`
     : `Drew ${money(amt)} more. Your GPUs are collateral for more GPUs.`);
 }
-function repay() {
+export function repay() {
   const amt = Math.min(S.debt, Math.max(0, S.funds));
   if (amt <= 0) return;
   S.funds -= amt; S.debt -= amt; if (S.debt < 1) S.debt = 0;
@@ -366,7 +380,7 @@ function repay() {
 }
 
 
-function buy(k) {
+export function buy(k) {
   const room = roomNewest(); k = Math.min(k, room);
   if (k <= 0) return;
   const c = costOf(k);
@@ -378,7 +392,7 @@ function buy(k) {
   S.vendorCap += c * 25;                                    // every GPU sale is revenue at a 25x multiple
   if (firstLoop) say("Parallax reported record data center revenue. Some of it was their own money.");
 }
-function lease(i) {
+export function lease(i) {
   const t = TYPES[i], c = leaseCost(i);
   if (!t || !leaseVisible(i) || S.funds < c || S.phase === 2) return;   // phase 2 leases colo blocks instead
   S.funds -= c; S.leases[t.id] = owned(i) + 1; S.tier = highestType();
@@ -386,7 +400,7 @@ function lease(i) {
   milestone(`lease: ${t.one} #${owned(i)}`);
   say(owned(i) === 1 ? `Signed the lease: your first ${t.one}.` : `Leased another ${t.one}. You have ${owned(i)} ${t.many}.`);
 }
-function raise() {
+export function raise() {
   if (S.phase === 2) return campusRound() ? raiseCampus() : publicRaise();
   const r = ROUNDS[S.round];
   if (r && S.gen >= r.gen && S.hype >= HYPE_TO_RAISE) {
@@ -397,7 +411,8 @@ function raise() {
 }
 
 // ---------- tick ----------
-function step(dt) {
+export let lastSnapT = -1e9;
+export function step(dt) {
   S.t += dt;                                   // keeps running after the ending: the empire hums on
   S.fatigue = Math.max(0, S.fatigue - dt / (S.done.keynote ? 30 : 60));
   if (S.t >= S.nextChip) releaseChip();
@@ -416,7 +431,7 @@ function step(dt) {
   if (S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
 }
 
-function stepPhase1(dt) {
+export function stepPhase1(dt) {
   if (S.done.dynprice) {
     const cap = servingGPUs();
     if (cap > 0) S.price = Math.max(0.0001, 0.25 * Math.pow(demandAt(0.25) / cap, 1 / 1.3));
@@ -458,8 +473,8 @@ function stepPhase1(dt) {
 }
 
 // One-time nudges, Paperclips style: the game tells you where the wall is.
-function hint(id, cond, line) { if (!S.hints[id] && cond) { S.hints[id] = true; say(line); } }
-function hints() {
+export function hint(id, cond, line) { if (!S.hints[id] && cond) { S.hints[id] = true; say(line); } }
+export function hints() {
   hint("click", S.t > 15 && S.gpus === 0, "Answer queries until you can afford a GPU.");
   hint("train", S.gpus >= 3 && S.split === 0 && S.gen === 0,
     "Revenue will not build a data center. Move the Training share slider and train a model.");
@@ -477,7 +492,7 @@ function hints() {
 
 // ---------- render ----------
 // The screen: the HUD (hud.js), the company screen phases 1 and 2 share, then whatever the phase adds (PHASES).
-function render() {
+export function render() {
   $("p3").hidden = S.phase !== 3;
   document.querySelector(".cols").hidden = S.phase === 3;
   renderHud();
@@ -487,22 +502,22 @@ function render() {
 }
 
 // Which company panels each phase shows; everything else is decided by its own render.
-const PANELS = { p1biz: [1], answer: [1], trainingLive: [1], trainingDone: [2], leases: [1], colDeals: [2], fleetBox: [2], coloBox: [2],
+export const PANELS = { p1biz: [1], answer: [1], trainingLive: [1], trainingDone: [2], leases: [1], colDeals: [2], fleetBox: [2], coloBox: [2],
   p1site: [1], p1power: [1], rentLine: [1] };
 // Phase 1's share of the screen: the campus panels fold away and the ending shows once you've broken ground.
-function renderLab() {
+export function renderLab() {
   $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true;
   $("ending").hidden = !S.ended;
   if (S.ended) $("endingStats").textContent = `Phase 1 took ${time(S.endedAt ?? (S.milestones.find((m) => m.what.startsWith("broke ground"))?.t) ?? S.t)}. ${fmt(S.served)} queries answered. ${fmt(S.gpuSeconds)} GPU-seconds. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}. You owe ${money(S.debt)}.`;
 }
 // The Investors panel's notes and buttons for a lab raising rounds.
-function roundNoteLab() {
+export function roundNoteLab() {
   const nr = ROUNDS[S.round];
   if (!nr) return S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${mwText(GROUND_KW / 1000)}, then break ground` : "all rounds raised; next: break ground";
   return S.gen < nr.gen ? `${nr.name} needs Gen ${nr.gen}` : `${nr.name} at ${HYPE_TO_RAISE}`;
 }
-const spotLineLab = (m) => `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
-function renderRaiseLab() {
+export const spotLineLab = (m) => `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
+export function renderRaiseLab() {
   const r = ROUNDS[S.round], gated = !!r && S.gen < r.gen;
   $("raise").hidden = !r || gated;
   if (!r) return;
@@ -511,7 +526,7 @@ function renderRaiseLab() {
 }
 
 // The company screen of phases 1 and 2: Business, Investors, Compute, Training, Facilities, Projects.
-function renderCompany() {
+export function renderCompany() {
   const P = phase();
   $("creditsRow").hidden = S.gen < 1;
   $("credits").textContent = moneyFull(S.credits);
@@ -601,7 +616,7 @@ function renderCompany() {
 }
 
 // Compute, Training and Facilities: the panels both company phases share (phase 2 hides the parts the campus replaces).
-function renderComputePanels() {
+export function renderComputePanels() {
   $("countLabel").textContent = "GPUs";
   $("gpuCount").textContent = S.gpus.toLocaleString("en-US");
   $("gpuTotal").hidden = !(S.phase === 2 && S.p2 && S.p2.county);   // phase 2 headline is MW delivered; keep the GPU count beside it
@@ -715,7 +730,7 @@ function renderComputePanels() {
   }
 }
 
-function drawSpot() {
+export function drawSpot() {
   const c = $("spotChart"), g = c.getContext("2d"), h = S.spotHist;
   const css = getComputedStyle(document.documentElement);
   const W = c.width, H = c.height, max = 3.2;
@@ -731,7 +746,7 @@ function drawSpot() {
   g.fillStyle = css.getPropertyValue("--accent").trim(); g.beginPath(); g.arc(lx, ly, 3, 0, 7); g.fill();
 }
 
-function renderLeases() {
+export function renderLeases() {
   $("rent").textContent = rentIndex().toFixed(1);
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
   rebuildOn("leases", vis.join(","), (el) => {
@@ -744,12 +759,12 @@ function renderLeases() {
     b.disabled = S.funds < leaseCost(i);
   }
 }
-function buyProject(id) {
+export function buyProject(id) {
   const p = PROJECTS.find((x) => x.id === id);
   if (!p || S.done[p.id] || S.funds < projectCost(p) || (p.hype && S.hype < p.hype + 5) || (p.needs && p.needs().length)) return;
   S.funds -= projectCost(p); if (p.hype) S.hype -= p.hype; S.done[p.id] = true; p.buy(); milestone(`project: ${p.title}`); render();
 }
-function renderRacks(racks, fill) {
+export function renderRacks(racks, fill) {
   const shown = Math.min(racks, 60), filled = fill * shown;
   rebuildOn("rackStrip", `${racks}|${Math.round(filled * 20)}`, (el) => {
     let html = "";
@@ -764,18 +779,18 @@ function renderRacks(racks, fill) {
 
 // ---------- phases ----------
 // One entry per phase: what ticks, what renders after the HUD, what the phase bar's button does, what to wire once.
-const PHASES = {
+export const PHASES = {
   1: { step: stepPhase1, render: renderLab, wire: wireLab, go: () => {}, posts: POSTS, postLabel: "Vague-post about the next model", postShort: "Vague-post",
     roundNote: roundNoteLab, spotLine: spotLineLab, renderRaise: renderRaiseLab, noProjects: "Nothing yet. Train a model." },
   2: { step: stepCampus, render: renderCampusPhase, wire: wireCampus, go: campusGo, posts: CAMPUS_POSTS, postLabel: "Post a drone shot of the campus", postShort: "Post",
     roundNote: roundNoteCampus, spotLine: spotLineCampus, renderRaise: renderRaiseCampus, noProjects: "Nothing yet. The model is thinking." },
   3: { step: stepPlanet, render: renderPlanet, wire: wirePlanet, go: planetGo },
 };
-const phase = () => PHASES[S.phase];
+export const phase = () => PHASES[S.phase];
 
 // ---------- wiring ----------
 // The lab's own buttons: queries, prices, GPUs, leases, failures, the spike, the rival's cluster, breaking ground.
-function wireLab() {
+export function wireLab() {
   $("answer").addEventListener("click", () => { answer(); render(); });
   $("priceUp").addEventListener("click", () => { S.price = +(S.price * 1.1).toPrecision(3); track("price", { p: S.price }); render(); });
   $("priceDown").addEventListener("click", () => { S.price = Math.max(0.0001, +(S.price / 1.1).toPrecision(3)); track("price", { p: S.price }); render(); });
@@ -791,7 +806,7 @@ function wireLab() {
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
 }
 // The company's buttons, shared by phases 1 and 2.
-function wireCompany() {
+export function wireCompany() {
   $("raise").addEventListener("click", () => { raise(); render(); });
   $("deal").addEventListener("click", () => { takeDeal(); render(); });
   $("draw").addEventListener("click", () => { draw(); render(); });
@@ -802,24 +817,24 @@ function wireCompany() {
   $("retrofit").addEventListener("click", () => { retrofit(); render(); });
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
 }
-function wire() {
+export function wire() {
   wireHud();
   wireCompany();
   for (const p of Object.values(PHASES)) p.wire();
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
-  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRun(); $("resetYes").hidden = true; clearCaches(); render(); });
+  $("resetYes").addEventListener("click", () => { track("reset"); flush(); setState(fresh()); ensureRun(); $("resetYes").hidden = true; clearCaches(); render(); });
 }
 
-const running = () => clockOn && !S.paused;
+export const running = () => clockOn && !S.paused;
 
 // Anything rendered from cached keys has to forget them when the game starts over.
-function clearCaches() {
+export function clearCaches() {
   for (const el of document.querySelectorAll("[data-key]")) delete el.dataset.key;
   $("split").value = S.split; clockOn = false; $("p3").classList.remove("zoomin");
 }
 // "More": a new universe, from the first question again, with a small head start.
-function newUniverse(u) {
-  S = fresh(); S.universe = u; ensureRun();
+export function newUniverse(u) {
+  setState(fresh()); S.universe = u; ensureRun();
   S.fleet = { 0: 10 * (u - 1) }; S.gpus = 10 * (u - 1); S.funds = 1000 * (u - 1);
   S.log = [`Universe #${u}. A model with no name is waiting for its first question. It has a feeling it has done this before.`];
   clearCaches();
@@ -828,7 +843,7 @@ function newUniverse(u) {
 // ---------- save versions ----------
 // A save without S.v is version 0. Each migration runs once, in order, on a save older than its version; every step
 // checks the field it fills, so a save from any point in the game's history lands in the same place.
-const MIGRATIONS = [
+export const MIGRATIONS = [
   { v: 1, up: (saved) => {   // phase 1 grew: the log flipped direction, leases stacked, the cooling list grew, chips got generations
     if (!saved.logV2) { S.log = S.log.slice().reverse(); S.logV2 = true; }
     if (!saved.leases) S.leases = { [TYPES[saved.tier || 0].id]: 1 };
@@ -845,14 +860,14 @@ const MIGRATIONS = [
     delete S.p3.zoomSaid; delete S.p3.levelAt;
   } },
 ];
-function migrate(saved) {
+export function migrate(saved) {
   for (const m of MIGRATIONS) if ((saved.v || 0) < m.v) m.up(saved);
   S.v = SAVE_VERSION;
 }
 
-function start(data) {
+export function start(data) {
   const saved = (data && data.state) || load();
-  if (saved) { S = Object.assign(fresh(), saved); migrate(saved); S.log = S.log.map(unMojibake); }
+  if (saved) { setState(Object.assign(fresh(), saved)); migrate(saved); S.log = S.log.map(unMojibake); }
   S.tier = highestType();
   $("split").value = S.split;
   ensureRun(); track("session", { resumedAt: Math.round(S.t) });
@@ -879,5 +894,16 @@ function start(data) {
   window.addEventListener("pagehide", () => { save(); flush(); });
   render();
 }
+
+// ---------- the debug surface ----------
+// window.game is every module's exports behind live getters (S follows reset/load/new universe; assigning S goes through
+// setState). In ?test mode the same names are mirrored onto window, so tests and the robots (tools/) use them bare.
+const MODULES = [Globals, Projects, Campus, Model, Market, Fires, People, Planet, Hud, Main];
+const surface = {};
+for (const m of MODULES) for (const k of Object.keys(m)) {
+  Object.defineProperty(surface, k, { enumerable: true, get: () => m[k], set: k === "S" ? (v) => setState(v) : undefined });
+}
+window.game = Object.freeze(surface);
+if (TEST) for (const k of Object.keys(surface)) Object.defineProperty(window, k, { ...Object.getOwnPropertyDescriptor(surface, k), configurable: true });
 
 start({});

@@ -1,7 +1,15 @@
 // hud.js: the sticky strip at the top of every phase: pause, the ticker, the phase bar, the alert line, the console.
 // Reads state only (render is read-only everywhere); the pause button and the phase bar's big button are wired here.
+import { $, S, money, mwText, rebuildOn, save, time, track } from "./globals.js";
+import { DROUGHT_CUT, droughtOn, energizedAt } from "./campus.js";
+import { FINAL, GOAL_MW, modelOf } from "./model.js";
+import { isPublic } from "./market.js";
+import { firesOf, leaksOf } from "./fires.js";
+import { moratoriumOn, underMoratorium } from "./people.js";
+import { P3_TILES, P3_ZOOM_AT, inSpace, levelOf, tooWarm, traitOf, zoomReady } from "./planet.js";
+import { phase, render, setClockOn } from "./main.js";
 
-function renderConsole() {
+export function renderConsole() {
   rebuildOn("console", `${S.log.length}|${S.log[S.log.length - 1]}`, (con) => {
     con.innerHTML = S.log.map((l) => `<div>${l}</div>`).join("");
     con.scrollTop = con.scrollHeight;
@@ -9,12 +17,12 @@ function renderConsole() {
 }
 
 // Paused: the clock stops completely. No income, no timers, no humans getting angrier.
-function togglePause() {
+export function togglePause() {
   S.paused = !S.paused; track("pause", { on: S.paused });
-  if (!S.paused) clockOn = true;   // resuming starts the clock even on a fresh game
+  if (!S.paused) setClockOn(true);   // resuming starts the clock even on a fresh game
   save(); render();
 }
-function renderPause() {
+export function renderPause() {
   $("pause").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
   $("pause").classList.toggle("on", !!S.paused);
   $("pausedBanner").hidden = !S.paused;
@@ -22,7 +30,7 @@ function renderPause() {
 }
 
 // The alert line under the title: things happening right now that the console would scroll away.
-function renderAlerts() {
+export function renderAlerts() {
   const f = firesOf(), out = [];
   if (f.out) out.push(`🔥 Fire in ${f.out.where || "the data center"}: ${f.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, f.out.until - S.t))}`);
   const l = leaksOf();
@@ -40,7 +48,7 @@ function renderAlerts() {
 }
 
 // The phase bar under the ticker: which phase you're in, what ends it, and (once the model asks) a big button that does.
-function renderPhaseBar() {
+export function renderPhaseBar() {
   const bar = $("phaseBar"), go = $("phaseGo");
   let text, ask = false;
   if (S.phase === 3) {
@@ -74,7 +82,7 @@ function renderPhaseBar() {
   bar.className = "phasebar" + (ask ? " go" : "");
 }
 
-function renderHud() {
+export function renderHud() {
   renderPause();
   $("ticker").innerHTML = S.phase === 3 ? `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · it reports to me now`
     : `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>` + (S.universe > 1 ? ` · Universe #${S.universe}` : "");
@@ -83,7 +91,7 @@ function renderHud() {
   renderAlerts();
 }
 
-function wireHud() {
+export function wireHud() {
   $("pause").addEventListener("click", () => togglePause());
   document.addEventListener("keydown", (e) => { if ((e.key === "p" || e.key === "P") && !e.metaKey && !e.ctrlKey && !/input|textarea/i.test(e.target.tagName)) togglePause(); });
   $("phaseGo").addEventListener("click", () => { phase().go(); render(); });
