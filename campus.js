@@ -46,6 +46,11 @@ const CUSTOMERS = [
   "Your old lab (Parallax is paying)", "A lab funded by Parallax", "PivotCloud, subleasing to its own customers",
   "A sovereign AI fund", "A lab you have never heard of with $4B", "A chatbot company that is also a hardware company",
 ];
+// The most each customer can sign for. ~2 kW per GPU all-in, so $4B buys about 20k GPUs: ~50 MW.
+const CUSTOMER_MAX_MW = {
+  "Your old lab (Parallax is paying)": 1000, "A lab funded by Parallax": 1500, "PivotCloud, subleasing to its own customers": 300,
+  "A sovereign AI fund": 500, "A lab you have never heard of with $4B": 50, "A chatbot company that is also a hardware company": 200,
+};
 const ROUNDS2 = [
   { name: "Series E", backlog: 100, campus: 150, amount: 100e6 },   // then the IPO (market.js)
 ];
@@ -230,10 +235,11 @@ function makeOffer(first = false) {
   const scale = Math.max(20, 0.3 * (usedKW() / 1000 + 40)) * (S.done.vp ? 1.2 : 1);
   const minGen = first ? 0 : Math.max(0, S.chipIdx - (Math.random() < 0.4 ? 1 : 0));   // labs want current chips
   const cap = Math.max(10, Math.floor(0.8 * deliverableMW(minGen) / 10) * 10);   // never ask for more than you could possibly deliver
-  const mw = first ? 30 : Math.min(cap, Math.max(10, Math.round(scale * (0.6 + Math.random() * 0.8) / 10) * 10));
+  const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
+  const most = Math.min(cap, CUSTOMER_MAX_MW[who] || cap);
+  const mw = first ? 30 : Math.min(most, Math.max(10, Math.round(scale * (0.6 + Math.random() * 0.8) / 10) * 10));
   const startsIn = first ? 300 : 240 + Math.floor(Math.random() * 180);
   const term = 480 + Math.floor(Math.random() * 420);
-  const who = first ? CUSTOMERS[0] : CUSTOMERS[1 + Math.floor(Math.random() * (CUSTOMERS.length - 1))];
   S.p2.offers.push({ id: `o${n}`, n, who, mw, minGen, start: S.t + startsIn, term,
     upfront: mw * term * UPFRONT_RATE * genPrice(minGen) * (modelDone("pricing") ? 1.3 : 1) * (S.done.resdesk ? 1.2 : 1), fee: mw * FEE_RATE * genPrice(minGen) * (S.done.sovereign2 && who === "A sovereign AI fund" ? 1.3 : 1) * (S.done.benchmarks ? 1.1 : 1) * ceoFee(), expires: S.t + (first ? 280 : OFFER_TTL) });
   track("contract", { ev: "offer", mw });

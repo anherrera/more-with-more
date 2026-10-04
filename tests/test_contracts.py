@@ -250,3 +250,14 @@ def test_offers_ignore_land_you_have_not_built_on(game):
     pg.evaluate("""() => { S.p2.market = 0; S.leases = {rack: 1}; S.leaseCool = {rack: {0: 1}}; S.fleet = {}; S.gpus = 0; }""")
     sizes = pg.evaluate("() => { const out = []; for (let i = 0; i < 30; i++) { S.p2.offers = []; makeOffer(); out.push(S.p2.offers[0].mw); } return out; }")
     assert max(sizes) <= 10                                 # nothing is deliverable by the start date yet
+
+
+def test_offers_are_sized_to_the_customer_not_just_your_fleet(game):
+    pg = game({**READY, "debt": 0})
+    pg.click("button[data-id='ground']")
+    pg.click("button[data-county='strong']")
+    sizes = pg.evaluate("""() => { S.fleet = {3: 3e6}; S.gpus = 3e6; S.p2.market = 1e5; S.p2.offers = []; const out = [];
+      for (let i = 0; i < 60; i++) { makeOffer(); const o = S.p2.offers.pop(); out.push([o.who, o.mw]); } return out; }""")
+    caps = pg.evaluate("() => CUSTOMER_MAX_MW")
+    assert all(mw <= caps[who] for who, mw in sizes)
+    assert max(mw for who, mw in sizes if who.startswith("A lab you have never heard of")) <= 50
