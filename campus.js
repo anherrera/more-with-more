@@ -29,7 +29,7 @@ const WATER = {
   well: { name: "well", mgd: 2, cost: 15e6, secs: 45, acres: 0 },
   reclaimed: { name: "reclaimed water plant", mgd: 3, cost: 40e6, secs: 120, acres: 0 },
 };
-const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.3;             // each request waits 30% longer: everyone is in the queue
+const QUEUE_DEPOSIT = 5e6, QUEUE_GROWTH = 1.1, QUEUE_MAX_SECS = 600;   // each request waits 10% longer (everyone is in the queue), up to 10 minutes
 const BUILD_DONE = {
   hall: () => `Hall ${doneBuilds("hall")} is up. ` +
     (hallMWAt() > powerAt() ? "It has no power yet. It is a very expensive shed." : "Energized. Rack some GPUs in it."),
@@ -135,11 +135,12 @@ function buyLand() {
 }
 // Owning the utility skips the line, but energizing still takes 30 s a request.
 const queueSecs = () => modelDone("utility") ? 30
-  : countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN) * (modelDone("lobbyist") ? 0.5 : 1) * (S.done.lawyer ? 0.7 : 1);
+  : Math.min(QUEUE_MAX_SECS, countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN)) * (modelDone("lobbyist") ? 0.5 : 1) * (S.done.lawyer ? 0.7 : 1);
 
-// Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered.
-const BUILD_GROWTH = 1.03;
-const buildCost = (kind) => specOf(kind).cost * Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length) * ceoBuild();
+// Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered,
+// ...until 5x the first one: by then the supply chain has caught up with you.
+const BUILD_GROWTH = 1.03, BUILD_MAX = 5;
+const buildCost = (kind) => specOf(kind).cost * Math.min(BUILD_MAX, Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length)) * ceoBuild();
 
 function build(kind) {
   const spec = specOf(kind);
@@ -457,7 +458,7 @@ function renderCampus() {
   const p = S.p2;
   $("coloLine").textContent = `Colo market: ${mwText(Math.max(0, p.market))} available` +
     (p.nextColo ? ` \u00b7 next colo opens in ~${time(Math.max(0, p.nextColo - S.t))}` : "");
-  $("leaseColo").textContent = p.market >= COLO_MW ? `Lease ${mwText(COLO_MW)} of colo space: ${money(coloCost())} (${money(coloCost() / (COLO_MW * 1000))}/kW, rent ${rentIndex().toFixed(0)}\u00d7)`
+  $("leaseColo").textContent = p.market >= COLO_MW ? `Lease ${mwText(COLO_MW)} of colo space: ${money(coloCost())} (${money(coloCost() / (COLO_MW * 1000))}/kW)`
     : `Colo sold out: next one opens in ~${time(Math.max(0, (p.nextColo || S.t) - S.t))}`;
   $("leaseColo").disabled = p.market < COLO_MW || S.funds < coloCost();
   renderFleet();

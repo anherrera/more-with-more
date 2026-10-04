@@ -14,4 +14,4 @@ def test_phase2_drops_phase1_leftovers_but_keeps_the_rack_strip(game):
     assert not pg.is_visible("#failRow")
     assert not pg.is_visible("#rentLine")
     assert pg.is_visible("#rackStrip")
-    assert "rent" in pg.inner_text("#leaseColo")
+    assert "/kW" in pg.inner_text("#leaseColo")

@@ -80,7 +80,7 @@ def test_queue_discounts_stack(game):
     base = pg.evaluate("() => queueSecs()")
     buy(pg, "lawyer", TRIGGERS["lawyer"])
     pg.evaluate("() => { S.p2.model.done.lobbyist = true; }")
-    assert pg.evaluate("() => queueSecs()") == pytest.approx(base * 1.3 * 0.7 * 0.5)   # queueN went 0 -> 1 in the trigger
+    assert pg.evaluate("() => queueSecs()") == pytest.approx(base * 1.1 * 0.7 * 0.5)   # queueN went 0 -> 1 in the trigger
 
 
 def test_offer_projects(game):

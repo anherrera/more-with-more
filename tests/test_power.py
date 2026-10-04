@@ -41,7 +41,7 @@ def test_queue_adds_grid_and_gets_slower(game):
     assert pg.is_disabled("#requestQueue")
     run(pg, 300)
     assert pg.evaluate("() => [S.p2.grid, S.p2.queue]") == [150, None]
-    assert pg.evaluate("() => queueSecs()") == pytest.approx(300 * 1.3)
+    assert pg.evaluate("() => queueSecs()") == pytest.approx(300 * 1.1)
 
 
 def test_land_runs_out(game):
@@ -159,3 +159,23 @@ def test_land_stays_sane_after_many_parcels(game):
     pg = campus(game, county="strong")
     pg.evaluate("() => { S.p2.landN = 60; townOf().v = 0; }")
     assert pg.evaluate("() => landCost()") < 150e6
+
+
+def test_queue_waits_stay_sane(game):
+    pg = campus(game, county="strong")
+    pg.evaluate("() => { S.p2.queueN = 40; }")
+    assert pg.evaluate("() => queueSecs()") <= 600
+
+
+def test_build_costs_level_off(game):
+    pg = campus(game, county="strong")
+    base = pg.evaluate("() => specOf('hall').cost")
+    pg.evaluate("() => { for (let i = 0; i < 200; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); ceoOf().mandate = null; }")
+    assert pg.evaluate("() => buildCost('hall')") == pytest.approx(base * 5)
+
+
+def test_colo_button_shows_price_per_kw_not_the_rent_multiplier(game):
+    pg = campus(game, county="strong")
+    pg.evaluate("() => { S.p2.market = 100; render(); }")
+    text = pg.inner_text("#leaseColo")
+    assert "/kW" in text and "rent" not in text
