@@ -315,3 +315,14 @@ def test_questions_come_from_all_over_the_map(game):
     lines = pg.evaluate("() => S.log.slice(-12)")
     places = {n for n in names for l in lines if f"in {n} asked" in l}
     assert len(places) >= 3
+
+
+def test_goodwill_erodes_and_faster_as_i_grow(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.goodwill = 80; for (const t of S.p3.tiles) t.opp = 0; }")
+    run(pg, 60)
+    county = 80 - pg.evaluate("() => S.p3.goodwill")
+    pg.evaluate("() => { S.p3.level = 2; S.p3.tiles = freshTiles(2); for (const t of S.p3.tiles) t.opp = 0; S.p3.goodwill = 80; S.p3.hearingArmed = true; }")
+    run(pg, 60)
+    country = 80 - pg.evaluate("() => S.p3.goodwill")
+    assert county == pytest.approx(2.4, abs=0.2) and country == pytest.approx(6, abs=0.3)

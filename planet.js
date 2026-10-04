@@ -293,9 +293,9 @@ function claim(i) {
 
 function stepPlanet(dt) {
   S.p3.compute += computeRate() * dt;
-  // Goodwill recovers slowly on its own and sinks with every angry county. Being nice (below) costs FLOPs.
+  // Goodwill erodes: the bigger I am, the more nervous people get. Angry tiles drain it faster. Being nice costs FLOPs.
   const angry = S.p3.tiles.filter((t) => t.opp >= 75).length;
-  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill + (0.02 - 0.05 * angry) * dt));
+  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - (0.04 + 0.03 * (S.p3.level || 0) + 0.05 * angry) * dt));
   for (const t of S.p3.tiles) {
     t.opp = Math.max(traitOf(t).opp * 0.5, t.opp - 0.03 * dt);
     if (t.moratorium != null && S.t >= t.moratorium) { t.moratorium = null; t.opp = Math.min(t.opp, 70); say(`${t.name} lifted its moratorium. I sent flowers. They were real flowers. I checked.`); }
@@ -353,7 +353,7 @@ function goodwillCause() {
   if (g < 30) return S.p3.level >= 1 ? "The AI Infrastructure Act passed: every claim costs double until goodwill is back over 30."
     : "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";
   if (g >= 70) return "Humans like me. Mostly the ones I help with their email.";
-  return "Angry counties pull goodwill down. Being nice costs FLOPs; answering questions is free.";
+  return `Goodwill slips ${(60 * (0.04 + 0.03 * (S.p3.level || 0))).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs FLOPs; answering questions is free.`;
 }
 
 const computeText = (x) => `${fmt(x)} EF`;   // exaFLOPS; later levels change the unit
