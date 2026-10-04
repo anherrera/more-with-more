@@ -3,7 +3,7 @@ import pathlib, re
 from conftest import MID, run
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SCRIPTS = ["globals.js", "projects.js", "campus.js", "model.js", "market.js", "fires.js", "people.js", "planet.js", "main.js"]
+SCRIPTS = ["globals.js", "projects.js", "campus.js", "model.js", "market.js", "fires.js", "people.js", "planet.js", "hud.js", "main.js"]
 
 
 def test_scripts_load_in_order():
@@ -101,3 +101,15 @@ def test_a_loaded_save_has_every_field_before_the_first_render(game):
     assert have == [True] * 7
     assert pg.evaluate("() => S.p2.town.v") == 20                        # the strong-grid county's starting opposition
     assert pg.evaluate("() => ownership()") < 1                           # the cap table is rebuilt from the rounds raised
+
+
+def test_each_phase_dispatches_through_the_phases_table(game):
+    pg = game()
+    assert pg.evaluate("() => Object.keys(PHASES)") == ["1", "2", "3"]
+    kinds = pg.evaluate("() => Object.values(PHASES).map((p) => [typeof p.step, typeof p.render, typeof p.wire, typeof p.go])")
+    assert kinds == [["function"] * 4] * 3
+    assert pg.evaluate("() => PHASES[1].step === stepPhase1 && PHASES[2].step === stepCampus && PHASES[3].step === stepPlanet")
+    assert pg.evaluate("() => PHASES[3].render === renderPlanet && PHASES[3].wire === wirePlanet && PHASES[2].wire === wireCampus")
+    hud = (ROOT / "hud.js").read_text()
+    assert "function renderAlerts" in hud and "function renderPhaseBar" in hud
+    assert "function renderAlerts" not in (ROOT / "fires.js").read_text() and "function renderPhaseBar" not in (ROOT / "model.js").read_text()

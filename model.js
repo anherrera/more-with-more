@@ -151,48 +151,11 @@ function renderModel() {
   }
 }
 
+// The phase bar's big button in phase 2: approve the model's ask, or zoom out to the map once it has built the next one.
+function campusGo() {
+  if (modelOf().endedAt != null) { startPlanet(); $("p3").classList.add("zoomin"); } else approveProposal();
+}
 function wireModel() {
   $("propYes").addEventListener("click", () => { approveProposal(); render(); });
-  $("phaseGo").addEventListener("click", () => {
-    if (S.phase === 3) { const lv = S.p3.level; zoomOut(); if (S.p3.level !== lv) { $("p3").classList.remove("zoomin"); void $("p3").offsetWidth; $("p3").classList.add("zoomin"); } render(); return; }
-    if (S.phase === 2 && modelOf().endedAt != null) { startPlanet(); $("p3").classList.add("zoomin"); } else approveProposal();
-    render();
-  });
   $("propNo").addEventListener("click", () => { rejectProposal(); render(); });
-}
-
-// The phase bar under the ticker: which phase you're in, what ends it, and (once the model asks) a big button that does.
-function renderPhaseBar() {
-  const bar = $("phaseBar"), go = $("phaseGo");
-  let text, ask = false;
-  if (S.phase === 3) {
-    const held = S.p3.tiles.filter((t) => t.state === "online").length;
-    const L = levelOf();
-    if (inSpace()) {
-      const rings = S.p3.tiles.filter((t) => traitOf(t).swarm), on = rings.filter((t) => t.state === "online").length;
-      text = S.p3.enough ? "The end. More with less." : S.p3.lastQ != null ? "The swarm is complete. Someone is asking me a question."
-        : `Phase 3 of 3 \u00b7 Space: ${on} of ${rings.length} swarm rings online. Mercury first, then the swarm.`;
-    } else if (S.p3.zoomSaid) text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online. The next level arrives in the next build.`;
-    else if (zoomReady()) { ask = true; text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online.`; go.textContent = `Zoom out: go ${L.next}`; go.disabled = false; }
-    else text = `Phase 3 of 3 \u00b7 ${L.name} level: ${held} of ${P3_TILES} ${L.plural} online. Hold ${P3_ZOOM_AT} to go ${L.next}.`;
-  } else if (S.phase === 1) {
-    text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."
-      : `Phase 1 of 3 · Goal: reach Gen 6 (now Gen ${S.gen}), then break ground on your own campus.`;
-  } else if (!S.p2 || !S.p2.county) {
-    text = "Phase 2 of 3 · Pick a county for the campus.";
-  } else {
-    const m = modelOf(), en = energizedAt();
-    if (m.endedAt != null) { ask = true; text = "Phase 2 complete. The model built the next one, and it has a map."; go.textContent = "Zoom out: begin phase 3"; go.disabled = false; }
-    else if (m.final) {
-      ask = true;
-      text = `Phase 2 goal reached. The model asks: “${FINAL.title}.”` + (m.final.at != null ? ` It approves itself in ${Math.max(0, Math.ceil(m.final.at - S.t))}s.` : "");
-      go.textContent = m.final.at != null ? "Approve (it's going ahead anyway)" : "Approve: finish phase 2";
-      go.disabled = m.final.at != null;
-    } else {
-      text = `Phase 2 of 3 · Goal: a 1 GW campus (${mwText(Math.min(en, GOAL_MW))} of 1 GW${en >= GOAL_MW ? " ✓" : ""}) and an IPO${isPublic() ? " ✓" : ""}. Then the model makes its last ask.`;
-    }
-  }
-  $("phaseText").textContent = text;
-  go.hidden = !ask;
-  bar.className = "phasebar" + (ask ? " go" : "");
 }

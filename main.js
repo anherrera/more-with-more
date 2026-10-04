@@ -1,4 +1,4 @@
-// main.js: phase 1 (the lab), the shared tick and render, wiring, and start().
+// main.js: phase 1 (the lab), the company screen phases 1 and 2 share, the PHASES table, the tick, wiring, and start().
 const TEST = new URLSearchParams(location.search).has("test");
 // Playtesting fast-forward: ?speed=10 runs the game 10x (1-50). Off unless the URL asks.
 const SPEED = Math.max(1, Math.min(50, Number(new URLSearchParams(location.search).get("speed")) || 1));
@@ -146,7 +146,7 @@ function vaguePost() {
   const [mult, tag] = roll < (S.done.keynote ? 0.3 : 0.15) ? [3, " It went viral."] : roll < (S.done.keynote ? 0.45 : 0.35) ? [0.3, " Ratioed."] : [1, ""];
   const gain = Math.max(1, Math.round(postBase() * mult));
   S.hype += gain; S.nextPost = S.t + 25; S.fatigue += 1; track("post", { gain, result: mult === 3 ? "viral" : mult < 1 ? "ratioed" : "normal" });
-  const lines = S.phase === 2 ? CAMPUS_POSTS : POSTS;
+  const lines = phase().posts;
   say(`Posted: \u201c${lines[S.posts % lines.length]}\u201d +${gain} hype.${tag}`);
   S.posts += 1;
 }
@@ -409,7 +409,7 @@ function step(dt) {
   stepLeaks();
   if (S.nextBuzz == null) S.nextBuzz = S.t + 120;
   if (S.phase <= 2 && S.gen >= 1 && S.t >= S.nextBuzz) buzz();
-  if (S.phase === 1) stepPhase1(dt); else if (S.phase === 2) stepCampus(dt); else stepPlanet(dt);
+  phase().step(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
   if (S.phase <= 2 && froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
   S.funds -= interestPerSec() * dt;
@@ -476,34 +476,49 @@ function hints() {
 }
 
 // ---------- render ----------
-function renderConsole() {
-  if (S.log.length !== lastLogLen || S.log[S.log.length - 1] !== lastLogTail) {
-    lastLogLen = S.log.length; lastLogTail = S.log[S.log.length - 1];
-    const con = $("console");
-    con.innerHTML = S.log.map((l) => `<div>${l}</div>`).join("");
-    con.scrollTop = con.scrollHeight;
-  }
-}
-
+// The screen: the HUD (hud.js), the company screen phases 1 and 2 share, then whatever the phase adds (PHASES).
 function render() {
   $("p3").hidden = S.phase !== 3;
   document.querySelector(".cols").hidden = S.phase === 3;
-  renderPause();
-  if (S.phase === 3) {   // phase 3 has its own screen; phases 1-2 panels are folded away
-    $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> \u00b7 it reports to me now`;
-    renderConsole(); renderPhaseBar(); renderAlerts(); renderPlanet();
-    $("ending").hidden = $("ending2").hidden = true;
-    $("clock").textContent = `${time(S.t)} played`;
-    return;
-  }
-  $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>` + (S.universe > 1 ? ` · Universe #${S.universe}` : "");
+  renderHud();
+  if (S.phase !== 3) renderCompany();
+  phase().render();
+  $("clock").textContent = S.phase === 3 ? `${time(S.t)} played` : `${time(S.t)} played · ${fmt(S.gpuSeconds)} GPU-seconds used`;
+}
+
+// Which company panels each phase shows; everything else is decided by its own render.
+const PANELS = { p1biz: [1], answer: [1], trainingLive: [1], trainingDone: [2], leases: [1], colDeals: [2], fleetBox: [2], coloBox: [2],
+  p1site: [1], p1power: [1], rentLine: [1] };
+// Phase 1's share of the screen: the campus panels fold away and the ending shows once you've broken ground.
+function renderLab() {
+  $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true;
+  $("ending").hidden = !S.ended;
+  if (S.ended) $("endingStats").textContent = `Phase 1 took ${time(S.endedAt ?? (S.milestones.find((m) => m.what.startsWith("broke ground"))?.t) ?? S.t)}. ${fmt(S.served)} queries answered. ${fmt(S.gpuSeconds)} GPU-seconds. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}. You owe ${money(S.debt)}.`;
+}
+// The Investors panel's notes and buttons for a lab raising rounds.
+function roundNoteLab() {
+  const nr = ROUNDS[S.round];
+  if (!nr) return S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${mwText(GROUND_KW / 1000)}, then break ground` : "all rounds raised; next: break ground";
+  return S.gen < nr.gen ? `${nr.name} needs Gen ${nr.gen}` : `${nr.name} at ${HYPE_TO_RAISE}`;
+}
+const spotLineLab = (m) => `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
+function renderRaiseLab() {
+  const r = ROUNDS[S.round], gated = !!r && S.gen < r.gen;
+  $("raise").hidden = !r || gated;
+  if (!r) return;
+  $("raise").textContent = S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
+  $("raise").disabled = gated || S.hype < HYPE_TO_RAISE;
+}
+
+// The company screen of phases 1 and 2: Business, Investors, Compute, Training, Facilities, Projects.
+function renderCompany() {
+  const P = phase();
   $("creditsRow").hidden = S.gen < 1;
   $("credits").textContent = moneyFull(S.credits);
   $("creditsNote").textContent = "(GPUs only)";
   $("deal").hidden = S.gen < 1;
   $("deal").disabled = !dealReady();
   $("deal").textContent = dealReady() ? `Take Parallax's strategic investment: ${money(dealSize())} in credits` : `Parallax will call back in ${time(S.nextDeal - S.t)}`;
-  renderConsole();
   $("funds").textContent = moneyFull(S.funds);
   $("credits").className = S.credits > 0 ? "hot" : "";
   $("debtRow").hidden = S.debt <= 0;
@@ -518,11 +533,7 @@ function render() {
     : (S.hype < DRAW_HYPE ? `Debt facility needs hype ${DRAW_HYPE}+` : `Bank will take your call in ${time(S.nextDraw - S.t)}`);
   $("hypeNum").textContent = Math.round(S.hype);
   {
-    const nr = S.phase === 2 ? campusRound() : ROUNDS[S.round], notes = [];
-    if (S.phase === 2) notes.push(nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${mwText(nr.backlog)} backlog` : isPublic() ? `follow-ons at ${HYPE_TO_RAISE}` : `IPO at ${HYPE_TO_RAISE}`);
-    else if (!nr) notes.push(S.ended ? "all rounds raised" : S.gen < 7 ? "all rounds raised; next: Gen 7, then break ground" : usedKW() < GROUND_KW ? `all rounds raised; next: grow to ${mwText(GROUND_KW / 1000)}, then break ground` : "all rounds raised; next: break ground");
-    else if (S.gen < nr.gen) notes.push(`${nr.name} needs Gen ${nr.gen}`);
-    else notes.push(`${nr.name} at ${HYPE_TO_RAISE}`);
+    const notes = [P.roundNote()];
     if (facilityOpen()) notes.push(`debt at ${DRAW_HYPE}`);
     if (froth() > 0) notes.push(`froth ${Math.round(froth())}`);
     $("hypeNote").textContent = `(${notes.join(", ")})`;
@@ -535,8 +546,7 @@ function render() {
   $("spotBox").hidden = !spotOpen();
   if (spotOpen()) {
     const m = spotMult();
-    $("spotNow").textContent = S.phase === 2 ? `${money(OD_RATE * genPrice(S.chipIdx) * m)}/MW-s for ${newest().name}s (${m.toFixed(1)}x on-demand)`
-      : `${money(spotRate() * 60)} per GPU-minute (${m.toFixed(1)}x query revenue)`;
+    $("spotNow").textContent = P.spotLine(m);
     $("spotNow").className = m >= 2 ? "good" : m < 1 ? "bad" : "";
     $("spot").disabled = !spotReady();
     $("spot").textContent = S.block ? `${S.block.n.toLocaleString("en-US")} GPUs leased out, back in ${Math.ceil(S.block.until - S.t)}s`
@@ -546,8 +556,8 @@ function render() {
   $("post").hidden = S.gen < 1;
   $("post").disabled = !postReady();
   $("post").textContent = postReady()
-    ? `${S.phase === 2 ? "Post a drone shot of the campus" : "Vague-post about the next model"} (~+${Math.max(1, Math.round(postBase()))} hype${S.fatigue >= 1 ? ", timeline is tired" : ""})`
-    : `${S.phase === 2 ? "Post" : "Vague-post"} again in ${Math.ceil(S.nextPost - S.t)}s`;
+    ? `${P.postLabel} (~+${Math.max(1, Math.round(postBase()))} hype${S.fatigue >= 1 ? ", timeline is tired" : ""})`
+    : `${P.postShort} again in ${Math.ceil(S.nextPost - S.t)}s`;
   $("hypeNum").className = S.hype > 100 ? "hot" : S.hype >= HYPE_TO_RAISE ? "good" : "";
   $("hypeMeter").firstElementChild.style.width = Math.min(100, S.hype / 2) + "%";
   // One rule for every meter: green fine, amber act soon, red trouble.
@@ -559,29 +569,14 @@ function render() {
     : S.hype >= HYPE_TO_RAISE ? "Investors will take a meeting. You can raise."
     : "Investors aren't returning calls. Ship a model or post.";
   renderMarket();
-  renderAlerts();
-  renderPhaseBar();
-  renderPeople();
+  renderPeople();     // these three hide themselves outside phase 2
   renderVendors();
   renderCeo();
-  const r = S.phase === 2 ? campusRound() : ROUNDS[S.round];
-  if (S.phase === 2 && !r) renderPublicRaise();
-  const gated = !!r && (S.phase === 2 ? !!roundGap(r) : S.gen < r.gen);
-  if (S.phase === 1 || r) $("raise").hidden = !r || (S.phase === 1 && gated);
-  if (r) {
-    $("raise").textContent = S.phase === 2 && gated ? `${r.name} needs ${roundGap(r)}`
-      : S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
-    $("raise").disabled = gated || S.hype < HYPE_TO_RAISE;
-  }
+  P.renderRaise();
 
-  for (const id of ["p1biz", "answer", "trainingLive"]) $(id).hidden = S.phase !== 1;
-  $("trainingDone").hidden = S.phase === 1;          // the panel stays and says why the slider is gone
-  $("colDeals").hidden = $("fleetBox").hidden = $("coloBox").hidden = S.phase !== 2;
+  for (const [id, phases] of Object.entries(PANELS)) $(id).hidden = !phases.includes(S.phase);
   if (S.phase !== 2) $("ending2").hidden = true;          // e.g. after a reset
-  $("leases").hidden = S.phase === 2;
-  renderPhase1();                                   // compute and leased space work in both phases
-  if (S.phase === 1) $("countyBox").hidden = $("campusBox").hidden = $("contractsBox").hidden = true;
-  else renderCampus();
+  renderComputePanels();
 
   // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.
   // (Rebuilding every tick swaps buttons out mid-click and the click never lands.)
@@ -589,7 +584,7 @@ function render() {
   const key = avail.map((p) => p.id).join(",");
   if (key !== lastProjectKey) {
     lastProjectKey = key;
-    $("projects").innerHTML = avail.length ? "" : `<div class="empty">${S.phase === 1 ? "Nothing yet. Train a model." : "Nothing yet. The model is thinking."}</div>`;
+    $("projects").innerHTML = avail.length ? "" : `<div class="empty">${P.noProjects}</div>`;
     for (const p of avail) {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.id = p.id;
@@ -605,12 +600,10 @@ function render() {
     b.disabled = S.funds < cost || (p.hype && S.hype < p.hype + 5) || missing.length > 0;   // hype projects need hype to spare
     if (p.needs) b.querySelector(".c").textContent = p.desc + (missing.length ? ` Still need to: ${missing.join(", ")}.` : " Ready.");
   }
-  $("clock").textContent = `${time(S.t)} played · ${fmt(S.gpuSeconds)} GPU-seconds used`;
-  $("ending").hidden = !(S.ended && S.phase === 1);
-  if (S.ended) $("endingStats").textContent = `Phase 1 took ${time(S.endedAt ?? (S.milestones.find((m) => m.what.startsWith("broke ground"))?.t) ?? S.t)}. ${fmt(S.served)} queries answered. ${fmt(S.gpuSeconds)} GPU-seconds. ${money(S.roundTrip)} went in a circle. Parallax is worth ${money(S.vendorCap)}. You owe ${money(S.debt)}.`;
 }
 
-function renderPhase1() {
+// Compute, Training and Facilities: the panels both company phases share (phase 2 hides the parts the campus replaces).
+function renderComputePanels() {
   $("countLabel").textContent = "GPUs";
   $("gpuCount").textContent = S.gpus.toLocaleString("en-US");
   $("gpuTotal").hidden = !(S.phase === 2 && S.p2 && S.p2.county);   // phase 2 headline is MW delivered; keep the GPU count beside it
@@ -640,9 +633,7 @@ function renderPhase1() {
   $("gpuPrice").textContent = `${money(gpuPrice())} per ${nc.name}` + (basePrice() >= PMAX ? " (Parallax volume pricing)" : "");
   const room = roomNewest();
   const wallet = S.funds + S.credits;
-  $("failRow").hidden = S.fails === 0 || S.phase === 2;
-  $("p1site").hidden = $("p1power").hidden = S.phase === 2;   // phase 2 shows space on Campus and Fleet   // GPUs don't fail one by one in phase 2
-  $("rentLine").hidden = S.phase === 2;                  // phase 2 shows rent on the colo button
+  $("failRow").hidden = S.fails === 0 || S.phase === 2;   // GPUs don't fail one by one in phase 2
   $("failed").textContent = S.failed.toLocaleString("en-US");
   $("rmaNote").textContent = inRMA() ? `(${inRMA().toLocaleString("en-US")} in RMA)` : (S.done.hands ? "(remote hands on it)" : "");
   $("swap").hidden = S.failed === 0 || !!S.done.hands;
@@ -742,7 +733,7 @@ function drawSpot() {
   g.fillStyle = css.getPropertyValue("--accent").trim(); g.beginPath(); g.arc(lx, ly, 3, 0, 7); g.fill();
 }
 
-let lastRackKey = "", lastProjectKey = null, lastLogLen = -1, lastLogTail = null, lastLeaseKey = null;
+let lastRackKey = "", lastProjectKey = null, lastLeaseKey = null;
 function renderLeases() {
   $("rent").textContent = rentIndex().toFixed(1);
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
@@ -776,8 +767,20 @@ function renderRacks(racks, fill) {
   $("rackStrip").innerHTML = html;
 }
 
+// ---------- phases ----------
+// One entry per phase: what ticks, what renders after the HUD, what the phase bar's button does, what to wire once.
+const PHASES = {
+  1: { step: stepPhase1, render: renderLab, wire: wireLab, go: () => {}, posts: POSTS, postLabel: "Vague-post about the next model", postShort: "Vague-post",
+    roundNote: roundNoteLab, spotLine: spotLineLab, renderRaise: renderRaiseLab, noProjects: "Nothing yet. Train a model." },
+  2: { step: stepCampus, render: renderCampusPhase, wire: wireCampus, go: campusGo, posts: CAMPUS_POSTS, postLabel: "Post a drone shot of the campus", postShort: "Post",
+    roundNote: roundNoteCampus, spotLine: spotLineCampus, renderRaise: renderRaiseCampus, noProjects: "Nothing yet. The model is thinking." },
+  3: { step: stepPlanet, render: renderPlanet, wire: wirePlanet, go: planetGo },
+};
+const phase = () => PHASES[S.phase];
+
 // ---------- wiring ----------
-function wire() {
+// The lab's own buttons: queries, prices, GPUs, leases, failures, the spike, the rival's cluster, breaking ground.
+function wireLab() {
   $("answer").addEventListener("click", () => { answer(); render(); });
   $("priceUp").addEventListener("click", () => { S.price = +(S.price * 1.1).toPrecision(3); track("price", { p: S.price }); render(); });
   $("priceDown").addEventListener("click", () => { S.price = Math.max(0.0001, +(S.price / 1.1).toPrecision(3)); track("price", { p: S.price }); render(); });
@@ -787,55 +790,32 @@ function wire() {
   $("buyCredits").addEventListener("click", () => { buy(maxBuy(S.credits)); render(); });
   $("split").addEventListener("input", (e) => { S.split = Number(e.target.value); render(); });
   $("leases").addEventListener("click", (e) => { const b = e.target.closest("button[data-lease]"); if (b) { lease(Number(b.dataset.lease)); render(); } });
+  $("swap").addEventListener("click", () => { swapFailed(); render(); });
+  $("rollback").addEventListener("click", () => { rollback(); render(); });
+  $("rentRival").addEventListener("click", () => { rentRival(); render(); });
+  $("toCampus").addEventListener("click", () => { startCampus(); render(); });
+}
+// The company's buttons, shared by phases 1 and 2.
+function wireCompany() {
   $("raise").addEventListener("click", () => { raise(); render(); });
   $("deal").addEventListener("click", () => { takeDeal(); render(); });
   $("draw").addEventListener("click", () => { draw(); render(); });
   $("repay").addEventListener("click", () => { repay(); render(); });
-  $("swap").addEventListener("click", () => { swapFailed(); render(); });
-  $("vendors").addEventListener("click", (e) => { const b = e.target.closest("button[data-vendor]"); if (b) { pickVendor(b.dataset.vendor); render(); } });
-  $("sponsor").addEventListener("click", () => { sponsor(); render(); });
-  $("perks").addEventListener("click", (e) => { const b = e.target.closest("button[data-perk]"); if (b) { usePerk(b.dataset.perk); render(); } });
-  $("cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
   $("tradein").addEventListener("click", () => { tradeIn(); render(); });
   $("post").addEventListener("click", () => { vaguePost(); render(); });
   $("spot").addEventListener("click", () => { sellSpot(); render(); });
-  $("rollback").addEventListener("click", () => { rollback(); render(); });
-  $("rentRival").addEventListener("click", () => { rentRival(); render(); });
   $("retrofit").addEventListener("click", () => { retrofit(); render(); });
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
-  $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
-  $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
-  $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
-  $("pause").addEventListener("click", () => togglePause());
-  document.addEventListener("keydown", (e) => { if ((e.key === "p" || e.key === "P") && !e.metaKey && !e.ctrlKey && !/input|textarea/i.test(e.target.tagName)) togglePause(); });
-  $("p3autotrain").addEventListener("click", () => { S.p3.autoTrainOff = !S.p3.autoTrainOff; render(); });
-  $("p3auto").addEventListener("click", () => { S.p3.autoOff = !S.p3.autoOff; render(); });
-  $("p3techs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
-  $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });
-  $("p3trainBtn").addEventListener("click", () => { trainSuccessor(); render(); });
-  $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
-  $("p3nice").addEventListener("click", (e) => { const b = e.target.closest("button[data-nice]"); if (b) { doNice(b.dataset.nice); render(); } });
+}
+function wire() {
+  wireHud();
+  wireCompany();
+  for (const p of Object.values(PHASES)) p.wire();
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
   $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("resetYes").hidden = true; clearCaches(); render(); });
-  $("lastMore").addEventListener("click", () => { chooseEnding(true); render(); });
-  $("lastEnough").addEventListener("click", () => { chooseEnding(false); render(); });
-  $("toCampus").addEventListener("click", () => { startCampus(); render(); });
-  wireCampus();
 }
 
-// Paused: the clock stops completely. No income, no timers, no humans getting angrier.
 const running = () => clockOn && !S.paused;
-function togglePause() {
-  S.paused = !S.paused; track("pause", { on: S.paused });
-  if (!S.paused) clockOn = true;   // resuming starts the clock even on a fresh game
-  save(); render();
-}
-function renderPause() {
-  $("pause").textContent = S.paused ? "\u25b6 Resume" : "\u23f8 Pause";
-  $("pause").classList.toggle("on", !!S.paused);
-  $("pausedBanner").hidden = !S.paused;
-  document.body.classList.toggle("paused", !!S.paused);
-}
 
 // Anything rendered from cached keys has to forget them when the game starts over.
 function clearCaches() {

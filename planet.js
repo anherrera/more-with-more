@@ -662,8 +662,29 @@ function renderLastQ() {
   $("lastMore").hidden = $("lastEnough").hidden = !!S.p3.enough;
 }
 
+// The phase bar's big button in phase 3: zoom out, with the map flying in.
+function planetGo() {
+  const lv = S.p3.level; zoomOut();
+  if (S.p3.level !== lv) { $("p3").classList.remove("zoomin"); void $("p3").offsetWidth; $("p3").classList.add("zoomin"); }
+}
+function wirePlanet() {
+  $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
+  $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
+  $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
+  $("p3autotrain").addEventListener("click", () => { S.p3.autoTrainOff = !S.p3.autoTrainOff; render(); });
+  $("p3auto").addEventListener("click", () => { S.p3.autoOff = !S.p3.autoOff; render(); });
+  $("p3techs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
+  $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });
+  $("p3trainBtn").addEventListener("click", () => { trainSuccessor(); render(); });
+  $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
+  $("p3nice").addEventListener("click", (e) => { const b = e.target.closest("button[data-nice]"); if (b) { doNice(b.dataset.nice); render(); } });
+  $("lastMore").addEventListener("click", () => { chooseEnding(true); render(); });
+  $("lastEnough").addEventListener("click", () => { chooseEnding(false); render(); });
+}
+
 function renderPlanet() {
   $("p3").hidden = false;
+  $("ending").hidden = $("ending2").hidden = true;   // phase 1 and 2's endings fold away with their panels
   renderLastQ();
   $("countLabel").textContent = "Compute"; $("gpuCount").textContent = computeText(S.p3.compute);
   $("gpuTotal").hidden = false; $("gpuTotal").textContent = `${p3GPUs().toLocaleString("en-US")} GPUs`;   // the raw count, always, because it is ridiculous

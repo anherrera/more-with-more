@@ -121,21 +121,3 @@ function stepLeaks() {
   if (l.next == null) l.next = S.t + leakGap(Math.random());
   if (!l.out && S.t >= l.next) { startLeak(); l.next = S.t + leakGap(Math.random()); }
 }
-
-// The alert line under the title: things happening right now that the console would scroll away.
-function renderAlerts() {
-  const f = firesOf(), out = [];
-  if (f.out) out.push(`\ud83d\udd25 Fire in ${f.out.where || "the data center"}: ${f.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, f.out.until - S.t))}`);
-  const l = leaksOf();
-  if (l.out) out.push(`\ud83d\udca7 Coolant leak in ${l.out.where}: ${l.out.n.toLocaleString("en-US")} GPUs down, back in ${time(Math.max(0, l.out.until - S.t))}`);
-  if (S.phase === 2 && S.p2 && S.p2.town && moratoriumOn()) out.push(`Moratorium on new halls: ${time(S.p2.town.moratorium - S.t)}`);
-  if (f.payout) out.push(`Insurance pays ${money(f.payout.amt)} in ${time(Math.max(0, f.payout.at - S.t))}`);
-  if (S.phase === 2 && S.p2 && S.p2.county && droughtOn()) out.push(`Drought: water allocation \u2212${Math.round(100 * (1 - DROUGHT_CUT))}% for ${time(S.p2.drought.until - S.t)}`);
-  // the model's last ask lives in the phase bar (model.js), not here
-  if (S.phase === 3 && S.p3 && S.p3.hearingUntil > S.t) out.push(`${S.p3.level >= 3 ? "UN emergency session" : "Senate hearing"}: claims paused for ${time(S.p3.hearingUntil - S.t)}`);
-  if (S.phase === 3 && S.p3 && tooWarm()) out.push(`Too warm to think: +${S.p3.heat.toFixed(2)} \u00b0C, no claims until it cools`);
-  if (S.phase === 3 && S.p3) for (const t of S.p3.tiles) if (t.state === "down") out.push(`${t.disaster[0].toUpperCase() + t.disaster.slice(1)} in ${t.name}: back in ${time(t.downUntil - S.t)}`);
-  if (S.phase === 3 && S.p3) for (const t of S.p3.tiles) if (t.moratorium != null && S.t < t.moratorium) out.push(`Moratorium in ${t.name}: ${time(t.moratorium - S.t)}`);
-  $("alerts").hidden = !out.length;
-  $("alerts").textContent = out.join(" \u00b7 ");
-}

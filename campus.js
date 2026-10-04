@@ -714,9 +714,27 @@ function renderContracts() {
   }
 }
 
+// Phase 2's share of the screen, after the company panels (renderCompany in main.js).
+function renderCampusPhase() { $("ending").hidden = true; renderCampus(); }
+// The Investors panel's notes and buttons, dressed for an infrastructure company.
+const roundNoteCampus = () => { const nr = campusRound(); return nr ? `${nr.name} at ${HYPE_TO_RAISE} with ${mwText(nr.backlog)} backlog` : isPublic() ? `follow-ons at ${HYPE_TO_RAISE}` : `IPO at ${HYPE_TO_RAISE}`; };
+const spotLineCampus = (m) => `${money(OD_RATE * genPrice(S.chipIdx) * m)}/MW-s for ${newest().name}s (${m.toFixed(1)}x on-demand)`;
+function renderRaiseCampus() {
+  const r = campusRound();
+  if (!r) return renderPublicRaise();
+  const gap = roundGap(r);
+  $("raise").hidden = false;
+  $("raise").textContent = gap ? `${r.name} needs ${gap}` : S.hype >= HYPE_TO_RAISE ? `Raise the ${r.name}: ${money(r.amount)}` : `${r.name} needs hype ${HYPE_TO_RAISE}+`;
+  $("raise").disabled = !!gap || S.hype < HYPE_TO_RAISE;
+}
+
 function wireCampus() {
   wireModel();
   wireMarket();
+  $("vendors").addEventListener("click", (e) => { const b = e.target.closest("button[data-vendor]"); if (b) { pickVendor(b.dataset.vendor); render(); } });
+  $("sponsor").addEventListener("click", () => { sponsor(); render(); });
+  $("perks").addEventListener("click", (e) => { const b = e.target.closest("button[data-perk]"); if (b) { usePerk(b.dataset.perk); render(); } });
+  $("cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
   $("counties").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-county]");
     if (b) { chooseCounty(b.dataset.county); render(); }
