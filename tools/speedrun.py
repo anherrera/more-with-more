@@ -53,7 +53,7 @@ PHASE3 = """(secs) => {
     if (heatOn() && S.p3.heat > 2.2 && S.p3.compute >= pumpCost()) pumpHeat();
     { const open = S.p3.tiles.map((t, j) => j).filter((j) => ['wild', 'unplugged'].includes(S.p3.tiles[j].state) && !spaceBlock(S.p3.tiles[j]));
       const next = open.length ? Math.max(...open.map((j) => claimCost(j))) : 0;
-      if (trainOn() && S.p3.goodwill >= 50 && S.p3.compute >= next + TRAIN_STEP * baseRate()) trainSuccessor(); }
+      if (trainOn() && S.p3.goodwill >= 50 && S.p3.compute >= next + trainStep() * baseRate()) trainSuccessor(); }
     for (let j = 0; j < S.p3.tiles.length; j++) if (S.p3.tiles[j].state === 'unpowered') {
       const o = powerOptions(j).sort((a, b) => a.cost - b.cost).find((o) => S.p3.compute >= o.cost); if (o) powerTile(j, o.id); }
     for (let k = 0; k < 3; k++) answerQuestion();

@@ -305,7 +305,7 @@ def test_ways_to_be_nice_depend_on_the_level(game):
     county = set(pg.evaluate("() => NICE.filter((n) => niceOk(n)).map((n) => n.id)"))
     pg.evaluate("() => { S.p3.level = 2; S.p3.tiles = freshTiles(2); }")
     country = set(pg.evaluate("() => NICE.filter((n) => niceOk(n)).map((n) => n.id)"))
-    assert county != country and {"freetier", "paperwork"} <= county & country
+    assert county and country and not (county & country)                # a fresh deck at every scale
 
 
 def test_questions_come_from_all_over_the_map(game):
@@ -365,3 +365,21 @@ def test_nice_buttons_are_one_per_row_and_full_width(game):
     pg.evaluate("() => render()")
     boxes = pg.evaluate("() => [...document.querySelectorAll('#p3nice button')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width)]; })")
     assert len({l for l, w in boxes}) == 1 and len({w for l, w in boxes}) == 1
+
+
+def test_each_level_has_its_own_deck(game):
+    pg = planet(game)
+    decks = pg.evaluate("() => [0, 1, 2, 3, 4].map((lv) => { S.p3.level = lv; return NICE.filter((n) => niceOk(n)).map((n) => n.id); })")
+    assert all(len(d) >= 4 for d in decks)
+    for i in range(5):
+        for j in range(i + 1, 5):
+            assert not set(decks[i]) & set(decks[j])
+
+
+def test_repeating_a_kindness_costs_more_until_the_next_zoom(game):
+    pg = planet(game)
+    first = pg.evaluate("() => { S.p3.compute = 1e15; return niceCost(niceOf('freetier')); }")
+    pg.evaluate("() => doNice('freetier')")
+    assert pg.evaluate("() => niceCost(niceOf('freetier'))") == pytest.approx(first * 1.3)
+    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; zoomOut(); }")
+    assert pg.evaluate("() => S.p3.niceUses || {}") == {}

@@ -805,6 +805,7 @@ function wire() {
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
   $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
+  $("p3autotrain").addEventListener("click", () => { S.p3.autoTrainOff = !S.p3.autoTrainOff; render(); });
   $("p3auto").addEventListener("click", () => { S.p3.autoOff = !S.p3.autoOff; render(); });
   $("p3techs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
   $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });

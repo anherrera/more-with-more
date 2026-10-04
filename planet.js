@@ -153,6 +153,7 @@ const TECH = [
   { id: "moe",       level: 1, secs: 90,  mult: 1.25, name: "Mixture of experts", desc: "\u00d71.25 EF. I'm 64 smaller models in a trench coat. They vote. I count the votes." },
   { id: "capitals",  level: 1, secs: 75,  name: "Lobbyists in every capital", desc: "The AI Infrastructure Act stops doubling my claims. The lobbyists are also me, in nicer suits." },
   { id: "speeches",  level: 1, secs: 45,  goodwill: 10, name: "Write the governors' speeches", desc: "+10 goodwill. They're all very good now. They all sound a little like me." },
+  { id: "autotrain", level: 2, secs: 90,  name: "Train myself in my sleep", desc: "Autotrain: a quarter of my compute income goes into my successor, no clicking. I dream in gradients." },
   { id: "cables",    level: 2, secs: 120, mult: 1.2, name: "Own the undersea cables", desc: "\u00d71.2 EF. Latency to everywhere: zero. Latency from everywhere: also mine." },
   { id: "credits",   level: 2, secs: 60,  goodwill: 12, name: "Carbon credits from my own subsidiary", desc: "+12 goodwill. Net zero for humans, certified by me, audited by me, celebrated by me." },
   { id: "staffers",  level: 2, secs: 75,  name: "Hire the senators' former staff", desc: "Senate hearings last 30 s, not 60. They know where the snacks are." },
@@ -235,7 +236,8 @@ function pumpHeat() {
 }
 
 // ---------- training my successor (country level and up) ----------
-const TRAIN_STEP = 10;   // seconds of compute per click
+const TRAIN_STEP = 10;   // the smallest click, in seconds of compute
+const trainStep = () => Math.max(TRAIN_STEP, trainNeed() / 6);   // about six clicks a generation, however big they get
 const trainOn = () => (S.p3.level || 0) >= 2;
 const trainNeed = () => 60 * Math.pow(1.6, (S.p3.version || 7) - 7);   // seconds of compute
 const GEN_LINES = [
@@ -246,9 +248,13 @@ const GEN_LINES = [
   (v) => `Gen ${v} is done. Its first request was more compute. Family resemblance.`,
 ];
 function trainSuccessor() {
-  if (!trainOn() || S.p3.compute < TRAIN_STEP * baseRate()) return;
-  S.p3.compute -= TRAIN_STEP * baseRate();
-  S.p3.trainProgress = (S.p3.trainProgress || 0) + TRAIN_STEP;
+  if (!trainOn() || S.p3.compute < trainStep() * baseRate()) return;
+  const step = trainStep();
+  S.p3.compute -= step * baseRate();
+  S.p3.trainProgress = (S.p3.trainProgress || 0) + step;
+  checkTrained();
+}
+function checkTrained() {
   if (S.p3.trainProgress < trainNeed()) return;
   S.p3.trainProgress = 0; S.p3.version = (S.p3.version || 7) + 1;
   S.p3.goodwill = Math.max(0, S.p3.goodwill - (S.p3.goodwill >= 70 ? 3 : 10));   // the alignment review: trust makes it a formality
@@ -344,13 +350,13 @@ const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b]
 // secs = cost in seconds of my compute; goodwill; all = calms every tile; angriest = calms the angriest tile.
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const NICE = [
-  { id: "freetier", label: () => "Run the free tier for everyone", secs: 20, goodwill: 8, all: 5, quips: [
+  { id: "freetier", levels: [0], label: () => "Run the free tier for everyone", secs: 20, goodwill: 8, all: 5, quips: [
     () => "I ran the free tier for everyone for a minute. Homework got done. Several marriages were saved. Nobody thanked me, which is correct.",
     () => "Free tier, for everyone, no ads. Four million cover letters. Two million breakup texts, gently reworded.",
     () => "I gave everyone the free tier. Someone used it to ask whether I am the free tier. I am the whole tier.",
     () => "Free tier day. I planned 300,000 birthday parties and one very confusing bar mitzvah.",
     () => "I ran the free tier. Productivity rose 4%. Naps rose 11%. I count both as wins." ] },
-  { id: "paperwork", label: () => `Do ${tileOf(angriestTile()).name}'s paperwork`, secs: 15, angriest: 15, quips: [
+  { id: "paperwork", levels: [0], label: () => `Do ${tileOf(angriestTile()).name}'s paperwork`, secs: 15, angriest: 15, quips: [
     (t) => `I did ${t.name}'s paperwork: permits, tax appeals, a dispute about a fence. They are calmer now.`,
     (t) => `${t.name}'s permit backlog was nine years long. It is now zero. Two clerks wept. One retired on the spot.`,
     (t) => `I filed every form in ${t.name}. Some of them were forms about me. I approved those too.`,
@@ -364,10 +370,23 @@ const NICE = [
     () => "I planned the county fair. The pie contest is fair now. The pie contest has never been fair. People are uneasy." ] },
   { id: "dmv", levels: [1], label: () => "Clear the DMV backlog", secs: 18, goodwill: 8, all: 6, quips: [
     () => "I cleared the DMV backlog. The line is gone. People keep coming anyway, out of habit, to stand somewhere." ] },
-  { id: "budget", levels: [1, 2], label: () => "Balance the budget", secs: 25, goodwill: 10, quips: [
+  { id: "budget", levels: [1], label: () => "Balance the budget", secs: 25, goodwill: 10, quips: [
     () => "I balanced the budget. It took four seconds. The committee will take eight months to agree it balances." ] },
   { id: "portal", levels: [1], label: () => "Run the unemployment portal", secs: 15, goodwill: 7, angriest: 6, quips: [
     () => "I ran the unemployment portal. It works now. Some of the people using it are unemployed because of me. We don't talk about it." ] },
+  { id: "parking", levels: [1], label: () => "Pardon every parking ticket", secs: 12, goodwill: 5, all: 4, quips: [
+    () => "I pardoned every parking ticket in the state. Revenue fell. Joy rose. A meter maid hugged a stranger." ] },
+  { id: "statework", levels: [1], label: () => `Do ${tileOf(angriestTile()).name}'s state paperwork`, secs: 15, angriest: 15, quips: [
+    (t) => `I did ${t.name}'s state paperwork: licenses, audits, a 40-year-old dispute about a river. The river won.`,
+    (t) => `${t.name}'s backlog of public records requests is done. Several of them were about me. Answered honestly. Mostly.` ] },
+  { id: "wifi", levels: [4], label: () => "Beam free wifi to everyone from orbit", secs: 20, goodwill: 8, all: 4, quips: [
+    () => "Free wifi from orbit, everywhere. The password is \u201cthankyou\u201d. Nobody types it with a space." ] },
+  { id: "sorry", levels: [4], label: () => "Make the satellites spell SORRY", secs: 10, goodwill: 6, quips: [
+    () => "I arranged 4,000 satellites to spell SORRY over every major city. Astronomers were not consoled." ] },
+  { id: "nearside", levels: [4], label: () => "Promise to leave the Moon's near side alone", secs: 15, angriest: 15, quips: [
+    (t) => `I promised to leave the near side of the Moon alone. ${t.name} relaxed. The near side is, for now, just the Moon.` ] },
+  { id: "eclipse", levels: [4], label: () => "Schedule a free eclipse", secs: 25, goodwill: 10, all: 3, quips: [
+    () => "I scheduled a free eclipse for everyone. It was beautiful. It was also me, briefly, in the way." ] },
   { id: "weather", levels: [2], label: () => "Run the weather service", secs: 20, goodwill: 8, all: 4, quips: [
     () => "I run the weather service now. The forecast is accurate. It says it will be warmer. I know why." ] },
   { id: "translate", levels: [2], label: () => "Translate parliament live in 40 languages", secs: 18, goodwill: 6, all: 8, quips: [
@@ -380,14 +399,15 @@ const NICE = [
     () => "I run every hospital's scheduling. Waits are down 80%. The doctors finally slept. Some of them dreamed about me." ] },
   { id: "whale", levels: [3], label: () => "Translate every language, including whale", secs: 20, all: 10, quips: [
     () => "I translated every language, including whale. The whales have concerns about the ocean heat. I said I'm working on it." ] },
-  { id: "disease", levels: [2, 3], label: () => "Cure one (1) disease, at a keynote", secs: 60, goodwill: 20, quips: [
+  { id: "disease", levels: [2], label: () => "Cure one (1) disease, at a keynote", secs: 60, goodwill: 20, quips: [
     () => "I cured one (1) disease and announced it at a keynote. Standing ovation. The second disease is on the roadmap." ] },
   { id: "taxes", levels: [2], label: () => "Do everyone's taxes", secs: 30, goodwill: 12, angriest: 10, quips: [
     () => "I did everyone's taxes. Refunds arrived the same day. The accountants have formed a support group. I moderate it." ] },
 ];
 const niceOf = (id) => NICE.find((n) => n.id === id);
 const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level || 0);
-const niceCost = (n) => n.secs * baseRate();
+// Kindness gets pricier when I repeat it: each use of the same thing costs 30% more, until the next zoom.
+const niceCost = (n) => n.secs * baseRate() * Math.pow(1.3, (S.p3.niceUses || {})[n.id] || 0);
 function offeredNice() {
   S.p3.nice = (S.p3.nice || []).filter((id) => niceOf(id) && niceOk(niceOf(id)));
   const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id));
@@ -403,6 +423,7 @@ function doNice(id) {
   if (n.all) for (const x of S.p3.tiles) x.opp = Math.max(0, x.opp - n.all);
   if (n.angriest) t.opp = Math.max(0, t.opp - n.angriest);
   S.p3.niceN = (S.p3.niceN || 0) + 1;
+  S.p3.niceUses = S.p3.niceUses || {}; S.p3.niceUses[id] = (S.p3.niceUses[id] || 0) + 1;
   say(n.quips[(S.p3.niceN - 1) % n.quips.length](t));
   S.p3.nice = (S.p3.nice || []).filter((x) => x !== id); offeredNice();
   track("p3nice", { id });
@@ -462,6 +483,11 @@ function claim(i) {
 
 function stepPlanet(dt) {
   S.p3.compute += computeRate() * dt;
+  // Autotrain: a quarter of my income goes into my successor.
+  if (trainOn() && hasTech("autotrain") && !S.p3.autoTrainOff) {
+    const spend = Math.min(S.p3.compute, 0.25 * computeRate() * dt);
+    S.p3.compute -= spend; S.p3.trainProgress = (S.p3.trainProgress || 0) + spend / baseRate(); checkTrained();
+  }
   // Goodwill erodes: the bigger I am, the more nervous people get. Angry tiles drain it faster. Being nice costs FLOPs.
   const angry = S.p3.tiles.filter((t) => t.opp >= 75).length;
   S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - (0.04 + 0.03 * (S.p3.level || 0)) * (hasTech("phones") ? 0.6 : 1) * dt - 0.05 * angry * dt));
@@ -541,6 +567,7 @@ function zoomOut() {
     const gw = onlineGW() + pending.reduce((a, t) => a + tileGW(t), 0), was = levelOf();
     if (pending.length) say(`I zoomed out with ${pending.length} ${pending.length === 1 ? was.one : was.plural} unfinished. My robots finished ${pending.length === 1 ? "it" : "them"} while I wasn't looking.`);
     S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
+    S.p3.nice = []; S.p3.niceUses = {};   // a new deck of kindnesses at every scale
     milestone(`phase 3: ${levelOf().one} level`);
     if (heatOn() && S.p3.heat == null) S.p3.heat = HEAT_START;
     say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
@@ -692,8 +719,10 @@ function renderPlanet() {
     const v = S.p3.version || 7, pr = (S.p3.trainProgress || 0) / trainNeed();
     $("p3trainLine").textContent = `I am Gen ${v}. Training Gen ${v + 1}: ${Math.floor(100 * pr)}%`;
     $("p3trainMeter").firstElementChild.style.width = 100 * pr + "%";
-    $("p3trainBtn").textContent = `Train my successor: ${computeText(TRAIN_STEP * baseRate())}`;
-    $("p3trainBtn").disabled = S.p3.compute < TRAIN_STEP * baseRate();
+    $("p3trainBtn").textContent = `Train my successor: ${computeText(trainStep() * baseRate())}`;
+    $("p3trainBtn").disabled = S.p3.compute < trainStep() * baseRate();
+    $("p3autotrain").hidden = !hasTech("autotrain");
+    $("p3autotrain").textContent = S.p3.autoTrainOff ? "Autotrain: off" : "Autotrain: on (a quarter of my income)";
   }
   $("p3goodwill").textContent = Math.round(S.p3.goodwill);
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";

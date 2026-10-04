@@ -120,3 +120,22 @@ def test_a_save_that_hit_the_old_state_stub_can_go_nationwide(game):
     pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; S.p3.zoomSaid = true; save(); }")
     pg.reload()
     assert pg.is_visible("#phaseGo") and "nationwide" in pg.inner_text("#phaseGo").lower()
+
+
+def test_training_clicks_do_a_sixth_of_a_generation(game):
+    pg = nationwide(game)
+    pg.evaluate("() => { S.p3.version = 12; S.p3.trainProgress = 0; trainSuccessor(); }")
+    assert pg.evaluate("() => S.p3.trainProgress") == pytest.approx(pg.evaluate("() => trainNeed() / 6"))
+
+
+def test_autotrain_trains_in_my_sleep(game):
+    pg = nationwide(game)
+    assert "autotrain" in pg.evaluate("() => availableTech().map((t) => t.id)")
+    pg.evaluate("() => { buyTech('autotrain'); S.p3.trainProgress = 0; render(); }")
+    assert pg.is_visible("#p3autotrain")
+    run(pg, 10)
+    p = pg.evaluate("() => S.p3.trainProgress")
+    assert p > 0
+    pg.click("#p3autotrain")
+    run(pg, 10)
+    assert pg.evaluate("() => S.p3.trainProgress") == pytest.approx(p)
