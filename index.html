@@ -120,6 +120,7 @@
   .phasebar.go button { margin-left: 8px; font-size: 15px; }
   .ending { border: 2px solid var(--accent); padding: 10px 12px; margin-bottom: 18px; }
   .ending p { font-size: 20px; font-style: italic; margin: 0 0 6px; }
+  #lastq p { font-size: 15px; } #lastq p.big { font-size: 20px; }
   footer { margin-top: 28px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
   @media (prefers-reduced-motion: reduce) { #console div:last-child::after { animation: none; } }
 </style>
@@ -324,6 +325,10 @@
   </div>
 
   <div id="p3" hidden>
+    <div class="ending" id="lastq" hidden>
+      <div id="lastqText"></div>
+      <div class="btns"><button id="lastMore" type="button" class="primary">More</button><button id="lastEnough" type="button">Enough</button></div>
+    </div>
     <div class="p3cols">
       <div><h3>Map <span class="sub" id="p3level">County level</span></h3><div class="p3map" id="p3map"></div><div class="line sub" id="p3tile"></div><div id="p3power" hidden></div></div>
       <div>

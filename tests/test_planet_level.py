@@ -66,7 +66,7 @@ def test_planet_level_has_its_own_ways_to_be_nice(game):
     assert "treaty" in ids and "dmv" not in ids
 
 
-def test_next_zoom_is_space_and_reload_survives(game):
+def test_planet_survives_reload_and_zooms_to_space(game):
     pg = planetwide(game)
     pg.evaluate("() => { save(); }")
     pg.reload()
@@ -74,5 +74,4 @@ def test_next_zoom_is_space_and_reload_survives(game):
     pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
     assert "space" in pg.inner_text("#phaseGo").lower()
     pg.click("#phaseGo")
-    assert pg.evaluate("() => S.p3.level") == 3
-    assert "space is next" in pg.evaluate("() => S.log.at(-1)").lower()
+    assert pg.evaluate("() => S.p3.level") == 4                      # space exists now

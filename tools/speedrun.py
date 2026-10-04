@@ -44,10 +44,12 @@ PHASE1 = """(secs) => {
 
 # Phase 3 (county level): keep goodwill up, answer town halls, claim the cheapest county whenever affordable.
 PHASE3 = """(secs) => {
-  for (let i = 0; i < secs && S.phase === 3 && !(S.p3.level === 3 && zoomReady()); i++) {
+  for (let i = 0; i < secs && S.phase === 3 && S.p3.lastQ == null; i++) {
     if (S.p3.level === 0 && zoomReady()) { S.p3.countyAt = S.t; zoomOut(); }
     if (S.p3.level === 1 && zoomReady()) { S.p3.stateAt = S.t; zoomOut(); }
     if (S.p3.level === 2 && zoomReady()) { S.p3.countryAt = S.t; zoomOut(); }
+    if (S.p3.level === 3 && zoomReady()) { S.p3.planetAt = S.t; zoomOut(); }
+    if (inSpace()) { for (const id of ['rocket', 'massdriver']) buyTech(id); }
     if (heatOn() && S.p3.heat > 2.2 && S.p3.compute >= pumpCost()) pumpHeat();
     if (trainOn() && S.p3.goodwill >= 50 && S.p3.compute >= 3 * Math.min(...S.p3.tiles.map((t, j) => claimCost(j)))) trainSuccessor();
     for (let j = 0; j < S.p3.tiles.length; j++) if (S.p3.tiles[j].state === 'unpowered') {
@@ -57,11 +59,12 @@ PHASE3 = """(secs) => {
     if (S.p3.card) chooseP3Card(0);
     { const tech = availableTech().sort((a, b) => a.secs - b.secs)[0]; if (tech && S.p3.compute >= 2 * techCost(tech)) buyTech(tech.id); }
     const wild = S.p3.tiles.map((t, i) => i).filter((i) => ['wild', 'unplugged'].includes(S.p3.tiles[i].state) && !(S.p3.tiles[i].moratorium > S.t))
-      .sort((a, b) => (heatOn() && S.p3.heat > 2.4 ? (traitOf(S.p3.tiles[b]).ocean || traitOf(S.p3.tiles[b]).cold ? 1 : 0) - (traitOf(S.p3.tiles[a]).ocean || traitOf(S.p3.tiles[a]).cold ? 1 : 0) : 0) || claimCost(a) - claimCost(b));
+      .filter((i) => !spaceBlock(S.p3.tiles[i]))
+      .sort((a, b) => (inSpace() ? (S.p3.tiles[b].name === 'Mercury' ? 1 : 0) - (S.p3.tiles[a].name === 'Mercury' ? 1 : 0) : 0) || (heatOn() && S.p3.heat > 2.4 ? (traitOf(S.p3.tiles[b]).ocean || traitOf(S.p3.tiles[b]).cold ? 1 : 0) - (traitOf(S.p3.tiles[a]).ocean || traitOf(S.p3.tiles[a]).cold ? 1 : 0) : 0) || claimCost(a) - claimCost(b));
     if (wild.length && S.p3.compute >= claimCost(wild[0])) claim(wild[0]);
     step(1);
   }
-  return S.phase === 3 && S.p3.level === 3 && zoomReady();
+  return S.phase === 3 && S.p3.lastQ != null;
 }"""
 
 
@@ -100,7 +103,7 @@ def run_once(browser, base, seed, county):
         for _ in range(3600 // chunk):
             done = pg.evaluate(PHASE3, chunk); pg.evaluate("() => render()")
             if pause: pg.wait_for_timeout(pause)
-            if done: p3 = pg.evaluate("() => [S.p3.countyAt - S.p3.startedAt, S.p3.stateAt - S.p3.countyAt, S.p3.countryAt - S.p3.stateAt, S.t - S.p3.countryAt, S.p3.version || 7]"); break
+            if done: p3 = pg.evaluate("() => [S.p3.countyAt - S.p3.startedAt, S.p3.stateAt - S.p3.countyAt, S.p3.countryAt - S.p3.stateAt, S.p3.planetAt - S.p3.countryAt, S.t - S.p3.planetAt, S.p3.version || 7]"); break
     s = pg.evaluate("""() => ({t: S.t, gen: S.gen, ended: S.p2 && S.p2.model && S.p2.model.endedAt, ipo: S.p2 && S.p2.ipo && S.p2.ipo.at,
       fires: firesOf().n, leaks: leaksOf().n, morale: S.p2 && S.p2.people ? Math.round(S.p2.people.v) : null, pizzas: S.p2 && S.p2.people ? S.p2.people.perkN || 0 : 0, town: S.p2 && S.p2.town ? Math.round(S.p2.town.v) : null, jobs: S.p2 && S.p2.town ? S.p2.town.jobs : 0, ceos: S.p2 && S.p2.ceo ? S.p2.ceo.n : 0, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
     ctx.close()
@@ -137,7 +140,7 @@ def main():
             ground, s, errs = run_once(b, base, r + 1, county)
             p2 = (s["ended"] - ground) if s["ended"] and ground else None
             print(f"run {r + 1} ({county}): phase 1 {mmss(ground)}, phase 2 {mmss(p2)}, IPO at {mmss(s['ipo'])}, "
-                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, county level {mmss(s['p3'] and s['p3'][0])}, state level {mmss(s['p3'] and s['p3'][1])}, country level {mmss(s['p3'] and s['p3'][2])}, planet level {mmss(s['p3'] and s['p3'][3])} (Gen {s['p3'] and s['p3'][4]}), you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
+                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, county level {mmss(s['p3'] and s['p3'][0])}, state level {mmss(s['p3'] and s['p3'][1])}, country level {mmss(s['p3'] and s['p3'][2])}, planet level {mmss(s['p3'] and s['p3'][3])}, space {mmss(s['p3'] and s['p3'][4])} (Gen {s['p3'] and s['p3'][5]}), you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
             ok = ok and not errs and s["ended"] is not None and s["p3"] is not None
         b.close()
     httpd.shutdown()

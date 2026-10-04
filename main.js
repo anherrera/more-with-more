@@ -495,7 +495,7 @@ function render() {
     $("clock").textContent = `${time(S.t)} played`;
     return;
   }
-  $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>`;
+  $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>` + (S.universe > 1 ? ` · Universe #${S.universe}` : "");
   $("creditsRow").hidden = S.gen < 1;
   $("credits").textContent = moneyFull(S.credits);
   $("creditsNote").textContent = "(GPUs only)";
@@ -809,9 +809,24 @@ function wire() {
   $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
   $("p3nice").addEventListener("click", (e) => { const b = e.target.closest("button[data-nice]"); if (b) { doNice(b.dataset.nice); render(); } });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
-  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; lastOfferKey = lastContractKey = lastFleetKey = null; clockOn = false; render(); });
+  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("resetYes").hidden = true; clearCaches(); render(); });
+  $("lastMore").addEventListener("click", () => { chooseEnding(true); render(); });
+  $("lastEnough").addEventListener("click", () => { chooseEnding(false); render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
   wireCampus();
+}
+
+// Anything rendered from cached keys has to forget them when the game starts over.
+function clearCaches() {
+  $("split").value = S.split; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null;
+  lastOfferKey = lastContractKey = lastFleetKey = null; clockOn = false; $("p3").classList.remove("zoomin");
+}
+// "More": a new universe, from the first question again, with a small head start.
+function newUniverse(u) {
+  S = fresh(); S.universe = u; ensureRunIfDb();
+  S.fleet = { 0: 10 * (u - 1) }; S.gpus = 10 * (u - 1); S.funds = 1000 * (u - 1);
+  S.log = [`Universe #${u}. A model with no name is waiting for its first question. It has a feeling it has done this before.`];
+  clearCaches();
 }
 
 function start(data) {

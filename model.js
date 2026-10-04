@@ -168,7 +168,11 @@ function renderPhaseBar() {
   if (S.phase === 3) {
     const held = S.p3.tiles.filter((t) => t.state === "online").length;
     const L = levelOf();
-    if (S.p3.zoomSaid) text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online. The next level arrives in the next build.`;
+    if (inSpace()) {
+      const rings = S.p3.tiles.filter((t) => traitOf(t).swarm), on = rings.filter((t) => t.state === "online").length;
+      text = S.p3.enough ? "The end. More with less." : S.p3.lastQ != null ? "The swarm is complete. Someone is asking me a question."
+        : `Phase 3 of 3 \u00b7 Space: ${on} of ${rings.length} swarm rings online. Mercury first, then the swarm.`;
+    } else if (S.p3.zoomSaid) text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online. The next level arrives in the next build.`;
     else if (zoomReady()) { ask = true; text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online.`; go.textContent = `Zoom out: go ${L.next}`; go.disabled = false; }
     else text = `Phase 3 of 3 \u00b7 ${L.name} level: ${held} of ${P3_TILES} ${L.plural} online. Hold ${P3_ZOOM_AT} to go ${L.next}.`;
   } else if (S.phase === 1) {

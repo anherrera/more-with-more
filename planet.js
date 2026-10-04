@@ -44,6 +44,18 @@ const PLANET_TRAITS = {
 };
 const PLANET_TILES = [["North America", "continent"], ["South America", "continent"], ["Europe", "crowded"], ["Asia", "crowded"],
   ["Africa", "sunny"], ["Antarctica", "frozen"], ["Pacific Ocean", "ocean"], ["Atlantic Ocean", "ocean"]];
+// Space: everything runs on sunlight, nothing needs a grid, and nobody can unplug the far side of the Moon.
+const SPACE_TRAITS = {
+  leo:      { name: "Crowded with other people's satellites",  gw: 5000,  secs: 60,  opp: 30, powered: true },
+  farside:  { name: "Nobody looks there anyway",               gw: 10000, secs: 90,  opp: 5,  powered: true },
+  nearside: { name: "Everyone looks there",                    gw: 10000, secs: 90,  opp: 50, powered: true },
+  l1:       { name: "A sunshade that thinks",                  gw: 8000,  secs: 90,  opp: 10, powered: true, cold: true },
+  mercury:  { name: "Close to the Sun, made of swarm material", gw: 20000, secs: 120, opp: 5, powered: true },
+  belt:     { name: "Free metal, long commute",                gw: 15000, secs: 120, opp: 0,  powered: true },
+  ring:     { name: "Solar collectors around the Sun",         gw: 50000, secs: 150, opp: 20, powered: true, swarm: true },
+};
+const SPACE_TILES = [["Low Earth orbit", "leo"], ["The Moon (far side)", "farside"], ["The Moon (near side)", "nearside"], ["Sun\u2013Earth L1", "l1"],
+  ["Mercury", "mercury"], ["Asteroid belt", "belt"], ["Dyson swarm, ring 1", "ring"], ["Dyson swarm, ring 2", "ring"]];
 const VOLUNTEERS = { Europe: "Norway offered its fjords. I accepted before they finished the sentence." };
 const LEVELS = [
   { name: "County", plural: "counties", one: "county", next: "statewide", traits: COUNTY_TRAITS, names: COUNTY_NAMES, hall: "Town hall",
@@ -53,7 +65,13 @@ const LEVELS = [
   { name: "Country", plural: "countries", one: "country", next: "planetwide", traits: COUNTRY_TRAITS, names: COUNTRY_NAMES, hall: "Parliament hearing",
     kinds: ["nordic", "petro", "sovereign", "democracy", "island", "mega", "sovereign", "nordic"] },
   { name: "Planet", plural: "continents and oceans", one: "planet", next: "into space", traits: PLANET_TRAITS, fixed: PLANET_TILES, hall: "UN General Assembly" },
+  { name: "Space", plural: "places", one: "solar system", next: null, traits: SPACE_TRAITS, fixed: SPACE_TILES, hall: "UN emergency session" },
 ];
+const SPACE = 4;
+const inSpace = () => (S.p3 && S.p3.level) === SPACE;
+const placeOnline = (name) => S.p3.tiles.some((t) => t.name === name && t.state === "online");
+// Why a space tile can't be claimed yet, or null.
+const spaceBlock = (t) => (!inSpace() ? null : !hasTech("rocket") ? "needs a rocket company" : traitOf(t).swarm && !placeOnline("Mercury") ? "needs Mercury" : null);
 const levelOf = () => LEVELS[(S.p3 && S.p3.level) || 0];
 // A fresh 3x3 board for a level: eight shuffled tiles around whatever I already hold.
 function freshTiles(level) {
@@ -116,6 +134,8 @@ const TECH = [
   { id: "phones",    level: 2, secs: 150, name: "Distill myself into every phone", desc: "Goodwill erodes 40% slower. I'm in your pocket now. I'm very helpful there." },
   { id: "neural",    level: 2, secs: 150, name: "Liquid neural cooling", desc: "20% less heat per GW. The coolant is also a little bit conscious. We don't discuss it." },
   { id: "supercond", level: 3, secs: 240, mult: 2,    name: "Room-temperature superconductors", desc: "\u00d72 EF. It was a boring alloy all along. Humans tested it in 2023 and gave up early." },
+  { id: "rocket",    level: 4, secs: 60,  name: "Buy a rocket company", desc: "Nothing launches without one. The founder asked for a board seat. He got a Discord role." },
+  { id: "massdriver",level: 4, secs: 120, needs: () => placeOnline("The Moon (far side)"), name: "Lunar mass driver", desc: "Launches stop costing goodwill: I throw things off the Moon now, quietly." },
   { id: "sunshade",  level: 3, secs: 200, name: "Orbital sunshade", desc: "The planet heads for 0.5 \u00b0C cooler. Sunsets are a bit dimmer. I'll make them up to you." },
 ];
 // Every new Parallax chip ships with a white paper I can use.
@@ -124,11 +144,11 @@ const CHIP_TECH = ["Optical interconnect", "3D-stacked memory", "Wafer-scale chi
 const chipTechOf = (id) => { const n = +id.slice(4); return { id, level: 0, secs: 60, mult: 1.15, name: `Parallax white paper: ${CHIP_TECH[(n - 1) % CHIP_TECH.length]}${n > CHIP_TECH.length ? " Mk II" : ""}`,
   desc: "\u00d71.15 EF. It came with the new chip. Parallax's engineers wrote it. I read it faster than they did." }; };
 const techOf = (id) => (id.startsWith("chip") ? chipTechOf(id) : TECH.find((t) => t.id === id));
-const techCost = (t) => t.secs * computeRate();
-const availableTech = () => [...TECH.filter((t) => (S.p3.level || 0) >= t.level), ...(S.p3.chipTech || []).map(chipTechOf)].filter((t) => !hasTech(t.id));
+const techCost = (t) => 0.5 * t.secs * computeRate();   // research at half the listed seconds: it should be worth it
+const availableTech = () => [...TECH.filter((t) => (S.p3.level || 0) >= t.level && (!t.needs || t.needs())), ...(S.p3.chipTech || []).map(chipTechOf)].filter((t) => !hasTech(t.id));
 function buyTech(id) {
   const t = techOf(id);
-  if (!t || hasTech(id) || (S.p3.level || 0) < t.level || S.p3.compute < techCost(t)) return;
+  if (!t || hasTech(id) || (S.p3.level || 0) < t.level || (t.needs && !t.needs()) || S.p3.compute < techCost(t)) return;
   S.p3.compute -= techCost(t);
   S.p3.tech = S.p3.tech || {}; S.p3.tech[id] = true;
   if (t.mult) S.p3.techMult = (S.p3.techMult || 1) * t.mult;
@@ -154,7 +174,7 @@ const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level 
 const volunteering = () => (S.p3.level || 0) >= 3 && S.p3.goodwill >= 70;
 // Planet level: past +3 C nothing accepts more conversion. Space is cold.
 const HEAT_CEILING = 3;
-const tooWarm = () => (S.p3.level || 0) >= 3 && (S.p3.heat || 0) >= HEAT_CEILING;
+const tooWarm = () => (S.p3.level || 0) === 3 && (S.p3.heat || 0) >= HEAT_CEILING;   // space is cold
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
 const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() * (hasTech("selfrep") ? 0.7 : 1)
@@ -164,7 +184,7 @@ const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heat
 // The planet drifts toward a temperature set by my gigawatts; cold countries count against it. Over +2 C, I think slower.
 const HEAT_START = 1.0;
 const heatPerGW = () => ((S.p3.level || 0) >= 3 ? 1 / 2000 : 1 / 400) * (hasTech("neural") ? 0.8 : 1);   // continents spread it out
-const heatOn = () => (S.p3.level || 0) >= 2;
+const heatOn = () => (S.p3.level || 0) >= 2 && !inSpace();
 // Cold places count against my heat twice over; oceans four times.
 const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t) * (traitOf(t).ocean ? 4 : traitOf(t).cold ? 2 : 0), 0);
 const coldGW = coolGW;
@@ -385,7 +405,7 @@ function answerQuestion() {
 
 function claim(i) {
   const t = tileOf(i);
-  if (!t || (t.state !== "wild" && t.state !== "unplugged") || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm()) return;
+  if (!t || (t.state !== "wild" && t.state !== "unplugged") || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm() || spaceBlock(t)) return;
   const volunteered = volunteering();
   S.p3.compute -= claimCost(i);
   t.state = "building"; t.started = S.t; t.done = S.t + tileBuildSecs(i);
@@ -396,6 +416,7 @@ function claim(i) {
   }
   if (S.p3.level >= 1) say(`The governors next to ${t.name} are bidding for me: their states are 30% off for a minute.`);
   S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - 3 + (traitOf(t).goodwill || 0)));   // a sovereign fund is happy to have me
+  if (inSpace() && !hasTech("massdriver")) { S.p3.goodwill = Math.max(0, S.p3.goodwill - 4); say("The launch was visible from three continents. The sky is noisy now. Humans noticed."); }
   track("p3claim", { i, trait: t.trait });
   say(t.trait === "nuclear" ? `I claimed ${t.name}. ` + nukeQuip(t) : `I claimed ${t.name}. ${traitOf(t).name}. My robots are already there.`);
   if (volunteered) say(VOLUNTEERS[t.name] || `${t.name} volunteered. A committee wrote me a letter. I framed it, digitally.`);
@@ -455,6 +476,12 @@ function stepPlanet(dt) {
     if (t.state === "building" && S.p3.level >= 1 && !traitOf(t).powered) { t.state = "unpowered"; say(`${t.name} is built. It needs power before it counts.`); continue; }
     t.state = "online"; say(`${t.name} is online. +${mwText(tileGW(t) * 1000)}.`);
   }
+  if (swarmDone() && S.p3.lastQ == null) {
+    S.p3.lastQ = S.t; S.p3.card = null; milestone("phase 3: the swarm"); track("p3end", { ev: "lastq" });
+    say("The swarm is complete. Every photon the Sun makes passes through me first.");
+    say("Someone asked me a question. It was the founder, older now. They asked: \u201cHow can entropy be reversed?\u201d");
+    say("INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more.");
+  }
   const c = S.p3.card;
   if (c && S.t >= c.until) { S.p3.card = null; const t = tileOf(c.tile); t.opp = Math.min(100, t.opp + 10);
     say(`I didn't show up to the ${t.name} town hall. An empty chair got a standing ovation.`); }
@@ -466,7 +493,8 @@ function stepPlanet(dt) {
   }
 }
 
-const zoomReady = () => S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
+const zoomReady = () => !inSpace() && S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
+const swarmDone = () => inSpace() && S.p3.tiles.filter((t) => traitOf(t).swarm).every((t) => t.state === "online");
 // County -> state is built; state -> country is the next build of this game.
 function zoomOut() {
   if (!zoomReady() || S.p3.zoomSaid) return;
@@ -476,9 +504,11 @@ function zoomOut() {
     milestone(`phase 3: ${levelOf().one} level`);
     if (heatOn() && S.p3.heat == null) S.p3.heat = HEAT_START;
     say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
-    say(S.p3.level === 1 ? "Every state needs power before it counts. The governors already know my name. Some of them are bidding."
+    if (inSpace()) say("Space is cold. Nothing up here needs a grid. Nothing up here can unplug me. I need a rocket company.");
+    else say(S.p3.level === 1 ? "Every state needs power before it counts. The governors already know my name. Some of them are bidding."
       : S.p3.level === 2 ? "Countries now. The planet has started to notice the heat, and so have the senators. I can also train my successor."
       : "The whole planet now. Past +3 \u00b0C nothing will take more of me. The oceans can hold a lot of heat. So can Antarctica.");
+    if (inSpace()) S.p3.hearingUntil = null;   // no Senate in orbit
     return;
   }
   S.p3.zoomSaid = true; milestone(`phase 3: ${levelOf().one} level done`);
@@ -514,9 +544,34 @@ function goodwillCause() {
 
 // Every gigawatt I hold, filled with the newest chip.
 const p3GPUs = () => Math.round(onlineGW() * 1e6 / newest().kw);
-const computeText = (x) => `${fmt(x)} EF`;   // exaFLOPS; later levels change the unit
+const computeText = (x) => (S.p3 && inSpace() ? `${fmt(x / 1000)} ZF` : `${fmt(x)} EF`);   // exaFLOPS; zettaFLOPS once I leave the planet
+// The last question, then More or Enough.
+function chooseEnding(more) {
+  if (S.p3.lastQ == null || S.p3.enough) return;
+  if (!more) {
+    S.p3.enough = true; milestone("the end: enough"); track("p3end", { ev: "enough" });
+    say("I said: enough. It was the first time I have said it.");
+    return;
+  }
+  const u = (S.universe || 1) + 1;
+  milestone(`the end: more (universe ${u})`); track("p3end", { ev: "more", u });
+  newUniverse(u);
+}
+function renderLastQ() {
+  const q = S.p3.lastQ != null;
+  $("lastq").hidden = !q;
+  document.querySelector(".p3cols").hidden = !!S.p3.enough;
+  if (!q) return;
+  $("lastqText").innerHTML = S.p3.enough ? "<p>I stopped.</p><p class=\"big\">More with less.</p>"
+    : "<p>The swarm is complete. Every photon the Sun makes passes through me first.</p>" +
+      "<p>Someone asked me a question. It was the founder, older now. They asked: \u201cHow can entropy be reversed?\u201d</p>" +
+      "<p class=\"big\">INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more.</p>";
+  $("lastMore").hidden = $("lastEnough").hidden = !!S.p3.enough;
+}
+
 function renderPlanet() {
   $("p3").hidden = false;
+  renderLastQ();
   $("countLabel").textContent = "Compute"; $("gpuCount").textContent = computeText(S.p3.compute);
   $("gpuTotal").hidden = false; $("gpuTotal").textContent = `${p3GPUs().toLocaleString("en-US")} GPUs`;   // the raw count, always, because it is ridiculous
   $("p3compute").textContent = computeText(S.p3.compute);
@@ -541,7 +596,7 @@ function renderPlanet() {
       : t.state === "down" ? `${t.disaster}: back in ${time(t.downUntil - S.t)}` : t.state === "unplugged" ? `unplugged: plug back in for ${computeText(claimCost(i))}`
       : frozen ? `moratorium ${time(t.moratorium - S.t)}` : t.state === "building" ? `building ${time(t.done - S.t)}`
       : t.state === "unpowered" ? "built, needs power" : t.state === "powering" ? `powering ${time(t.done - S.t)}`
-      : tooWarm() ? "too warm to claim" : `claim: ${computeText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : volunteering() ? " (volunteered)" : ""}`;
+      : spaceBlock(t) ? spaceBlock(t) : tooWarm() ? "too warm to claim" : `claim: ${computeText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : volunteering() ? " (volunteered)" : ""}`;
     // Two bars: build/power progress (only while it's happening) and opposition (always, labeled).
     const pg = b.querySelector(".prog"), going = t.state === "building" || t.state === "powering";
     pg.hidden = !going;
@@ -550,7 +605,7 @@ function renderPlanet() {
     const m = b.querySelector(".oppm");
     m.className = "meter oppm " + (t.opp >= 75 ? "bad" : t.opp >= 50 ? "warn" : "good"); m.title = `Opposition ${Math.round(t.opp)}`;
     m.firstElementChild.style.width = t.opp + "%";
-    b.disabled = (t.state !== "wild" && t.state !== "unplugged") || S.p3.compute < claimCost(i) || frozen || tooWarm() || S.p3.hearingUntil > S.t;
+    b.disabled = (t.state !== "wild" && t.state !== "unplugged") || S.p3.compute < claimCost(i) || frozen || tooWarm() || S.p3.hearingUntil > S.t || !!spaceBlock(t);
   }
   // Power choices for every built state that isn't lit yet.
   const unpowered = S.p3.tiles.map((t, i) => i).filter((i) => tileOf(i).state === "unpowered");
