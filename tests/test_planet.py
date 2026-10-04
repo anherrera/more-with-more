@@ -115,3 +115,42 @@ def test_phase3_fits_a_laptop(game, page):
     pg = planet(game)
     bottom = pg.evaluate("() => Math.max(document.getElementById('p3map').getBoundingClientRect().bottom, document.getElementById('p3slider').getBoundingClientRect().bottom)")
     assert bottom <= 900
+
+
+def test_claiming_angers_the_county_and_its_neighbors(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e12; for (const t of S.p3.tiles) t.opp = 10; claim(0); }")
+    assert pg.evaluate("() => S.p3.tiles[0].opp") > 10
+    assert pg.evaluate("() => S.p3.tiles[1].opp") > 10                  # a neighbor
+
+
+def test_being_useful_raises_goodwill_and_growing_lowers_it(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.slider = 0; S.p3.goodwill = 50; }")
+    run(pg, 30)
+    up = pg.evaluate("() => S.p3.goodwill")
+    pg.evaluate("() => { S.p3.slider = 100; S.p3.goodwill = 50; }")
+    run(pg, 30)
+    assert up > 50 > pg.evaluate("() => S.p3.goodwill")
+
+
+def test_angry_county_gets_a_moratorium_that_freezes_building(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e12; claim(0); S.p3.tiles[0].opp = 95; }")
+    run(pg, 2)
+    t = pg.evaluate("() => S.p3.tiles[0]")
+    assert t["moratorium"] is not None
+    done = t["done"]
+    run(pg, 10)
+    assert pg.evaluate("() => S.p3.tiles[0].done") > done                # frozen
+    pg.evaluate("() => render()")
+    assert "Moratorium" in pg.inner_text("#alerts")
+
+
+def test_low_goodwill_adds_the_commission_review(game):
+    pg = planet(game)
+    fast = pg.evaluate("() => { S.p3.goodwill = 60; return tileBuildSecs(0); }")
+    slow = pg.evaluate("() => { S.p3.goodwill = 20; return tileBuildSecs(0); }")
+    assert slow >= fast + 45
+    pg.evaluate("() => render()")
+    assert "commission" in pg.inner_text("#p3goodwillNote").lower()
