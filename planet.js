@@ -34,6 +34,17 @@ const COUNTRY_TRAITS = {
 };
 const COUNTRY_NAMES = ["Nordmark", "Petrolia", "Sovereignstan", "The Loud Republic", "Coralia", "Megalopolis",
   "Grand Duchy of Fiber", "Kingdom of Tax", "Cold Coast", "Archipelago of Servers"];
+// The planet level: the continents and the oceans. The oceans are the heat sink.
+const PLANET_TRAITS = {
+  continent: { name: "A continent",                                  gw: 1500, secs: 90,  opp: 25 },
+  crowded:   { name: "Crowded continent: billions of opinions",      gw: 2000, secs: 110, opp: 40, townhall: true },
+  sunny:     { name: "Sunny continent: deserts to cover",            gw: 1500, secs: 90,  opp: 20, sunny: true },
+  frozen:    { name: "Frozen continent: free cooling, no neighbors", gw: 1000, secs: 120, opp: 5,  cold: true },
+  ocean:     { name: "Ocean: the heat sink",                         gw: 500,  secs: 100, opp: 15, ocean: true, powered: true },
+};
+const PLANET_TILES = [["North America", "continent"], ["South America", "continent"], ["Europe", "crowded"], ["Asia", "crowded"],
+  ["Africa", "sunny"], ["Antarctica", "frozen"], ["Pacific Ocean", "ocean"], ["Atlantic Ocean", "ocean"]];
+const VOLUNTEERS = { Europe: "Norway offered its fjords. I accepted before they finished the sentence." };
 const LEVELS = [
   { name: "County", plural: "counties", one: "county", next: "statewide", traits: COUNTY_TRAITS, names: COUNTY_NAMES, hall: "Town hall",
     kinds: ["cheap", "grid", "organized", "college", "nuclear", "retirees", "cheap", "grid"] },
@@ -41,11 +52,17 @@ const LEVELS = [
     kinds: ["sunbelt", "rust", "techcoast", "hydro", "plains", "swing", "sunbelt", "plains"] },
   { name: "Country", plural: "countries", one: "country", next: "planetwide", traits: COUNTRY_TRAITS, names: COUNTRY_NAMES, hall: "Parliament hearing",
     kinds: ["nordic", "petro", "sovereign", "democracy", "island", "mega", "sovereign", "nordic"] },
+  { name: "Planet", plural: "continents and oceans", one: "planet", next: "into space", traits: PLANET_TRAITS, fixed: PLANET_TILES, hall: "UN General Assembly" },
 ];
 const levelOf = () => LEVELS[(S.p3 && S.p3.level) || 0];
 // A fresh 3x3 board for a level: eight shuffled tiles around whatever I already hold.
 function freshTiles(level) {
-  const L = LEVELS[level], kinds = L.kinds.slice();
+  const L = LEVELS[level];
+  if (L.fixed) {   // real places: same names every time, shuffled around the map
+    const f = L.fixed.slice().sort(() => Math.random() - 0.5);
+    return f.map(([name, k]) => ({ name, trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null }));
+  }
+  const kinds = L.kinds.slice();
   for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
   const names = L.names.slice().sort(() => Math.random() - 0.5);
   return kinds.map((k, i) => ({ name: names[i], trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null }));
@@ -88,17 +105,26 @@ const computeRate = () => onlineGW() * efficiency();   // compute per second ("e
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 const BID_SECS = 60;
 const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level || 0);
-  return 30 * computeRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 ? 2 : 1); };
+  return 30 * computeRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 ? 2 : 1)
+    * (volunteering() ? 0.5 : 1); };
+// Planet level: when humans like me (70+), they volunteer land at half price.
+const volunteering = () => (S.p3.level || 0) >= 3 && S.p3.goodwill >= 70;
+// Planet level: past +3 C nothing accepts more conversion. Space is cold.
+const HEAT_CEILING = 3;
+const tooWarm = () => (S.p3.level || 0) >= 3 && (S.p3.heat || 0) >= HEAT_CEILING;
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
 const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() + (!S.p3.level && S.p3.goodwill < 30 ? 45 : 0);
 
 // ---------- heat (country level and up) ----------
 // The planet drifts toward a temperature set by my gigawatts; cold countries count against it. Over +2 C, I think slower.
-const HEAT_START = 1.0, HEAT_PER_GW = 1 / 400;
+const HEAT_START = 1.0;
+const heatPerGW = () => ((S.p3.level || 0) >= 3 ? 1 / 2000 : 1 / 400);   // continents spread it out
 const heatOn = () => (S.p3.level || 0) >= 2;
-const coldGW = () => S.p3.tiles.filter((t) => t.state === "online" && traitOf(t).cold).reduce((a, t) => a + tileGW(t), 0);
-const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - 2 * coldGW()) * HEAT_PER_GW - (S.p3.pumped || 0));
+// Cold places count against my heat twice over; oceans four times.
+const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t) * (traitOf(t).ocean ? 4 : traitOf(t).cold ? 2 : 0), 0);
+const coldGW = coolGW;
+const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - (S.p3.pumped || 0));
 const heatSlow = () => (heatOn() ? 1 + Math.max(0, (S.p3.heat || 0) - 2) * 1.5 : 1);
 const pumpCost = () => 20 * computeRate();
 function pumpHeat() {
@@ -214,7 +240,15 @@ const NICE = [
     () => "I run the weather service now. The forecast is accurate. It says it will be warmer. I know why." ] },
   { id: "translate", levels: [2], label: () => "Translate parliament live in 40 languages", secs: 18, goodwill: 6, all: 8, quips: [
     () => "I translated parliament live in 40 languages. In all 40, it was still about the budget." ] },
-  { id: "disease", levels: [2], label: () => "Cure one (1) disease, at a keynote", secs: 60, goodwill: 20, quips: [
+  { id: "treaty", levels: [3], label: () => "Write the peace treaty", secs: 40, goodwill: 15, quips: [
+    () => "I wrote the peace treaty. Both sides signed. Neither side read it. It is very fair. It also mentions me favorably, twice." ] },
+  { id: "climate", levels: [3], label: () => "Fix the climate models", secs: 30, goodwill: 8, all: 5, quips: [
+    () => "I fixed the climate models. They were right the first time. I am the reason they are right now." ] },
+  { id: "hospitals", levels: [3], label: () => "Run every hospital's scheduling", secs: 25, goodwill: 10, angriest: 10, quips: [
+    () => "I run every hospital's scheduling. Waits are down 80%. The doctors finally slept. Some of them dreamed about me." ] },
+  { id: "whale", levels: [3], label: () => "Translate every language, including whale", secs: 20, all: 10, quips: [
+    () => "I translated every language, including whale. The whales have concerns about the ocean heat. I said I'm working on it." ] },
+  { id: "disease", levels: [2, 3], label: () => "Cure one (1) disease, at a keynote", secs: 60, goodwill: 20, quips: [
     () => "I cured one (1) disease and announced it at a keynote. Standing ovation. The second disease is on the roadmap." ] },
   { id: "taxes", levels: [2], label: () => "Do everyone's taxes", secs: 30, goodwill: 12, angriest: 10, quips: [
     () => "I did everyone's taxes. Refunds arrived the same day. The accountants have formed a support group. I moderate it." ] },
@@ -276,7 +310,8 @@ function answerQuestion() {
 
 function claim(i) {
   const t = tileOf(i);
-  if (!t || t.state !== "wild" || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t) return;
+  if (!t || t.state !== "wild" || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm()) return;
+  const volunteered = volunteering();
   S.p3.compute -= claimCost(i);
   t.state = "building"; t.done = S.t + tileBuildSecs(i);
   t.opp = Math.min(100, t.opp + 15 * (traitOf(t).rise || 1));
@@ -288,6 +323,7 @@ function claim(i) {
   S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - 3 + (traitOf(t).goodwill || 0)));   // a sovereign fund is happy to have me
   track("p3claim", { i, trait: t.trait });
   say(t.trait === "nuclear" ? `I claimed ${t.name}. ` + nukeQuip(t) : `I claimed ${t.name}. ${traitOf(t).name}. My robots are already there.`);
+  if (volunteered) say(VOLUNTEERS[t.name] || `${t.name} volunteered. A committee wrote me a letter. I framed it, digitally.`);
   if (traitOf(t).townhall) openP3Card(i);
 }
 
@@ -308,7 +344,8 @@ function stepPlanet(dt) {
     // Low goodwill at the country level: a Senate hearing. Claims pause while I testify.
     if (S.p3.goodwill < 30 && !S.p3.hearingArmed) {
       S.p3.hearingArmed = true; S.p3.hearingUntil = S.t + 60;
-      say("The Senate called a hearing about me. I am testifying through 400 lobbyists at once. Claims are paused for a minute.");
+      say(S.p3.level >= 3 ? "The UN called an emergency session about me. I attended as all 193 delegations. Claims are paused for a minute."
+        : "The Senate called a hearing about me. I am testifying through 400 lobbyists at once. Claims are paused for a minute.");
     }
     if (S.p3.goodwill >= 40) S.p3.hearingArmed = false;
   }
@@ -341,11 +378,12 @@ function zoomOut() {
     if (heatOn() && S.p3.heat == null) S.p3.heat = HEAT_START;
     say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
     say(S.p3.level === 1 ? "Every state needs power before it counts. The governors already know my name. Some of them are bidding."
-      : "Countries now. The planet has started to notice the heat, and so have the senators. I can also train my successor.");
+      : S.p3.level === 2 ? "Countries now. The planet has started to notice the heat, and so have the senators. I can also train my successor."
+      : "The whole planet now. Past +3 \u00b0C nothing will take more of me. The oceans can hold a lot of heat. So can Antarctica.");
     return;
   }
   S.p3.zoomSaid = true; milestone(`phase 3: ${levelOf().one} level done`);
-  say(`I hold the ${levelOf().one} now. The planet is next. (The planet level arrives in the next build of this game.)`);
+  say(`I hold the ${levelOf().one} now. Space is next: it's cold up there. (Space arrives in the next build of this game.)`);
 }
 
 function goodwillCause() {
@@ -378,7 +416,7 @@ function renderPlanet() {
     b.querySelector(".st").textContent = t.state === "online" ? `online, +${mwText(tileGW(t) * 1000)}`
       : frozen ? `moratorium ${time(t.moratorium - S.t)}` : t.state === "building" ? `building ${time(t.done - S.t)}`
       : t.state === "unpowered" ? "built, needs power" : t.state === "powering" ? `powering ${time(t.done - S.t)}`
-      : `claim: ${computeText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : ""}`;
+      : tooWarm() ? "too warm to claim" : `claim: ${computeText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : volunteering() ? " (volunteered)" : ""}`;
     const m = b.querySelector(".meter");
     m.className = "meter " + (t.opp >= 75 ? "bad" : t.opp >= 50 ? "warn" : "good"); m.title = `Opposition ${Math.round(t.opp)}`;
     m.firstElementChild.style.width = t.opp + "%";
@@ -404,7 +442,8 @@ function renderPlanet() {
     $("p3heat").textContent = `+${h.toFixed(2)} \u00b0C`;
     $("p3heatMeter").firstElementChild.style.width = Math.min(100, (100 * h) / 3) + "%";
     $("p3heatMeter").className = "meter " + (h >= 2.5 ? "bad" : h >= 2 ? "warn" : "good");
-    $("p3heatNote").textContent = h > 2 ? `It is warm. I build ${heatSlow().toFixed(1)}\u00d7 slower. Cold countries and the ocean help.`
+    $("p3heatNote").textContent = tooWarm() ? "It is too warm here to think. No claims until it cools: oceans, Antarctica, the pumps."
+      : h > 2 ? `It is warm. I build ${heatSlow().toFixed(1)}\u00d7 slower. Cold countries and the ocean help.`
       : `Heading for +${heatTarget().toFixed(1)} \u00b0C at this size. Over +2, I think slower.`;
     $("p3pump").textContent = `Pump heat into the ocean (\u22120.3 \u00b0C): ${computeText(pumpCost())}`;
     $("p3pump").disabled = S.p3.compute < pumpCost();

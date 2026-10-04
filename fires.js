@@ -132,7 +132,8 @@ function renderAlerts() {
   if (f.payout) out.push(`Insurance pays ${money(f.payout.amt)} in ${time(Math.max(0, f.payout.at - S.t))}`);
   if (S.phase === 2 && S.p2 && S.p2.county && droughtOn()) out.push(`Drought: water allocation \u2212${Math.round(100 * (1 - DROUGHT_CUT))}% for ${time(S.p2.drought.until - S.t)}`);
   // the model's last ask lives in the phase bar (model.js), not here
-  if (S.phase === 3 && S.p3 && S.p3.hearingUntil > S.t) out.push(`Senate hearing: claims paused for ${time(S.p3.hearingUntil - S.t)}`);
+  if (S.phase === 3 && S.p3 && S.p3.hearingUntil > S.t) out.push(`${S.p3.level >= 3 ? "UN emergency session" : "Senate hearing"}: claims paused for ${time(S.p3.hearingUntil - S.t)}`);
+  if (S.phase === 3 && S.p3 && (S.p3.level || 0) >= 3 && (S.p3.heat || 0) >= 3) out.push(`Too warm to think: +${S.p3.heat.toFixed(2)} \u00b0C, no claims until it cools`);
   if (S.phase === 3 && S.p3) for (const t of S.p3.tiles) if (t.moratorium != null && S.t < t.moratorium) out.push(`Moratorium in ${t.name}: ${time(t.moratorium - S.t)}`);
   $("alerts").hidden = !out.length;
   $("alerts").textContent = out.join(" \u00b7 ");

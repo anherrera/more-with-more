@@ -76,7 +76,7 @@ def test_sovereign_fund_countries_bring_goodwill(game):
     assert pg.evaluate("() => S.p3.goodwill") > g
 
 
-def test_country_level_survives_reload_and_next_zoom_is_a_stub(game):
+def test_country_level_survives_reload_and_zooms_to_the_planet(game):
     pg = nationwide(game)
     pg.evaluate("() => { S.p3.heat = 1.7; save(); }")
     pg.reload()
@@ -84,7 +84,7 @@ def test_country_level_survives_reload_and_next_zoom_is_a_stub(game):
     pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
     assert "planet" in pg.inner_text("#phaseGo").lower()
     pg.click("#phaseGo")
-    assert pg.evaluate("() => S.p3.level") == 2
+    assert pg.evaluate("() => S.p3.level") == 3                       # the planet level exists now
 
 
 def test_training_my_successor(game):
