@@ -1,4 +1,4 @@
-from conftest import READY, run
+from conftest import MID, READY, run
 
 LAPTOP = {"width": 1440, "height": 900}
 
@@ -27,3 +27,12 @@ def test_the_important_stuff_fits_on_a_laptop_screen(game, page):
     bottoms = pg.evaluate("""() => Object.fromEntries(['contractsBox', 'modelBox', 'campusBox', 'fleetBox', 'computeBox', 'projects', 'hypeNum', 'raise']
       .map((id) => [id, Math.round(document.getElementById(id).getBoundingClientRect().bottom)]))""")
     assert all(b <= 900 for b in bottoms.values()), bottoms
+
+
+def test_console_stays_in_view_while_scrolling(game, page):
+    page.set_viewport_size({"width": 1440, "height": 600})
+    pg = game(MID)
+    pg.mouse.wheel(0, 500)
+    pg.wait_for_timeout(100)
+    top, bottom = pg.evaluate("() => { const r = document.getElementById('console').getBoundingClientRect(); return [r.top, r.bottom]; }")
+    assert top >= 0 and bottom <= 600
