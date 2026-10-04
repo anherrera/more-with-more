@@ -16,7 +16,7 @@ P3_OLD = ["level", "compute", "goodwill", "startedAt", "startChip", "homeGW", "t
 TILE_OLD = ["name", "trait", "state", "opp", "done", "moratorium"]
 # Fields a current phase 3 save always has (the planet code reads them without defaults).
 P3_NOW = ["tech", "techMult", "chipTech", "version", "trainProgress", "heat", "pumped", "nukes", "nice", "niceN", "niceUses",
-          "answers", "unplugN", "nextUnplug", "nextDisaster", "hearingArmed", "hearingUntil", "autoOff", "autoTrainOff", "lastQ", "enough"]
+          "answers", "unplugN", "nextUnplug", "nextDisaster", "hearingArmed", "hearingUntil", "autoclaimOff", "autotrainOff", "lastQ", "enough"]
 
 
 def old_p3_save(pg, **extra):
@@ -89,7 +89,7 @@ def test_an_old_country_level_save_loads_with_heat(game):
 def test_an_old_planet_level_save_with_the_space_placeholder_can_go_to_space(game):
     pg = old_p3_save(planetwide(game), zoomSaid=True)                  # saved when "space arrives in the next build"
     assert_current(pg, 3)
-    assert pg.evaluate("() => S.p3.zoomSaid") is False
+    assert pg.evaluate("() => 'zoomSaid' in S.p3") is False
     pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
     assert "into space" in pg.inner_text("#phaseGo").lower()
 

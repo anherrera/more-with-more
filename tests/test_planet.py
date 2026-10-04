@@ -249,7 +249,7 @@ def test_answering_a_question_is_free_and_helps(game):
 
 def test_town_halls_dont_talk_money(game):
     pg = planet(game)
-    labels = pg.evaluate("() => P3_CHOICES.map((c) => c.label).join(' ')")
+    labels = pg.evaluate("() => P3_HEARINGS[0].choices.map((c) => c.label).join(' ')")
     assert "Fund" not in labels and "$" not in labels and "library" not in labels.lower()
 
 

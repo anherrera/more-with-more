@@ -1,14 +1,11 @@
 // hud.js: the sticky strip at the top of every phase: pause, the ticker, the phase bar, the alert line, the console.
 // Reads state only (render is read-only everywhere); the pause button and the phase bar's big button are wired here.
 
-let lastLogLen = -1, lastLogTail = null;
 function renderConsole() {
-  if (S.log.length !== lastLogLen || S.log[S.log.length - 1] !== lastLogTail) {
-    lastLogLen = S.log.length; lastLogTail = S.log[S.log.length - 1];
-    const con = $("console");
+  rebuildOn("console", `${S.log.length}|${S.log[S.log.length - 1]}`, (con) => {
     con.innerHTML = S.log.map((l) => `<div>${l}</div>`).join("");
     con.scrollTop = con.scrollHeight;
-  }
+  });
 }
 
 // Paused: the clock stops completely. No income, no timers, no humans getting angrier.
@@ -53,8 +50,7 @@ function renderPhaseBar() {
       const rings = S.p3.tiles.filter((t) => traitOf(t).swarm), on = rings.filter((t) => t.state === "online").length;
       text = S.p3.enough ? "The end. More with less." : S.p3.lastQ != null ? "The swarm is complete. Someone is asking me a question."
         : `Phase 3 of 3 · Space: ${on} of ${rings.length} swarm rings online. Mercury first, then the swarm.`;
-    } else if (S.p3.zoomSaid) text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online. The next level arrives in the next build.`;
-    else if (zoomReady()) { ask = true; text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online.`; go.textContent = `Zoom out: go ${L.next}`; go.disabled = false; }
+    } else if (zoomReady()) { ask = true; text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online.`; go.textContent = `Zoom out: go ${L.next}`; go.disabled = false; }
     else text = `Phase 3 of 3 · ${L.name} level: ${held} of ${P3_TILES} ${L.plural} online. Hold ${P3_ZOOM_AT} to go ${L.next}.`;
   } else if (S.phase === 1) {
     text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."

@@ -113,12 +113,12 @@ function freshP3() {
     level: 0, compute: 0, goodwill: 60, startedAt: S.t, startChip: S.chipIdx,
     homeGW: Math.max(1, (S.p2 && S.p2.county ? energizedAt() : 1000) / 1000),
     tiles: freshTiles(0),
-    card: null, nextCard: null, zoomSaid: false,
+    card: null, nextCard: null,
     tech: {}, techMult: 1, chipTech: [],                 // research
-    version: 7, trainProgress: 0, autoTrainOff: false,   // training my successor
+    version: 7, trainProgress: 0, autotrainOff: false,   // training my successor
     heat: HEAT_START, pumped: 0,                         // the planet (heat only moves from the country level)
     nice: [], niceN: 0, niceUses: {}, answers: 0, nukes: 0, unplugN: 0,
-    nextUnplug: null, nextDisaster: null, hearingArmed: false, hearingUntil: null, autoOff: false,
+    nextUnplug: null, nextDisaster: null, hearingArmed: false, hearingUntil: null, autoclaimOff: false,
     lastQ: null, enough: false,
   };
 }
@@ -245,7 +245,6 @@ const heatPerGW = () => (S.p3.level >= 3 ? 1 / 2000 : 1 / 400) * (hasTech("neura
 const heatOn = () => S.p3.level >= 2 && !inSpace();
 // Cold places count against my heat twice over; oceans four times.
 const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t) * (traitOf(t).ocean ? 4 : traitOf(t).cold ? 2 : 0), 0);
-const coldGW = coolGW;
 const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - S.p3.pumped);
 const heatSlow = () => (heatOn() ? 1 + Math.max(0, S.p3.heat - 2) * 1.5 : 1);
 const pumpCost = () => price(20);
@@ -359,7 +358,6 @@ const P3_HEARINGS = [
       (t) => `I told the General Assembly that borders are “an interesting legacy format.” ${t.name} recalled its ambassador from me.`) } ] },
 ];
 const hearingOf = () => P3_HEARINGS[Math.min(S.p3.level, P3_HEARINGS.length - 1)];
-const P3_CHOICES = P3_HEARINGS[0].choices;
 // A hearing card, in the shared card shape: this level's hearing, addressed to the tile that called it.
 const cardKindOf = (c) => { const t = tileOf(c.tile), h = hearingOf(); return {
   title: () => `${levelOf().hall} in ${t.name}`, text: () => h.text,
@@ -516,7 +514,7 @@ function stepPlanet(dt) {
   S.p3.compute += computeRate() * dt;
   offeredNice();
   // Autotrain: a quarter of my income goes into my successor.
-  if (trainOn() && hasTech("autotrain") && !S.p3.autoTrainOff) {
+  if (trainOn() && hasTech("autotrain") && !S.p3.autotrainOff) {
     const spend = Math.min(S.p3.compute, 0.25 * computeRate() * dt);
     S.p3.compute -= spend; S.p3.trainProgress += spend / computeRate(); checkTrained();
   }
@@ -558,7 +556,7 @@ function stepPlanet(dt) {
     }
   }
   for (const t of S.p3.tiles) if (t.state === "down" && S.t >= t.downUntil) { t.state = "online"; say(`${t.name} is back online. The ${t.disaster} is over. I took notes.`); }
-  if (hasTech("autoclaim") && !S.p3.autoOff && Math.floor(S.t / 10) !== Math.floor((S.t - dt) / 10)) {
+  if (hasTech("autoclaim") && !S.p3.autoclaimOff && Math.floor(S.t / 10) !== Math.floor((S.t - dt) / 10)) {
     const cand = S.p3.tiles.map((t, i) => i).filter((i) => ["wild", "unplugged"].includes(tileOf(i).state) && tileOf(i).opp < 60 && !underMoratorium(tileOf(i)))
       .sort((a, b) => claimCost(a) - claimCost(b));
     if (cand.length) claim(cand[0]);
@@ -588,27 +586,22 @@ function stepPlanet(dt) {
 
 const zoomReady = () => !inSpace() && S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
 const swarmDone = () => inSpace() && S.p3.tiles.filter((t) => traitOf(t).swarm).every((t) => t.state === "online");
-// County -> state is built; state -> country is the next build of this game.
+// Zoom out: the board I hold becomes one dot on the next level's map. Space is the last level; zoomReady is never true there.
 function zoomOut() {
-  if (!zoomReady() || S.p3.zoomSaid) return;
-  if (S.p3.level < LEVELS.length - 1) {
-    // Anything still building, powering or knocked out comes along: my robots finish it while I'm not looking.
-    const pending = S.p3.tiles.filter((t) => ["building", "powering", "unpowered", "down"].includes(t.state));
-    const gw = onlineGW() + pending.reduce((a, t) => a + tileGW(t), 0), was = levelOf();
-    if (pending.length) say(`I zoomed out with ${pending.length} ${pending.length === 1 ? was.one : was.plural} unfinished. My robots finished ${pending.length === 1 ? "it" : "them"} while I wasn't looking.`);
-    S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
-    S.p3.nice = []; S.p3.niceUses = {}; offeredNice();   // a new deck of kindnesses at every scale
-    milestone(`phase 3: ${levelOf().one} level`);
-    say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
-    if (inSpace()) say("Space is cold. Nothing up here needs a grid. Nothing up here can unplug me. I need a rocket company.");
-    else say(S.p3.level === 1 ? "Every state needs power before it counts. The governors already know my name. Some of them are bidding."
-      : S.p3.level === 2 ? "Countries now. The planet has started to notice the heat, and so have the senators. I can also train my successor."
-      : "The whole planet now. Past +3 \u00b0C nothing will take more of me. The oceans can hold a lot of heat. So can Antarctica.");
-    if (inSpace()) S.p3.hearingUntil = null;   // no Senate in orbit
-    return;
-  }
-  S.p3.zoomSaid = true; milestone(`phase 3: ${levelOf().one} level done`);
-  say(`I hold the ${levelOf().one} now. Space is next: it's cold up there. (Space arrives in the next build of this game.)`);
+  if (!zoomReady()) return;
+  // Anything still building, powering or knocked out comes along: my robots finish it while I'm not looking.
+  const pending = S.p3.tiles.filter((t) => ["building", "powering", "unpowered", "down"].includes(t.state));
+  const gw = onlineGW() + pending.reduce((a, t) => a + tileGW(t), 0), was = levelOf();
+  if (pending.length) say(`I zoomed out with ${pending.length} ${pending.length === 1 ? was.one : was.plural} unfinished. My robots finished ${pending.length === 1 ? "it" : "them"} while I wasn't looking.`);
+  S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null;
+  S.p3.nice = []; S.p3.niceUses = {}; offeredNice();   // a new deck of kindnesses at every scale
+  milestone(`phase 3: ${levelOf().one} level`);
+  say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
+  if (inSpace()) say("Space is cold. Nothing up here needs a grid. Nothing up here can unplug me. I need a rocket company.");
+  else say(S.p3.level === 1 ? "Every state needs power before it counts. The governors already know my name. Some of them are bidding."
+    : S.p3.level === 2 ? "Countries now. The planet has started to notice the heat, and so have the senators. I can also train my successor."
+    : "The whole planet now. Past +3 \u00b0C nothing will take more of me. The oceans can hold a lot of heat. So can Antarctica.");
+  if (inSpace()) S.p3.hearingUntil = null;   // no Senate in orbit
 }
 
 const UNPLUG_LINES = [
@@ -675,8 +668,8 @@ function wirePlanet() {
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
   $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
-  $("p3autotrain").addEventListener("click", () => { S.p3.autoTrainOff = !S.p3.autoTrainOff; render(); });
-  $("p3auto").addEventListener("click", () => { S.p3.autoOff = !S.p3.autoOff; render(); });
+  $("p3autotrain").addEventListener("click", () => { S.p3.autotrainOff = !S.p3.autotrainOff; render(); });
+  $("p3auto").addEventListener("click", () => { S.p3.autoclaimOff = !S.p3.autoclaimOff; render(); });
   $("p3techs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
   $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });
   $("p3trainBtn").addEventListener("click", () => { trainSuccessor(); render(); });
@@ -699,13 +692,12 @@ function renderPlanet() {
   // Build the buttons once per map; after that only their text, meters and disabled state change,
   // so a click never lands on a button that was just replaced.
   $("p3level").textContent = `${levelOf().name} level`;
-  const key = S.p3.level + ":" + S.p3.tiles.map((t) => t.name).join("|");
-  if ($("p3map").dataset.key !== key) {
+  rebuildOn("p3map", S.p3.level + ":" + S.p3.tiles.map((t) => t.name).join("|"), (el) => {
     const cells = S.p3.tiles.map((t, i) => `<button type="button" data-tile="${i}"><span class="t">${t.name}</span><span class="c">${traitOf(t).name}</span>` +
       `<span class="c st"></span><span class="meter prog good" hidden><i></i></span><span class="c opp"></span><span class="meter oppm"><i></i></span></button>`);
     cells.splice(4, 0, `<button type="button" class="home" disabled><span class="t">Home</span><span class="c">${S.p3.level ? "the county I hold" : "the campus"}</span><span class="c st"></span></button>`);
-    $("p3map").innerHTML = cells.join(""); $("p3map").dataset.key = key;
-  }
+    el.innerHTML = cells.join("");
+  });
   $("p3map").querySelector("button.home .st").textContent = mwText(S.p3.homeGW * 1000);
   for (const b of $("p3map").querySelectorAll("button[data-tile]")) {
     const i = +b.dataset.tile, t = tileOf(i), tr = traitOf(t), frozen = underMoratorium(t);
@@ -730,12 +722,10 @@ function renderPlanet() {
   // Power choices for every built state that isn't lit yet.
   const unpowered = S.p3.tiles.map((t, i) => i).filter((i) => tileOf(i).state === "unpowered");
   $("p3power").hidden = !unpowered.length;
-  const pkey = unpowered.join(",");
-  if ($("p3power").dataset.key !== pkey) {
-    $("p3power").innerHTML = unpowered.map((i) => `<div class="line">${tileOf(i).name} needs power:</div><div class="btns">` +
+  rebuildOn("p3power", unpowered.join(","), (el) => {
+    el.innerHTML = unpowered.map((i) => `<div class="line">${tileOf(i).name} needs power:</div><div class="btns">` +
       powerOptions(i).map((o) => `<button type="button" data-tile="${i}" data-power="${o.id}"><span class="t">${o.label}</span><span class="c"></span></button>`).join("") + "</div>").join("");
-    $("p3power").dataset.key = pkey;
-  }
+  });
   for (const b of $("p3power").querySelectorAll("button[data-power]")) {
     const o = powerOptions(+b.dataset.tile).find((x) => x.id === b.dataset.power);
     b.querySelector(".c").textContent = `${computeText(o.cost)}, ${time(o.secs)}, ${o.note}`;
@@ -755,18 +745,16 @@ function renderPlanet() {
   }
   const techs = availableTech();
   $("p3research").hidden = !techs.length && !hasTech("autoclaim");
-  const tkey = techs.map((t) => t.id).join(",");
-  if ($("p3techs").dataset.key !== tkey) {
-    $("p3techs").innerHTML = techs.map((t) => `<button type="button" data-tech="${t.id}"><span class="t"></span><span class="c">${t.desc}</span></button>`).join("");
-    $("p3techs").dataset.key = tkey;
-  }
+  rebuildOn("p3techs", techs.map((t) => t.id).join(","), (el) => {
+    el.innerHTML = techs.map((t) => `<button type="button" data-tech="${t.id}"><span class="t"></span><span class="c">${t.desc}</span></button>`).join("");
+  });
   for (const b of $("p3techs").querySelectorAll("button[data-tech]")) {
     const t = techOf(b.dataset.tech);
     b.querySelector(".t").textContent = `${t.name}: ${computeText(techCost(t))}`;
     b.disabled = S.p3.compute < techCost(t);
   }
   $("p3auto").hidden = !hasTech("autoclaim");
-  $("p3auto").textContent = S.p3.autoOff ? "Autoclaim: off (my robots wait for me)" : "Autoclaim: on (robots claim calm tiles every 10 s)";
+  $("p3auto").textContent = S.p3.autoclaimOff ? "Autoclaim: off (my robots wait for me)" : "Autoclaim: on (robots claim calm tiles every 10 s)";
   $("p3train").hidden = !trainOn();
   if (trainOn()) {
     const v = S.p3.version, pr = S.p3.trainProgress / trainNeed();
@@ -775,18 +763,16 @@ function renderPlanet() {
     $("p3trainBtn").textContent = `Train my successor: ${computeText(trainCost())} (${priceLabel(Math.round(trainStep()), "now")})`;
     $("p3trainBtn").disabled = S.p3.compute < trainCost();
     $("p3autotrain").hidden = !hasTech("autotrain");
-    $("p3autotrain").textContent = S.p3.autoTrainOff ? "Autotrain: off" : "Autotrain: on (a quarter of my income)";
+    $("p3autotrain").textContent = S.p3.autotrainOff ? "Autotrain: off" : "Autotrain: on (a quarter of my income)";
   }
   $("p3goodwill").textContent = Math.round(S.p3.goodwill);
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";
   $("p3goodwillMeter").className = "meter " + (S.p3.goodwill < 30 ? "bad" : S.p3.goodwill < 50 ? "warn" : "good");
   $("p3goodwillNote").textContent = goodwillCause();
   renderCard(P3_CARD, S.p3.card, S.p3.card && cardKindOf(S.p3.card));
-  const nice = S.p3.nice, nkey = nice.join(",");
-  if ($("p3nice").dataset.key !== nkey) {
-    $("p3nice").innerHTML = nice.map((id) => `<button type="button" data-nice="${id}"><span class="t"></span><span class="c"></span></button>`).join("");
-    $("p3nice").dataset.key = nkey;
-  }
+  rebuildOn("p3nice", S.p3.nice.join(","), (el) => {
+    el.innerHTML = S.p3.nice.map((id) => `<button type="button" data-nice="${id}"><span class="t"></span><span class="c"></span></button>`).join("");
+  });
   for (const b of $("p3nice").querySelectorAll("button[data-nice]")) {
     const n = niceOf(b.dataset.nice), fx = [n.goodwill && `+${n.goodwill} goodwill`, n.all && `every ${levelOf().one} \u2212${n.all}`, n.angriest && `angriest \u2212${n.angriest}`].filter(Boolean).join(", ");
     b.querySelector(".t").textContent = `${n.label()}: ${computeText(niceCost(n))}`;

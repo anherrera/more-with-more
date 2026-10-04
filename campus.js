@@ -559,7 +559,6 @@ function renderCampus() {
 
 // The fleet by chip generation: what can serve new contracts, and what is old and only earns on-demand.
 const contractReady = (g) => g >= S.chipIdx - 1;   // offers ask for the newest chip or one behind
-let lastFleetKey = null;
 function renderFleet() {
   const free = freeKWByGen();
   const gens = Object.keys(S.fleet).map(Number).filter((g) => S.fleet[g] > 0).sort((a, b) => b - a);
@@ -569,17 +568,15 @@ function renderFleet() {
   $("fleetSummary").textContent = `Contract-ready: ${kwText(sum(ready, kwOf))} (${kwText(sum(ready, (g) => free[g] || 0))} free) \u00b7 ` +
     `Old: ${kwText(sum(old, (g) => free[g] || 0))} free, earning on-demand \u00b7 Room: ${kwText(Math.max(0, capKW() - usedKW()))}`;
   const tradeable = (g) => g < S.chipIdx && tradeCount(g) > 0;   // any chip older than the newest, if some are free
-  const key = gens.map((g) => `${g}:${contractReady(g)}:${tradeable(g)}`).join(",");
-  if (key !== lastFleetKey) {
-    lastFleetKey = key;
-    $("fleetRows").innerHTML = gens.length ? "" : `<div class="empty">No GPUs. Buy some under Compute.</div>`;
+  rebuildOn("fleetRows", gens.map((g) => `${g}:${contractReady(g)}:${tradeable(g)}`).join(","), (el) => {
+    el.innerHTML = gens.length ? "" : `<div class="empty">No GPUs. Buy some under Compute.</div>`;
     for (const g of gens) {
       const d = document.createElement("div"); d.className = "deal"; d.dataset.gen = g;
       d.innerHTML = `<div class="line fl"></div>` + (tradeable(g)
         ? `<div class="btns"><button type="button" data-tradegen="${g}"></button></div>` : "");
-      $("fleetRows").appendChild(d);
+      el.appendChild(d);
     }
-  }
+  });
   for (const d of $("fleetRows").querySelectorAll("[data-gen]")) {
     const g = Number(d.dataset.gen); if (!S.fleet[g]) continue;
     const under = kwOf(g) - (free[g] || 0);
@@ -645,7 +642,6 @@ function nextMove() {
   return "Wait for offers. Post to keep hype up: raises and debt draws need it.";
 }
 
-let lastOfferKey = null, lastContractKey = null;
 function renderContracts() {
   const p = S.p2;
   $("nextMove").textContent = `Next: ${nextMove()}`;
@@ -656,17 +652,15 @@ function renderContracts() {
   $("delivered").textContent = `${mwText(deliveredMW())} of ${mwText(usedKW() / 1000)} of GPUs`;
   $("p2rev").textContent = `${money(campusRevenue())}/s (${money(onDemandRevenue())}/s of it on-demand)`;
   // Rebuild rows only when the set changes, so a click never lands on a button that was just replaced.
-  const oKey = p.offers.map((o) => o.id).join(",");
-  if (oKey !== lastOfferKey) {
-    lastOfferKey = oKey;
-    $("offers").innerHTML = p.offers.length ? "" : `<div class="empty">No offers right now. They come every minute or two.</div>`;
+  rebuildOn("offers", p.offers.map((o) => o.id).join(","), (el) => {
+    el.innerHTML = p.offers.length ? "" : `<div class="empty">No offers right now. They come every minute or two.</div>`;
     for (const o of p.offers) {
       const d = document.createElement("div"); d.className = "deal"; d.dataset.offer = o.id;
       d.innerHTML = `<div class="line what"></div><div class="row"><span class="line sub fc"></span>` +
         `<button type="button" class="primary" data-accept="${o.id}"></button><button type="button" data-decline="${o.id}">Pass</button></div>`;
-      $("offers").appendChild(d);
+      el.appendChild(d);
     }
-  }
+  });
   for (const d of $("offers").querySelectorAll("[data-offer]")) {
     const o = p.offers.find((x) => x.id === d.dataset.offer); if (!o) continue;
     const f = forecast(o);
@@ -686,17 +680,15 @@ function renderContracts() {
       `${money(running.reduce((a, c) => a + c.fee, 0))}/s \u00b7 next ends in ${time(Math.max(0, soonest))}`;
   }
   const shown = p.contracts.filter((c) => c.status === "waiting" || c.status === "late");
-  const cKey = shown.map((c) => `${c.id}:${c.status}:${c.reneg}`).join(",");
-  if (cKey !== lastContractKey) {
-    lastContractKey = cKey;
-    $("contracts").innerHTML = shown.length || running.length ? "" : `<div class="empty">Nothing signed.</div>`;
+  rebuildOn("contracts", shown.map((c) => `${c.id}:${c.status}:${c.reneg}`).join(","), (el) => {
+    el.innerHTML = shown.length || running.length ? "" : `<div class="empty">Nothing signed.</div>`;
     for (const c of shown) {
       const d = document.createElement("div"); d.className = "deal"; d.dataset.contract = c.id;
       d.innerHTML = `<div class="row"><span class="line st"></span>` + (!c.reneg && c.status !== "active"
         ? `<button type="button" data-reneg="${c.id}">Push ${time(RENEGOTIATE_SECS)} (−${RENEGOTIATE_HYPE} hype)</button>` : "") + `</div>`;
-      $("contracts").appendChild(d);
+      el.appendChild(d);
     }
-  }
+  });
   for (const d of $("contracts").querySelectorAll("[data-contract]")) {
     const c = p.contracts.find((x) => x.id === d.dataset.contract); if (!c) continue;
     const st = d.querySelector(".st"), who = c.who.split(" (")[0], late = S.t - c.start;
@@ -780,14 +772,12 @@ function pickVendor(id) {
 }
 // Campus buttons: name and price on top, the details underneath.
 function buildBtn(id, name, cost, detail) {
-  const html = `<span class="t">${name}${cost != null ? ": " + money(cost) : ""}</span><span class="c">${detail}</span>`;
-  if ($(id).dataset.html !== html) { $(id).innerHTML = html; $(id).dataset.html = html; }
+  setHtml(id, `<span class="t">${name}${cost != null ? ": " + money(cost) : ""}</span><span class="c">${detail}</span>`);
 }
 function renderVendors() {
   const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
   $("vendorRow").hidden = !on;
   if (!on) return;
   const cur = vendorOf().id;
-  const html = VENDORS.map((v) => `<button type="button" data-vendor="${v.id}" class="${v.id === cur ? "on" : ""}" aria-pressed="${v.id === cur}" title="${v.blurb}"><span class="t">${v.name}</span><span class="c">${v.blurb}</span></button>`).join("");
-  if ($("vendors").dataset.html !== html) { $("vendors").innerHTML = html; $("vendors").dataset.html = html; }
+  setHtml("vendors", VENDORS.map((v) => `<button type="button" data-vendor="${v.id}" class="${v.id === cur ? "on" : ""}" aria-pressed="${v.id === cur}" title="${v.blurb}"><span class="t">${v.name}</span><span class="c">${v.blurb}</span></button>`).join(""));
 }

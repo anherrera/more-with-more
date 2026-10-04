@@ -22,8 +22,7 @@ function renderCard(ids, card, kind) {
   if (!card) return;
   $(ids.title).textContent = `${kind.title()} (${Math.max(0, Math.ceil(card.until - S.t))}s)`;
   $(ids.text).textContent = kind.text();
-  const html = kind.choices.map((ch, i) => `<button type="button" data-${ids.data}="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
-  if ($(ids.btns).dataset.html !== html) { $(ids.btns).innerHTML = html; $(ids.btns).dataset.html = html; }
+  setHtml(ids.btns, kind.choices.map((ch, i) => `<button type="button" data-${ids.data}="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join(""));
 }
 // Opposition (0-100) passes a moratorium at 90; when it lifts after `secs`, the meter settles at 70.
 // Returns "passed" or "lifted" so the caller can say its line and take its own hit, or null.
@@ -141,13 +140,13 @@ function townBuilt(kind) {
   t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba2 ? 0.5 : 1) * familiar);
 }
 // Sponsorships: press any time; each costs double the last and helps a bit less. Late-game money still buys goodwill.
-const COOLDOWN = 60;   // sponsorships: one a minute, flat prices
+const SPONSOR_COOLDOWN = 60;   // sponsorships: one a minute, flat prices
 const SPONSORED = [["the county fair", 3e6], ["the Little League team", 1e6], ["a new fire truck", 2e6], ["the library's 3D printer", 1e6],
   ["the Fourth of July fireworks", 2e6], ["a splash pad", 3e6], ["the high school's prom", 1e6], ["a mural of the model, which the model designed", 5e6]];
 const sponsorNext = () => SPONSORED[(townOf().sponsors || 0) % SPONSORED.length];
 const sponsorCost = () => sponsorNext()[1];
 const sponsorGain = () => 10;
-const sponsorWait = () => Math.max(0, (townOf().sponsorAt ?? -1e9) + COOLDOWN - S.t);
+const sponsorWait = () => Math.max(0, (townOf().sponsorAt ?? -1e9) + SPONSOR_COOLDOWN - S.t);
 function sponsor() {
   const t = townOf();
   if (S.funds < sponsorCost() || sponsorWait() > 0) return;
@@ -231,10 +230,9 @@ function renderPeople() {
   $("moraleMeter").className = "meter " + (m.v < 25 ? "bad" : m.v < 50 ? "warn" : "good");
   $("moraleCause").textContent = moraleCause();
   const wait = perkWait();
-  const html = (m.perks || []).map((id) => { const p = perkOf(id);
+  setHtml("perks", (m.perks || []).map((id) => { const p = perkOf(id);
     return `<button type="button" data-perk="${id}">${p.name} (+${Math.round(perkGain(p))}): ${p.cost ? money(p.cost) : "free"}</button>`; }).join("")
-    + (wait > 0 ? `<span class="sub"> next perk in ${Math.ceil(wait)}s</span>` : "");
-  if ($("perks").dataset.html !== html) { $("perks").innerHTML = html; $("perks").dataset.html = html; }
+    + (wait > 0 ? `<span class="sub"> next perk in ${Math.ceil(wait)}s</span>` : ""));
   for (const btn of $("perks").querySelectorAll("button")) btn.disabled = wait > 0 || m.v >= 100 || S.funds < perkOf(btn.dataset.perk).cost;
   const t = townOf();
   $("town").textContent = Math.round(t.v);

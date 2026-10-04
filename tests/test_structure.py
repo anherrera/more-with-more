@@ -113,3 +113,33 @@ def test_each_phase_dispatches_through_the_phases_table(game):
     hud = (ROOT / "hud.js").read_text()
     assert "function renderAlerts" in hud and "function renderPhaseBar" in hud
     assert "function renderAlerts" not in (ROOT / "fires.js").read_text() and "function renderPhaseBar" not in (ROOT / "model.js").read_text()
+
+
+def test_one_render_cache_idiom_and_no_leftover_module_caches(game):
+    pg = game(MID)
+    assert pg.evaluate("() => typeof rebuildOn === 'function' && typeof setHtml === 'function'")
+    assert pg.evaluate("() => ['lastRackKey', 'lastProjectKey', 'lastLeaseKey', 'lastOfferKey', 'lastContractKey', 'lastFleetKey', 'lastLogLen'].every((n) => typeof window[n] === 'undefined')")
+    assert pg.evaluate("() => document.querySelectorAll('[data-key]').length") >= 3      # the console, leases, projects...
+    assert not any("dataset.html" in (ROOT / f).read_text() for f in SCRIPTS)
+    pg.evaluate("() => { S = fresh(); clearCaches(); }")
+    assert pg.evaluate("() => document.querySelectorAll('[data-key]').length") == 0
+
+
+def test_dead_code_is_gone(game):
+    pg = game()
+    assert pg.evaluate("() => ['coldGW', 'P3_CHOICES', 'ensureRunIfDb', 'db', 'COOLDOWN'].every((n) => typeof window[n] === 'undefined')")
+    assert pg.evaluate("() => typeof SPONSOR_COOLDOWN === 'number' && typeof ensureRun === 'function'")
+    for f in SCRIPTS:
+        assert "next build" not in (ROOT / f).read_text(), f
+    assert "zoomSaid" not in (ROOT / "planet.js").read_text() and "levelAt" not in (ROOT / "planet.js").read_text()
+    assert "fresh = " not in (ROOT / "market.js").read_text()
+
+
+def test_phase3_toggles_have_clear_names_and_old_ones_migrate(game):
+    pg = game()
+    assert pg.evaluate("() => { S.p3 = null; const d = freshP3(); return [d.autoclaimOff, d.autotrainOff, 'autoOff' in d, 'zoomSaid' in d]; }") == [False, False, False, False]
+    from test_planet import planet
+    pg = planet(game)
+    pg.evaluate("() => { S.v = 4; S.p3.autoOff = true; S.p3.autoTrainOff = true; S.p3.zoomSaid = false; S.p3.levelAt = 1; save(); }")
+    pg.reload()
+    assert pg.evaluate("() => [S.p3.autoclaimOff, S.p3.autotrainOff, 'autoOff' in S.p3, 'zoomSaid' in S.p3, 'levelAt' in S.p3]") == [True, True, False, False, False]

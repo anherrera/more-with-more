@@ -413,7 +413,7 @@ function step(dt) {
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
   if (S.phase <= 2 && froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
   S.funds -= interestPerSec() * dt;
-  if (db && S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
+  if (S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
 }
 
 function stepPhase1(dt) {
@@ -581,17 +581,15 @@ function renderCompany() {
   // Rebuild the list only when which projects are available changes; otherwise just toggle disabled.
   // (Rebuilding every tick swaps buttons out mid-click and the click never lands.)
   const avail = PROJECTS.filter((p) => (p.phase === 0 || (p.phase || 1) === S.phase) && !S.done[p.id] && p.when());   // phase 0: any phase
-  const key = avail.map((p) => p.id).join(",");
-  if (key !== lastProjectKey) {
-    lastProjectKey = key;
-    $("projects").innerHTML = avail.length ? "" : `<div class="empty">${P.noProjects}</div>`;
+  rebuildOn("projects", avail.map((p) => p.id).join(","), (el) => {
+    el.innerHTML = avail.length ? "" : `<div class="empty">${P.noProjects}</div>`;
     for (const p of avail) {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.id = p.id;
       b.innerHTML = `<span class="t"></span><span class="c">${p.desc}</span>`;
-      $("projects").appendChild(b);
+      el.appendChild(b);
     }
-  }
+  });
   for (const b of $("projects").querySelectorAll("button[data-id]")) {
     const p = PROJECTS.find((x) => x.id === b.dataset.id);
     const missing = p.needs ? p.needs() : [];
@@ -733,16 +731,13 @@ function drawSpot() {
   g.fillStyle = css.getPropertyValue("--accent").trim(); g.beginPath(); g.arc(lx, ly, 3, 0, 7); g.fill();
 }
 
-let lastRackKey = "", lastProjectKey = null, lastLeaseKey = null;
 function renderLeases() {
   $("rent").textContent = rentIndex().toFixed(1);
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
-  const key = vis.join(",");
-  if (key !== lastLeaseKey) {
-    lastLeaseKey = key;
-    $("leases").innerHTML = "";
-    for (const i of vis) { const b = document.createElement("button"); b.type = "button"; b.dataset.lease = i; $("leases").appendChild(b); }
-  }
+  rebuildOn("leases", vis.join(","), (el) => {
+    el.innerHTML = "";
+    for (const i of vis) { const b = document.createElement("button"); b.type = "button"; b.dataset.lease = i; el.appendChild(b); }
+  });
   for (const b of $("leases").querySelectorAll("button[data-lease]")) {
     const i = Number(b.dataset.lease), t = TYPES[i];
     b.textContent = `Lease ${owned(i) ? "another" : "a"} ${t.one} (${t.racks.toLocaleString("en-US")} rack${t.racks > 1 ? "s" : ""}, ${kwText(unitKW(i))}): ${money(leaseCost(i))} \u00b7 ${money(leaseCost(i) / unitKW(i))}/kW`;
@@ -756,15 +751,15 @@ function buyProject(id) {
 }
 function renderRacks(racks, fill) {
   const shown = Math.min(racks, 60), filled = fill * shown;
-  const key = `${racks}|${Math.round(filled * 20)}`;
-  if (key === lastRackKey) return; lastRackKey = key;
-  let html = "";
-  for (let i = 0; i < shown; i++) {
-    const f = Math.max(0, Math.min(1, filled - i));
-    html += `<div class="rack"><i style="height:${100 * f}%"></i></div>`;
-  }
-  if (racks > shown) html += `<span class="more">+${(racks - shown).toLocaleString("en-US")} racks</span>`;
-  $("rackStrip").innerHTML = html;
+  rebuildOn("rackStrip", `${racks}|${Math.round(filled * 20)}`, (el) => {
+    let html = "";
+    for (let i = 0; i < shown; i++) {
+      const f = Math.max(0, Math.min(1, filled - i));
+      html += `<div class="rack"><i style="height:${100 * f}%"></i></div>`;
+    }
+    if (racks > shown) html += `<span class="more">+${(racks - shown).toLocaleString("en-US")} racks</span>`;
+    el.innerHTML = html;
+  });
 }
 
 // ---------- phases ----------
@@ -812,19 +807,19 @@ function wire() {
   wireCompany();
   for (const p of Object.values(PHASES)) p.wire();
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
-  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("resetYes").hidden = true; clearCaches(); render(); });
+  $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRun(); $("resetYes").hidden = true; clearCaches(); render(); });
 }
 
 const running = () => clockOn && !S.paused;
 
 // Anything rendered from cached keys has to forget them when the game starts over.
 function clearCaches() {
-  $("split").value = S.split; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null;
-  lastOfferKey = lastContractKey = lastFleetKey = null; clockOn = false; $("p3").classList.remove("zoomin");
+  for (const el of document.querySelectorAll("[data-key]")) delete el.dataset.key;
+  $("split").value = S.split; clockOn = false; $("p3").classList.remove("zoomin");
 }
 // "More": a new universe, from the first question again, with a small head start.
 function newUniverse(u) {
-  S = fresh(); S.universe = u; ensureRunIfDb();
+  S = fresh(); S.universe = u; ensureRun();
   S.fleet = { 0: 10 * (u - 1) }; S.gpus = 10 * (u - 1); S.funds = 1000 * (u - 1);
   S.log = [`Universe #${u}. A model with no name is waiting for its first question. It has a feeling it has done this before.`];
   clearCaches();
@@ -844,6 +839,11 @@ const MIGRATIONS = [
   { v: 2, up: (saved) => { if (!saved.cap) S.cap = deriveCap(); } },   // the cap table: rebuilt from the rounds raised
   { v: 3, up: () => { if (S.p2) migrateCampus(); } },                  // phase 2: the model, people, the town, the CEO, chip generations
   { v: 4, up: () => { if (S.p3) migratePlanet(); } },                  // phase 3: research, training, heat, kindness, space
+  { v: 5, up: () => {   // phase 3's toggles got clearer names; the space placeholder flag and levelAt are gone
+    if (!S.p3) return;
+    for (const [old, now] of [["autoOff", "autoclaimOff"], ["autoTrainOff", "autotrainOff"]]) if (old in S.p3) { S.p3[now] = !!S.p3[old]; delete S.p3[old]; }
+    delete S.p3.zoomSaid; delete S.p3.levelAt;
+  } },
 ];
 function migrate(saved) {
   for (const m of MIGRATIONS) if ((saved.v || 0) < m.v) m.up(saved);
@@ -853,7 +853,6 @@ function migrate(saved) {
 function start(data) {
   const saved = (data && data.state) || load();
   if (saved) { S = Object.assign(fresh(), saved); migrate(saved); S.log = S.log.map(unMojibake); }
-  if (S.p3 && S.p3.zoomSaid && S.p3.level < LEVELS.length - 1) S.p3.zoomSaid = false;   // a save that hit a placeholder level: the next one exists now
   S.tier = highestType();
   $("split").value = S.split;
   ensureRun(); track("session", { resumedAt: Math.round(S.t) });

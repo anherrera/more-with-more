@@ -41,7 +41,7 @@ const MODEL_LINES = [
 
 // ---------- state ----------
 // Every save carries its version; start() migrates older ones in order (MIGRATIONS in main.js).
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 const fresh = () => ({
   // queue: a few questions are already waiting, so the first click is always possible
   v: SAVE_VERSION, universe: 1, paused: false, logV2: true, t: 0, funds: 0, price: 0.25, gpus: 0, queue: 5, served: 0, gpuSeconds: 0, phase: 1, p2: null, p3: null,
@@ -70,8 +70,7 @@ function say(line) { S.log.push(line); S.log = S.log.slice(-40); }
 // ---------- play log: actions, milestones and snapshots in localStorage (read back from the browser profile) ----------
 const LOG_KEY = "more-with-more-log-v1", MAX_EVENTS = 20000;
 let pending = [], answerClicks = 0, lastSnapT = -1e9;
-const db = true;                                    // logging is always on; it's local
-function ensureRunIfDb() { ensureRun(); }
+// Logging is always on; it's local.
 function ensureRun() {
   if (!S.runId) { S.runId = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7); S.chunkNo = 0; S.started = new Date().toISOString(); }
 }
@@ -115,6 +114,10 @@ const moneyFull = (x) => Math.abs(x) >= 1e15 ? money(x)
   : (x < 0 ? "-$" : "$") + Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const time = (s) => { s = Math.round(s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; };
 const $ = (id) => document.getElementById(id);
+// Rebuild an element's contents only when its key changes, so a click never lands on a button that was just replaced.
+// Every cached element carries data-key; clearCaches() (main.js) wipes them when the game starts over.
+function rebuildOn(id, key, build) { const el = $(id); if (el.dataset.key === key) return; el.dataset.key = key; build(el); }
+const setHtml = (id, html) => rebuildOn(id, html, (el) => { el.innerHTML = html; });
 
 const SAVE_KEY = "more-with-more-v1";
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }

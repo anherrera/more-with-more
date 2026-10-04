@@ -60,10 +60,10 @@ const ipoGap = () => backlogMW() + deliveredMW() < IPO_BACKLOG ? `${mwText(IPO_B
 
 function ringTheBell() {
   if (isPublic() || ipoGap() || S.hype < HYPE_TO_RAISE) return;
-  const c = capOf(), px = IPO_DISCOUNT * fundamentalCap() / c.shares, fresh = c.shares * IPO_FLOAT / (1 - IPO_FLOAT);
+  const c = capOf(), px = IPO_DISCOUNT * fundamentalCap() / c.shares, minted = c.shares * IPO_FLOAT / (1 - IPO_FLOAT);
   S.p2.ipo = { at: S.t, px0: px, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: false };
-  c.shares += fresh; S.funds += fresh * px;
-  milestone("IPO"); track("ipo", { proceeds: Math.round(fresh * px) });
+  c.shares += minted; S.funds += minted * px;
+  milestone("IPO"); track("ipo", { proceeds: Math.round(minted * px) });
   confetti();
   say(`You rang the bell. MORE priced at ${money(px)}, below the range. The bankers call that “leaving room for the pop.” The pop is for their other clients.`);
 }
