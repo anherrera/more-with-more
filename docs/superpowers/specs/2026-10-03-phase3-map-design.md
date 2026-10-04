@@ -75,7 +75,7 @@ says which (`priceLabel`: "15 s of tokens at my starting rate" / "15 s of tokens
 **Tiles** move through states: wild -> building -> (state level and up: unpowered -> powering) -> online; an online tile can
 be knocked **down** by a disaster (back in 45 s) or **unplugged** by humans (plug back in for half a claim; it keeps its
 power and boost).
-- **Claim** (click the tile): `CLAIM_SECS` per level (55, 55, 85, 100, 90 s of level-start tokens), scaled by the tile's GW; 30% off while a
+- **Claim** (click the tile): `CLAIM_SECS` per level (55, 60, 100, 130, 90 s of level-start tokens), scaled by the tile's GW; 30% off while a
   neighboring governor is bidding (state level and up), double under the AI Infrastructure Act, half when humans
   volunteer (planet level, goodwill 70+) or when plugging back in. Build time comes from the tile's trait, practice
   (5% faster per online tile, floor 40%), heat, and research. Claiming raises the tile's opposition (+15, doubled on

@@ -12,7 +12,7 @@ export const ZOOM_AT = [6, 7, 7, 7];
 export const zoomAt = () => ZOOM_AT[Math.min(S.p3 ? S.p3.level : 0, ZOOM_AT.length - 1)];
 // Tuning: a tile is worth this many seconds of level-start tokens (per level) before its size and discounts; builds take the
 // trait's seconds over BUILD_DIV. The bigger levels charge more per tile because their boards snowball faster.
-export const CLAIM_SECS = [55, 55, 85, 100, 90], BUILD_DIV = 1.0;
+export const CLAIM_SECS = [55, 60, 100, 130, 90], BUILD_DIV = 1.0;
 export const claimSecs = () => CLAIM_SECS[Math.min(S.p3.level, CLAIM_SECS.length - 1)];
 export const COUNTY_TRAITS = {
   cheap:     { name: "Cheap land, weak grid",       gw: 1,   secs: 40, opp: 10 },
@@ -67,11 +67,11 @@ export const COUNTRY_NAMES = {
 };
 // The planet level: the continents and the oceans. The oceans are the heat sink.
 export const PLANET_TRAITS = {
-  continent: { name: "A continent",                                  gw: 1500, secs: 110, opp: 25 },
-  crowded:   { name: "Crowded continent: billions of opinions",      gw: 2000, secs: 130, opp: 40, townhall: true },
-  sunny:     { name: "Sunny continent: deserts to cover",            gw: 1500, secs: 110, opp: 20, sunny: true },
-  frozen:    { name: "Frozen continent: free cooling, no neighbors", gw: 1000, secs: 140, opp: 5,  cold: true },
-  ocean:     { name: "Ocean: the heat sink",                         gw: 500,  secs: 120, opp: 15, ocean: true, powered: true },
+  continent: { name: "A continent",                                  gw: 1500, secs: 150, opp: 25 },
+  crowded:   { name: "Crowded continent: billions of opinions",      gw: 2000, secs: 170, opp: 40, townhall: true },
+  sunny:     { name: "Sunny continent: deserts to cover",            gw: 1500, secs: 150, opp: 20, sunny: true },
+  frozen:    { name: "Frozen continent: free cooling, no neighbors", gw: 1000, secs: 180, opp: 5,  cold: true },
+  ocean:     { name: "Ocean: the heat sink",                         gw: 500,  secs: 160, opp: 15, ocean: true, powered: true },
 };
 export const PLANET_TILES = [["North America", "continent"], ["South America", "continent"], ["Europe", "crowded"], ["Asia", "crowded"],
   ["Africa", "sunny"], ["Antarctica", "frozen"], ["Pacific Ocean", "ocean"], ["Atlantic Ocean", "ocean"]];
