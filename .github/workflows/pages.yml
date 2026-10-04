@@ -19,6 +19,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Syntax-check every script
         run: for f in *.js; do node --check "$f"; done
+      - name: Type-check the scripts (tsc, no build)
+        run: npx --yes -p typescript@5.6 tsc -p .
       - name: Run the test suite (headless Chrome)
         run: uv run --with pytest --with playwright --with pytest-rerunfailures pytest -q --reruns 1
   deploy:

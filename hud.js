@@ -93,6 +93,6 @@ export function renderHud() {
 
 export function wireHud() {
   $("pause").addEventListener("click", () => togglePause());
-  document.addEventListener("keydown", (e) => { if ((e.key === "p" || e.key === "P") && !e.metaKey && !e.ctrlKey && !/input|textarea/i.test(e.target.tagName)) togglePause(); });
+  document.addEventListener("keydown", (e) => { if ((e.key === "p" || e.key === "P") && !e.metaKey && !e.ctrlKey && !/input|textarea/i.test(/** @type {HTMLElement} */ (e.target).tagName)) togglePause(); });
   $("phaseGo").addEventListener("click", () => { phase().go(); render(); });
 }

@@ -145,6 +145,7 @@ export function townBuilt(kind) {
 }
 // Sponsorships: press any time; each costs double the last and helps a bit less. Late-game money still buys goodwill.
 export const SPONSOR_COOLDOWN = 60;   // sponsorships: one a minute, flat prices
+/** @type {[string, number][]} */
 export const SPONSORED = [["the county fair", 3e6], ["the Little League team", 1e6], ["a new fire truck", 2e6], ["the library's 3D printer", 1e6],
   ["the Fourth of July fireworks", 2e6], ["a splash pad", 3e6], ["the high school's prom", 1e6], ["a mural of the model, which the model designed", 5e6]];
 export const sponsorNext = () => SPONSORED[(townOf().sponsors || 0) % SPONSORED.length];

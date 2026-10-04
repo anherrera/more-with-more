@@ -1,6 +1,6 @@
 // planet.js: phase 3. I am the model now. The campus was one county; the map is the rest of them.
 // All state lives in S.p3. Phases 1 and 2 never read it.
-import { $, S, fmt, milestone, mwText, rebuildOn, say, time, track } from "./globals.js";
+import { $, $q, fmt, hit, milestone, mwText, rebuildOn, S, say, time, track } from "./globals.js";
 import { energizedAt } from "./campus.js";
 import { firesOf, leaksOf } from "./fires.js";
 import { dealCard, expireCard, refillDeck, renderCard, stepMoratorium, takeCard, underMoratorium } from "./people.js";
@@ -290,7 +290,10 @@ export function checkTrained() {
 
 // ---------- energy (state level and up): a built state needs power before it counts ----------
 export const powerOptions = (i) => {
-  const t = tileOf(i), off = hasTech("gridop") ? 0.5 : 1, names = POWER_NAMES[Math.min(Math.max(S.p3.level, 1), 3)], out = [
+  /** @type {{ id: string, label: string, cost: number, secs: number, note: string, goodwill?: number, boost?: number }[]} */
+  let out;
+  const t = tileOf(i), off = hasTech("gridop") ? 0.5 : 1, names = POWER_NAMES[Math.min(Math.max(S.p3.level, 1), 3)];
+  out = [
     { id: "utility", label: names.utility, cost: price(10) * off, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
     { id: "nuclear", label: names.nuclear, cost: price(25) * off, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
   ];
@@ -655,7 +658,7 @@ export function chooseEnding(more) {
 export function renderLastQ() {
   const q = S.p3.lastQ != null;
   $("lastq").hidden = !q;
-  document.querySelector(".p3cols").hidden = !!S.p3.enough;
+  $q(".p3cols").hidden = !!S.p3.enough;
   if (!q) return;
   $("lastqText").innerHTML = S.p3.enough ? "<p>I stopped.</p><p class=\"big\">More with less.</p>"
     : "<p>The swarm is complete. Every photon the Sun makes passes through me first.</p>" +
@@ -670,16 +673,16 @@ export function planetGo() {
   if (S.p3.level !== lv) { $("p3").classList.remove("zoomin"); void $("p3").offsetWidth; $("p3").classList.add("zoomin"); }
 }
 export function wirePlanet() {
-  $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
-  $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
-  $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
+  $("p3map").addEventListener("click", (e) => { const b = hit(e, "button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
+  $("p3cardBtns").addEventListener("click", (e) => { const b = hit(e, "button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
+  $("p3power").addEventListener("click", (e) => { const b = hit(e, "button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
   $("p3autotrain").addEventListener("click", () => { S.p3.autotrainOff = !S.p3.autotrainOff; render(); });
   $("p3auto").addEventListener("click", () => { S.p3.autoclaimOff = !S.p3.autoclaimOff; render(); });
-  $("p3techs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
+  $("p3techs").addEventListener("click", (e) => { const b = hit(e, "button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
   $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });
   $("p3trainBtn").addEventListener("click", () => { trainSuccessor(); render(); });
   $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
-  $("p3nice").addEventListener("click", (e) => { const b = e.target.closest("button[data-nice]"); if (b) { doNice(b.dataset.nice); render(); } });
+  $("p3nice").addEventListener("click", (e) => { const b = hit(e, "button[data-nice]"); if (b) { doNice(b.dataset.nice); render(); } });
   $("lastMore").addEventListener("click", () => { chooseEnding(true); render(); });
   $("lastEnough").addEventListener("click", () => { chooseEnding(false); render(); });
 }

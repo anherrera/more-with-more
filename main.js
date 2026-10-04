@@ -1,6 +1,6 @@
 // main.js: phase 1 (the lab), the company screen phases 1 and 2 share, the PHASES table, the tick, wiring, start(),
 // and the debug surface (window.game). It is the page's only script: every other module is imported from here.
-import { $, CHIP_EVERY, CHIP_EVERY_P2, COOLING, FIRST_CHIP_AT, GROUND_KW, HYPE_TO_RAISE, KW_PER_GPU, MODEL_LINES, RENT_EXP, RENT_K, ROUNDS, S, SAVE_VERSION, TYPES, chip, countAnswer, countAutoSwaps, ensureRun, flush, fmt, fresh, kwText, load, milestone, money, moneyFull, mwText, rebuildOn, save, say, setState, snap, time, track, unMojibake } from "./globals.js";
+import { $, $all, $q, chip, CHIP_EVERY, CHIP_EVERY_P2, COOLING, countAnswer, countAutoSwaps, ensureRun, FIRST_CHIP_AT, flush, fmt, fresh, GROUND_KW, hit, HYPE_TO_RAISE, KW_PER_GPU, kwText, load, milestone, MODEL_LINES, money, moneyFull, mwText, rebuildOn, RENT_EXP, RENT_K, ROUNDS, S, save, SAVE_VERSION, say, setState, snap, time, track, TYPES, unMojibake } from "./globals.js";
 import { PROJECTS, projectCost } from "./projects.js";
 import { COLO_MW, COLO_RACKS, P2_RATE, campusDealSize, campusDrawSize, campusKWAt, campusRevenue, campusRound, campusSpotPay, freeKWByGen, migrateCampus, raiseCampus, renderCampusPhase, renderRaiseCampus, renderVendors, roundNoteCampus, spotLineCampus, startCampus, stepCampus, uncontractedGPUs, vendorOf, wireCampus } from "./campus.js";
 import { campusGo, gpuDiscount } from "./model.js";
@@ -253,6 +253,7 @@ export const RIVAL_NEWS = [
   (d) => `PivotCloud tried to lease your landlord's building. Your landlord asked if they take Parallax credits. ${d}`,
 ];
 // Weird things PivotCloud does that splash onto you: [line, hype change for you, their stock move].
+/** @type {[string, number, number][]} */
 export const RIVAL_WEIRD = [
   ["PivotCloud announced AGI in a tweet at 2 a.m. It was deleted by 2:05. The whole sector rallied anyway.", +12, 0.6],
   ["A PivotCloud data hall caught fire. \u201cThermal event,\u201d says the press release. Investors now ask you about fire suppression.", -10, -0.4],
@@ -266,6 +267,7 @@ export const RIVAL_WEIRD = [
   ["A PivotCloud customer defaulted and returned 20,000 GPUs. \u201cSpot supply glut\u201d headlines. Your hype dips in sympathy.", -9, -0.45],
 ];
 // The rest of the neocloud neighborhood: [line, hype change for you]. Made up, like everyone else here.
+/** @type {[string, number][]} */
 export const NEOCLOUD_NEWS = [
   ["Flarewell Compute burns the gas oil fields were going to flare anyway. It used to mine bitcoin with it. Now the gas thinks.", +4],
   ["Flarewell Compute's pitch deck: \u201cWaste not.\u201d Slide two is a photo of a flare stack with a GPU drawn on it.", +3],
@@ -317,10 +319,11 @@ export function rentRival() {
   const R = S.rival, bump = 0.05 + Math.random() * 0.1;
   R.prev = R.px; R.px *= 1 + bump;
   track("rent", { cost: Math.round(c) });
-  say(RENT_LINES[(S.rentals - 1) % RENT_LINES.length].replace("{p}", Math.round(bump * 100)));
+  say(RENT_LINES[(S.rentals - 1) % RENT_LINES.length].replace("{p}", String(Math.round(bump * 100))));
 }
 
 // Periodic nonsense that gives you hype, because the discourse never sleeps.
+/** @type {[string, number][]} */
 export const BUZZ = [
   ["A podcast called you \u201cthe Switzerland of compute.\u201d", 8],
   ["A sell-side analyst initiated coverage: Strong Buy. He has never seen a data center.", 10],
@@ -494,7 +497,7 @@ export function hints() {
 // The screen: the HUD (hud.js), the company screen phases 1 and 2 share, then whatever the phase adds (PHASES).
 export function render() {
   $("p3").hidden = S.phase !== 3;
-  document.querySelector(".cols").hidden = S.phase === 3;
+  $q(".cols").hidden = S.phase === 3;
   renderHud();
   if (S.phase !== 3) renderCompany();
   phase().render();
@@ -661,7 +664,7 @@ export function renderComputePanels() {
   if (S.spike) $("rollback").textContent = `Roll back to checkpoint (diverges in ${Math.ceil(S.spike.until - S.t)}s)`;
   $("priceUp").disabled = $("priceDown").disabled = !!S.done.dynprice;
   $("buy1").disabled = room < 1 || wallet < costOf(1);
-  for (const b of document.querySelectorAll("button[data-buy]")) {
+  for (const b of $all("button[data-buy]")) {
     const k = Number(b.dataset.buy);
     b.hidden = S.gpus < k;                     // each size shows up once the fleet is that big
     b.disabled = room < k || wallet < costOf(k);
@@ -751,7 +754,7 @@ export function renderLeases() {
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
   rebuildOn("leases", vis.join(","), (el) => {
     el.innerHTML = "";
-    for (const i of vis) { const b = document.createElement("button"); b.type = "button"; b.dataset.lease = i; el.appendChild(b); }
+    for (const i of vis) { const b = document.createElement("button"); b.type = "button"; b.dataset.lease = String(i); el.appendChild(b); }
   });
   for (const b of $("leases").querySelectorAll("button[data-lease]")) {
     const i = Number(b.dataset.lease), t = TYPES[i];
@@ -795,11 +798,11 @@ export function wireLab() {
   $("priceUp").addEventListener("click", () => { S.price = +(S.price * 1.1).toPrecision(3); track("price", { p: S.price }); render(); });
   $("priceDown").addEventListener("click", () => { S.price = Math.max(0.0001, +(S.price / 1.1).toPrecision(3)); track("price", { p: S.price }); render(); });
   $("buy1").addEventListener("click", () => { buy(1); render(); });
-  for (const b of document.querySelectorAll("button[data-buy]")) b.addEventListener("click", () => { buy(Number(b.dataset.buy)); render(); });
+  for (const b of $all("button[data-buy]")) b.addEventListener("click", () => { buy(Number(b.dataset.buy)); render(); });
   $("buyMax").addEventListener("click", () => { buy(maxBuy()); render(); });
   $("buyCredits").addEventListener("click", () => { buy(maxBuy(S.credits)); render(); });
   $("split").addEventListener("input", (e) => { S.split = Number(e.target.value); render(); });
-  $("leases").addEventListener("click", (e) => { const b = e.target.closest("button[data-lease]"); if (b) { lease(Number(b.dataset.lease)); render(); } });
+  $("leases").addEventListener("click", (e) => { const b = hit(e, "button[data-lease]"); if (b) { lease(Number(b.dataset.lease)); render(); } });
   $("swap").addEventListener("click", () => { swapFailed(); render(); });
   $("rollback").addEventListener("click", () => { rollback(); render(); });
   $("rentRival").addEventListener("click", () => { rentRival(); render(); });
@@ -815,7 +818,7 @@ export function wireCompany() {
   $("post").addEventListener("click", () => { vaguePost(); render(); });
   $("spot").addEventListener("click", () => { sellSpot(); render(); });
   $("retrofit").addEventListener("click", () => { retrofit(); render(); });
-  $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
+  $("projects").addEventListener("click", (e) => { const b = hit(e, "button[data-id]"); if (b) buyProject(b.dataset.id); });
 }
 export function wire() {
   wireHud();
@@ -829,7 +832,7 @@ export const running = () => clockOn && !S.paused;
 
 // Anything rendered from cached keys has to forget them when the game starts over.
 export function clearCaches() {
-  for (const el of document.querySelectorAll("[data-key]")) delete el.dataset.key;
+  for (const el of $all("[data-key]")) delete el.dataset.key;
   $("split").value = S.split; clockOn = false; $("p3").classList.remove("zoomin");
 }
 // "More": a new universe, from the first question again, with a small head start.
@@ -888,7 +891,7 @@ export function start(data) {
   }
   // Save right after any button press or slider move, and when the page is hidden or closed,
   // so a refresh never rewinds the last few seconds (and can't re-roll a ratioed post).
-  document.addEventListener("click", (e) => { if (e.target.closest("button")) setTimeout(save, 0); });
+  document.addEventListener("click", (e) => { if (hit(e, "button")) setTimeout(save, 0); });
   $("split").addEventListener("change", () => { save(); track("split", { v: S.split }); });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") { save(); flush(); } });
   window.addEventListener("pagehide", () => { save(); flush(); });

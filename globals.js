@@ -47,8 +47,8 @@ export const SAVE_VERSION = 5;
 export const fresh = () => ({
   // queue: a few questions are already waiting, so the first click is always possible
   v: SAVE_VERSION, universe: 1, paused: false, logV2: true, t: 0, funds: 0, price: 0.25, gpus: 0, queue: 5, served: 0, gpuSeconds: 0, phase: 1, p2: null, p3: null,
-  split: 50, gen: 0, progress: 0, hype: 20, tier: 0, cooling: 0, round: 0, leases: { rack: 1 }, powerBoost: 1, coolingV2: true, fleet: {}, chipIdx: 0, nextChip: 300,
-  leaseCool: { rack: { 0: 1 } }, rival: { px: 40, prev: 40, next: 150, n: 0 }, rentals: 0, rentUntil: 0,
+  split: 50, gen: 0, progress: 0, hype: 20, tier: 0, cooling: 0, round: 0, leases: /** @type {Record<string, number>} */ ({ rack: 1 }), powerBoost: 1, coolingV2: true, fleet: {}, chipIdx: 0, nextChip: 300,
+  leaseCool: /** @type {Record<string, Record<number, number>>} */ ({ rack: { 0: 1 } }), rival: { px: 40, prev: 40, next: 150, n: 0 }, rentals: 0, rentUntil: 0,
   fires: { next: null, out: null, payout: null, premium: 0, n: 0, lost: 0 }, leaks: { next: null, out: null, n: 0, lost: 0 },
   cap: { shares: 1e9, founder: 1e9, liquidity: 0, lastVal: 0 },
   demandMult: 1, done: {}, log: ["A model with no name is waiting for its first question."], ended: false, endedAt: null, checks: 0, lastStranded: null, nextBuzz: null,
@@ -120,7 +120,16 @@ export const kwText = (kw) => (Math.abs(kw) >= 1000 ? mwText(kw / 1000) : `${fmt
 export const moneyFull = (x) => Math.abs(x) >= 1e15 ? money(x)
   : (x < 0 ? "-$" : "$") + Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const time = (s) => { s = Math.round(s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; };
+/** @type {(id: string) => any} */
 export const $ = (id) => document.getElementById(id);
+// The element a click landed in that matches the selector (delegated handlers), or null.
+// querySelector / querySelectorAll, typed loosely: the game only ever touches HTML elements.
+/** @type {(sel: string) => any} */
+export const $q = (sel) => document.querySelector(sel);
+/** @type {(sel: string, root?: ParentNode) => any[]} */
+export const $all = (sel, root = document) => [...root.querySelectorAll(sel)];
+/** @type {(e: Event, sel: string) => any} */
+export const hit = (e, sel) => (e.target instanceof Element ? e.target.closest(sel) : null);
 // Rebuild an element's contents only when its key changes, so a click never lands on a button that was just replaced.
 // Every cached element carries data-key; clearCaches() (main.js) wipes them when the game starts over.
 export function rebuildOn(id, key, build) { const el = $(id); if (el.dataset.key === key) return; el.dataset.key = key; build(el); }

@@ -1,6 +1,6 @@
 // campus.js: phase 2, "The Campus". You are an infrastructure company now: sell capacity to labs,
 // then scramble to build it. Phase 2 state lives in S.p2; phase 1 state is read only at handoff.
-import { $, HYPE_TO_RAISE, S, chip, fmt, kwText, milestone, money, mwText, rebuildOn, say, setHtml, time, track } from "./globals.js";
+import { $, chip, fmt, hit, HYPE_TO_RAISE, kwText, milestone, money, mwText, rebuildOn, S, say, setHtml, time, track } from "./globals.js";
 import { PROJECTS, projectCost } from "./projects.js";
 import { GOAL_MW, extraAcres, freshModel, modelDone, renderModel, stepModel, wireModel } from "./model.js";
 import { DILUTION, dilute, isPublic, renderPublicRaise, stepMarket, wireMarket } from "./market.js";
@@ -577,7 +577,7 @@ export function renderFleet() {
   rebuildOn("fleetRows", gens.map((g) => `${g}:${contractReady(g)}:${tradeable(g)}`).join(","), (el) => {
     el.innerHTML = gens.length ? "" : `<div class="empty">No GPUs. Buy some under Compute.</div>`;
     for (const g of gens) {
-      const d = document.createElement("div"); d.className = "deal"; d.dataset.gen = g;
+      const d = document.createElement("div"); d.className = "deal"; d.dataset.gen = String(g);
       d.innerHTML = `<div class="line fl"></div>` + (tradeable(g)
         ? `<div class="btns"><button type="button" data-tradegen="${g}"></button></div>` : "");
       el.appendChild(d);
@@ -729,12 +729,12 @@ export function renderRaiseCampus() {
 export function wireCampus() {
   wireModel();
   wireMarket();
-  $("vendors").addEventListener("click", (e) => { const b = e.target.closest("button[data-vendor]"); if (b) { pickVendor(b.dataset.vendor); render(); } });
+  $("vendors").addEventListener("click", (e) => { const b = hit(e, "button[data-vendor]"); if (b) { pickVendor(b.dataset.vendor); render(); } });
   $("sponsor").addEventListener("click", () => { sponsor(); render(); });
-  $("perks").addEventListener("click", (e) => { const b = e.target.closest("button[data-perk]"); if (b) { usePerk(b.dataset.perk); render(); } });
-  $("cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
+  $("perks").addEventListener("click", (e) => { const b = hit(e, "button[data-perk]"); if (b) { usePerk(b.dataset.perk); render(); } });
+  $("cardBtns").addEventListener("click", (e) => { const b = hit(e, "button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
   $("counties").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-county]");
+    const b = hit(e, "button[data-county]");
     if (b) { chooseCounty(b.dataset.county); render(); }
   });
   $("buildHall").addEventListener("click", () => { build("hall"); render(); });
@@ -746,15 +746,15 @@ export function wireCampus() {
   $("buyLand").addEventListener("click", () => { buyLand(); render(); });
   $("leaseColo").addEventListener("click", () => { leaseColo(); render(); });
   $("offers").addEventListener("click", (e) => {
-    const a = e.target.closest("button[data-accept]"), d = e.target.closest("button[data-decline]");
+    const a = hit(e, "button[data-accept]"), d = hit(e, "button[data-decline]");
     if (a) { acceptOffer(a.dataset.accept); render(); } else if (d) { declineOffer(d.dataset.decline); render(); }
   });
   $("fleetRows").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-tradegen]");
+    const b = hit(e, "button[data-tradegen]");
     if (b) { tradeIn(Number(b.dataset.tradegen)); render(); }
   });
   $("contracts").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-reneg]");
+    const b = hit(e, "button[data-reneg]");
     if (b) { renegotiate(b.dataset.reneg); render(); }
   });
 }
