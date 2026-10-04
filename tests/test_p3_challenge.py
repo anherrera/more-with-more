@@ -1,8 +1,6 @@
 import pytest
 
-from conftest import run
-from test_planet import planet
-from test_country import nationwide
+from conftest import run, planet, nationwide
 
 
 def test_held_tiles_stand_out(game):
@@ -92,7 +90,7 @@ def test_level_tech_unlocks_with_scale(game):
 
 
 def test_hearings_fit_the_level(game):
-    from test_planet_level import planetwide
+    from conftest import planetwide
     pg = planetwide(game)
     pg.evaluate("() => { openP3Card(0); render(); }")
     card = pg.inner_text("#p3card")
@@ -106,7 +104,7 @@ def test_power_options_scale_with_the_level(game):
     pg = nationwide(game)
     labels = " ".join(pg.evaluate("() => powerOptions(0).map((o) => o.label)"))
     assert "grid" in labels.lower() and "fleet" in labels.lower()
-    from test_planet_level import planetwide
+    from conftest import planetwide
 
 
 def test_getting_faster_makes_things_cheaper_in_time(game):

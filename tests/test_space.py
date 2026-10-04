@@ -1,15 +1,6 @@
 import pytest
 
-from conftest import run
-from test_planet_level import planetwide
-
-
-def to_space(game):
-    pg = planetwide(game)
-    pg.evaluate("() => { S.p3.heat = 1.5; for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
-    pg.click("#phaseGo")
-    pg.evaluate("() => { S.p3.compute = 1e21; S.p3.goodwill = 60; render(); }")
-    return pg
+from conftest import run, planetwide, to_space
 
 
 def idx(pg, name):

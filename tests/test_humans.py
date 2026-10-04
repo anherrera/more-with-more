@@ -1,9 +1,8 @@
 """The humans are one system in both phases: rotating decks, cards that wait and expire, opposition with moratoriums."""
 import pytest
 
-from conftest import run
+from conftest import run, planet
 from test_phasebar import campus
-from test_planet import planet
 
 
 def test_one_deck_helper_fills_filters_and_keeps_the_used_card_out(game):

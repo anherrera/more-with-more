@@ -3,13 +3,8 @@ import json
 
 import pytest
 
-from conftest import MID, run
+from conftest import MID, run, planet, statewide, nationwide, planetwide, to_space
 from test_phasebar import campus
-from test_planet import planet
-from test_state import statewide
-from test_country import nationwide
-from test_planet_level import planetwide
-from test_space import to_space
 
 # What a phase 3 save looked like when the map first shipped: nothing beyond the original freshP3().
 P3_OLD = ["level", "compute", "goodwill", "startedAt", "startChip", "homeGW", "tiles", "card", "nextCard", "zoomSaid"]

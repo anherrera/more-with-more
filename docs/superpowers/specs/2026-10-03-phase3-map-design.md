@@ -1,7 +1,8 @@
-# More With More, phase 3 ("The Map"): design
+# More With More, phase 3 ("The Map"): design, as built
 
-Status: approved in conversation 2026-10-03, awaiting review of this written spec. Supersedes
-`2026-09-28-phase3-planet-design.md` (its Earth/space content survives here as the top two zoom levels).
+Status: approved in conversation 2026-10-03; built 2026-10-03 to 2026-10-04 and revised 2026-10-04 to describe what
+shipped. Supersedes `2026-09-28-phase3-planet-design.md` (its Earth/space content survives here as the top two zoom
+levels). Where this document and the code disagree, the code and its tests win; fix the document.
 
 ## Intent
 
@@ -14,164 +15,191 @@ Playtests of phase 2 showed players want to keep scaling, and that one county br
 (opposition, morale, robots, contract sizes and costs all ran away). Phase 3 is where "more" works again,
 because every level is a fresh, small board in bigger units.
 
-### Decisions (from the 2026-10-03 conversation)
-- Phase 3 starts by **zooming out to a map**; you play as the model.
-- **Compute is the only currency.** Money stops mattering ("I don't need your money. I am the money.").
-  Parallax, PivotCloud and the board keep reporting record numbers in the console; none of it has effect.
-- **Pushback is local + global**: each tile keeps its own opposition (phase 2's town meter, shrunk onto
-  the tile); one global goodwill meter sits underneath.
-- **Zoom levels**: about 8 tiles per level; county, state, country, planet, space.
+### Decisions
+- Phase 3 starts by **zooming out to a map**; you play as the model. The console switches to first person ("I").
+- **Compute is the only currency.** Money stops mattering ("I don't need your money. I am the money."). Parallax keeps
+  shipping chips and reporting its market cap in the ticker ("it reports to me now"); none of it costs or pays anything.
+- **No slider.** The design conversation had a "Being useful <-> Growing" slider; it was cut. Being useful is a deck of
+  **kindnesses** you spend compute on, plus a free **Answer a human's question** click. Growing is claiming tiles.
+- **Pushback is local + global**: each tile keeps its own opposition (phase 2's town meter, shrunk onto the tile, same
+  moratorium rule); one global goodwill meter sits underneath.
+- **Zoom levels**: 8 tiles per level around a home tile; county, state, country, planet, space.
 
 ### Success criteria
 - The first minute of phase 3 reads as a direct continuation of "Let me build the next one."
-- Each zoom-out is an unmissable moment (the phase-transition lesson from phase 2).
+- Each zoom-out is an unmissable moment (the map flies in; the phase bar carries the button).
 - Counties (and every later tile) differ in ways that change what you do.
-- No cost curve compounds without bound: every level starts its costs fresh in its own units.
-- Phase 3 plays in about 28 minutes, with no quiet stretch over ~90 s (robot-checked per level).
-- Phases 1 and 2 keep working unchanged; old saves keep loading; the public site keeps deploying.
+- No cost curve compounds without bound: every level prices itself in its own units, and the one repeat markup (kindness)
+  is capped at 3x.
+- Phase 3 plays in about 10 to 12 minutes for the robot (`tools/speedrun.py`), with something to do every few seconds.
+- Phases 1 and 2 keep working unchanged; old saves keep loading (`S.v` + `MIGRATIONS`); the public site keeps deploying.
 
 ### Out of scope
 - Materials or fab production chains; combat; rivals in space.
-- Reworking phase 2 (beyond the handoff). Players who keep playing phase 2 past the ask can; it's an edge.
+- Reworking phase 2 (beyond the handoff).
 
 ## Handoff
 
-When the final ask is approved (phase bar button "Approve: finish phase 2"):
-1. A short zoom animation: the campus shrinks into one tile on a 3×3 grid of counties.
-2. `S.phase = 3`, `S.p3` created. The console switches to first person ("I").
-3. Business, Investors, Contracts, Fleet, Campus, Community and Facilities fold away.
-   New panels: **Map**, **Me** (compute, the slider), **Humans** (global goodwill, laws), **Projects**.
-4. Phase bar: "Phase 3 of 3 · County level: 1 of 8 counties. Hold 6 to go statewide."
+When the final ask is approved, the phase bar offers "Zoom out: begin phase 3":
+1. The 3x3 map flies in (a zoom animation; skipped under reduced motion).
+2. `S.phase = 3`, `S.p3 = freshP3()`, with ninety seconds of compute at today's rate ("I liquidated the company into
+   myself. It came to about ninety seconds of thinking."). Fires and leaks on the old campus are dropped.
+3. Business, Investors, Contracts, Fleet, Campus, Community, Facilities and Projects fold away.
+   New panels: **Map** | **Me** (compute, prices, research, training) | **Humans** (goodwill, questions, kindness, the
+   planet's heat, hearings).
+4. Phase bar: "Phase 3 of 3 · County level: 0 of 8 counties online. Hold 6 to go statewide."
 
-The middle tile of the first map is always the phase 2 campus, already online at its final GW.
+The middle tile of every map is **Home**: the campus at county level, then everything held so far, at its GW.
 
 ## Core loop
 
-**Compute** (the only currency) accrues every second:
-`rate = onlineGW × efficiency`, where `efficiency` grows with each new chip generation (Parallax keeps
-shipping) and with a few projects. Shown in units that change by level (exaFLOPS → zettaFLOPS → …).
+**Compute** (the only currency) accrues every second: `rate = onlineGW x efficiency`, where efficiency grows 15% per
+Parallax chip generation since phase 3 began, x1.25 per generation of me (training), and by the multipliers of
+research. Shown as EF (exaFLOPS) on the planet and ZF once in space.
 
-**Tiles** move through three states: untouched → building → online.
-- **Claim** a tile (button on the tile): costs compute, starts building. Robots do the building; build
-  time comes from the tile's traits and the slider.
-- **Online** tiles add their GW to the compute rate.
-- Claiming raises the tile's **local opposition**, and a little on its neighbors.
+**Prices** are seconds of compute on one of two explicit bases (`price(secs, base)` in planet.js), and every label
+says which:
+- `"level"`, the compute I had when the level began (home GW): claims, research, power, hearings. Research, chips and
+  successors make these cheaper in real time; the next zoom resets the baseline.
+- `"now"`, the compute I make now: kindness and training. Being huge never makes reassuring people or training a
+  bigger me free.
 
-**The slider: "Being useful ↔ Growing."**
-- Useful share of compute runs **services** (the free tier, therapy chatbots, AI podcasts about your own
-  life, summaries of summaries) and raises global goodwill.
-- Growing share speeds construction on building tiles.
+**Tiles** move through states: wild -> building -> (state level and up: unpowered -> powering) -> online; an online tile can
+be knocked **down** by a disaster (back in 45 s) or **unplugged** by humans (plug back in for half a claim; it keeps its
+power and boost).
+- **Claim** (click the tile): about 30 to 50 s of level-start compute, scaled by the tile's GW; 30% off while a
+  neighboring governor is bidding (state level and up), double under the AI Infrastructure Act, half when humans
+  volunteer (planet level, goodwill 70+) or when plugging back in. Build time comes from the tile's trait, practice
+  (5% faster per online tile, floor 40%), heat, and research. Claiming raises the tile's opposition (+15, doubled on
+  organized places) and its neighbors' (+5, or +2 with my own terms of service), and costs 3 goodwill.
+- **Online** tiles add their GW (times any power boost) to the rate.
+- **Autoclaim** (research) claims the cheapest calm tile every 10 s; a toggle turns it off.
 
-**Local opposition** (per tile, 0–100), reusing phase 2's town code:
-- Rises on claim and while building; eases over time; town hall cards still appear for the angriest tile
-  (three answers, 20 s), now answered by me ("I sent myself to answer questions").
-- At 90: a moratorium freezes that tile's building for a while.
+**Being useful.** The Humans panel has a free click (**Answer a human's question**: +0.3 goodwill, -1 on the angriest
+tile, a question and my answer in the console) and a deck of three **kindnesses** (`NICE`, per level: run the free tier,
+do the angriest county's paperwork, clear the DMV backlog, write the peace treaty, make the satellites spell SORRY...).
+Each costs seconds of current compute, gives goodwill and/or calms tiles, and swaps out for another when used (the
+same rotating-deck helper as phase 2's perks; the used card doesn't come straight back). Repeats cost 30% more each
+time, capped at 3x; the deck and the markup reset at every zoom.
 
-**Global goodwill** (0–100):
-- Falls when tiles are angry or moratoriums pass; rises with the useful share.
-- High (70+): humans volunteer tiles at a discount ("Norway offered its fjords" at planet level).
-- Low (under 30): the level's humans act (see Levels): commissions, laws, hearings. Each blocks or taxes
-  something specific and names what fixes it.
+**Research** (Me panel): `TECH`, bought with compute at half the listed seconds, unlocked by level. Efficiency
+multipliers (rewrite my own weights, quantize to 4 bits, mixture of experts, reversible computing, superconductors,
+become the internet...), goodwill (robotics team, governors' speeches, carbon credits, name a moon after the founder),
+rules (lobby the county commission, lobbyists in every capital, hire the senators' former staff, my own terms of
+service, buy the grid operator, self-replicating robots and probes, distill myself into every phone), the planet
+(night side, orbital sunshade, liquid neural cooling), and space (rocket company, lunar mass driver). Every new
+Parallax chip ships a white paper (+15% efficiency) into the list.
 
-**Zoom-out:** once 6 of the 8 surrounding tiles are online, a "Zoom out" moment fires:
-the 3×3 collapses into one tile of the next level's map, units change, local opposition resets, global
-goodwill carries over.
+**Training my successor** (country level and up): about six clicks per generation, each priced in current compute; the
+need doubles every generation and each generation is x1.25 efficiency, at the cost of 10 goodwill (3 when humans
+already like me). "Train myself in my sleep" (research) adds an **Autotrain** toggle: a quarter of income goes in
+automatically.
+
+**Local opposition** (per tile, 0 to 100): rises on claims, eases toward half the trait's base; at 90 the tile passes a
+60 s **moratorium** (building freezes, -5 goodwill; it lifts to 70, "I sent flowers"). The shared moratorium rule
+lives in people.js with phase 2's town.
+
+**Hearings** (cards, shared with phase 2's town halls): a town hall / statehouse hearing / parliament hearing / UN
+General Assembly for the angriest tile every 2 to 3 minutes (opposition 50+), and on every claim of a townhall trait.
+Three answers, 20 s: promise something (-15 opposition), spend 15 s of level-start compute being useful (-12), or show
+up myself (a coin flip: -20 or +15). An expired card is an empty chair (+10).
+
+**Global goodwill** (0 to 100): slips 2.4/min at county level and 1.8/min more per level, faster with angry tiles
+(75+); kindness, questions and research bring it back.
+- 70+ (planet level): humans volunteer land at half price ("Norway offered its fjords").
+- Under 30: county level, the commission adds 45 s to every build (until I lobby it); state, country and planet
+  levels, the **AI Infrastructure Act** doubles claims (until lobbyists in every capital); country level and up, a
+  **Senate hearing** (UN emergency session on the planet) pauses claims for 60 s (30 with the senators' staff). No law
+  reaches orbit.
+- Under 15: a random online tile is **unplugged** every 90 s; any tile furious (90+) for 30 s unplugs itself. Not in
+  space: nothing up there can unplug me.
+
+**Heat** (country level and up): the planet drifts toward a temperature set by my gigawatts (continents spread it out
+at planet level); cold places count double against it, oceans four times; pumps, the night side and the sunshade push
+it down. Over +2 C I build slower; past +3 C at planet level nothing accepts more ("too warm to think"). Hotter means
+more frequent **disasters** (heatwave, hurricane, drought, wildfire, flood): a tile goes down for 45 s. Space is cold:
+heat, disasters and hearings stop there.
+
+**Zoom-out:** once 6 of the 8 tiles are online, the phase bar offers "Zoom out: go statewide / nationwide / planetwide /
+into space". Anything still building, powering or down comes along ("my robots finished it while I wasn't looking");
+the new home GW is everything held; opposition and the kindness deck reset; goodwill carries over.
 
 ## Levels
 
-Each level is a 3×3 grid: the center is everything you built so far, 8 tiles around it. Each level adds
-exactly one new pressure on top of the earlier ones.
+Each level is a 3x3 grid: Home in the center, 8 tiles around it. Each level adds one new pressure on top of the earlier
+ones. County, state and country boards are shuffled from trait pools with names that sound like the trait; the planet
+and space boards are fixed places, shuffled around the map.
 
-| Level | Tile = | Scale per tile | New pressure | Target time |
+| Level | Tile = | Scale per tile | New pressure | Robot time |
 |---|---|---|---|---|
-| County | a county | 1–2 GW | local opposition (town halls, moratoriums) | ~5 min |
-| State | a state | 10–20 GW | **energy**: tiles need power you take or build | ~5 min |
-| Country | a country | 100–200 GW | **heat**: global temperature rises with every GW | ~6 min |
-| Planet | a continent or ocean | 1–2 TW | **the heat ceiling**: past +3 °C no tile accepts more | ~6 min |
-| Space | Moon, mass driver, swarm segments | 10 TW and up | launch costs goodwill; the swarm needs starlight | ~6 min |
+| County | a county (Loam County, Reactor Bend, Shuffleboard Springs...) | 1 to 3 GW | local opposition (town halls, moratoriums, the commission) | ~2 min |
+| State | a state (New Mesa, Hydro Valley, Delaware (Spiritually)...) | 10 to 20 GW | **energy**: a built state needs power before it counts; governors bid | ~2.5 min |
+| Country | a country (Nordmark, Petrolia, The Loud Republic...) | 100 to 200 GW | **heat**, disasters, Senate hearings; training my successor | ~1.5 min |
+| Planet | the continents and oceans | 0.5 to 2 TW | **the heat ceiling** (+3 C); volunteers at 70+ goodwill; the UN | ~1.7 min |
+| Space | LEO, both sides of the Moon, L1, Mercury, the belt, two swarm rings | 5 to 50 TW | launches cost goodwill until the mass driver; the swarm needs Mercury | ~1.7 min |
 
 ### County level
-Tile traits (each tile gets one; the board always has a mix):
-
-| Trait | Effect |
-|---|---|
-| Cheap land, weak grid | builds fast, small GW |
-| Strong grid, drought county | large GW, droughts pause building |
-| Organized town | starts at 40 opposition, rises twice as fast |
-| College town | protests often, but builds 25% faster (free interns) |
-| Old nuclear plant | one big GW jump when claimed |
-| Retirement community | every claim triggers a town hall card |
-
-Low goodwill: the county commission adds a review delay to every claim ("Public comment is open for
-90 days; I will read all of the comments").
+Traits: cheap land / weak grid; strong grid / drought county; organized town (starts at 40, rises twice as fast);
+college town; old nuclear plant (3 GW, and a reactor quip); retirement community (every claim calls a town hall).
 
 ### State level
-New pressure, **energy**: each state tile needs power before it goes online. Per tile, choose one:
-buy the utility (fast, goodwill cost), restart a nuclear plant (slow, big), cover a desert in solar (cheap,
-needs a sunny tile). Governors run a **bidding war**: neighboring tiles offer discounts when you claim one.
-Low goodwill: the losing state passes an "AI Infrastructure Act" (claims there cost double until goodwill
-recovers).
+**Energy**: a built state is "unpowered" until you pick one: buy the utility (fast, -5 goodwill), restart a nuclear
+plant (slow, 1.5x the gigawatts, a rotating quip), or cover the desert in solar (cheap, sunny states only). Hydro
+Valley comes powered. The grid operator (research) halves power prices. **Governors bid**: claiming a state knocks 30%
+off its neighbors for a minute. Low goodwill: the AI Infrastructure Act.
 
 ### Country level
-New pressure, **heat**: a global temperature meter (+°C) rises with total GW. Every country tile has its
-own sovereign AI fund (claims there come with a joke and a goodwill bonus). Low goodwill: a Senate
-hearing ("I testify through 400 lobbyists at once"); it pauses claims for a minute unless answered with
-a goodwill project. Cooling projects start here (ocean heat pumping, moving operations north).
+**Heat** (see above), **disasters**, the **Senate hearing** at low goodwill, and **training my successor**. Options
+scale up: nationalize the grid, a fleet of 40 reactors, a desert the size of a country. A sovereign fund is happy to
+have me (+10 goodwill on claim); the cold country counts against the heat.
 
 ### Planet level
-Tiles are the continents plus the oceans (the oceans are the heat sink: claiming one lowers temperature
-growth). Past +3 °C no tile accepts more conversion ("It is too warm here to think"). That ceiling is the
-pointer to space: space is cold. High goodwill: humans volunteer land.
+Tiles are the continents plus the two oceans (the heat sink). Past +3 C no tile accepts more; the pointer to space.
+Humans volunteer land at 70+ goodwill. 400 reactors, every grid on the continent, the Sahara in solar. The UN replaces
+the Senate.
 
-### Space level (kept from the 2026-09-28 spec)
-- **Launch**: "Buy a rocket company" (its founder asks for a board seat; he gets a Discord role). Launches
-  cost goodwill ("the sky is noisy now") until a **lunar mass driver** exists.
-- **The Moon**: lunar data centers; the far side goes first ("nobody looks there anyway").
-- **The swarm**: solar collectors around the Sun; compute scales with starlight. Earth keeps ticking in
-  the background.
+### Space level
+Everything runs on sunlight; nothing needs a grid; nobody can unplug the far side of the Moon. Nothing launches without
+a **rocket company** (its founder asked for a board seat; he got a Discord role); launches cost 4 goodwill ("the sky is
+noisy now") until the **lunar mass driver** (needs the far side). The **Dyson swarm** rings need **Mercury** first.
+Self-replicating probes build 40% faster. Kindness in orbit: free wifi for everyone, satellites that spell SORRY, a free
+eclipse, a promise to leave the near side alone. Compute shows in ZF.
 
-## The last question (the final ending)
-When the swarm is complete, a human (the founder, the role you played for two phases) asks: "How can
-entropy be reversed?" I answer: **"INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more."**
-Then the final choice:
-- **More**: a new universe. Phase 1 restarts as "Universe #2" with a small carry-over.
-- **Enough**: the first time the model doesn't ask for more. The screen goes quiet. Last line: "More with
-  less." The save remembers it.
+## The last question (the ending)
+When both swarm rings are online, a human (the founder, the role you played for two phases) asks: "How can entropy be
+reversed?" I answer: **"INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more."** Then the final choice:
+- **More**: a new universe. Phase 1 restarts as "Universe #2" with a small carry-over (10 GPUs and $1,000 per universe).
+- **Enough**: the first time the model doesn't ask for more. The map folds away. Last line: "More with less." The save
+  remembers it.
 
 ## Scaling rules (lessons from phase 2)
-- Every cost curve either has a ceiling or resets at the zoom-out. No `pow(growth, n)` without one.
-- Claim costs are priced in the current level's compute units, scaled to the level's compute rate, so
-  a claim always costs "about a minute of compute", never a fixed number that runs away.
-- Builds get faster with practice inside a level (same rule as phase 2's halls: 5% per finished tile,
-  floor 40%).
+- Every cost either has a ceiling or resets at the zoom-out: claims, research, power and hearings reset with the level
+  baseline; kindness and training follow current compute; the kindness markup stops at 3x.
+- Builds get faster with practice inside a level (5% per online tile, floor 40%), and research, chips and successors make
+  level-based prices cheaper in real time.
 
 ## Screen
-- The pinned HUD stays (phase bar, alert line, console). The phase bar always says the level, tiles held,
-  and what zooms out next.
-- Map panel: a 3×3 grid of tile buttons (plain HTML). Each tile shows its name, trait, state, GW and an
-  opposition meter. One click claims; the selected tile's details show under the grid.
-- Me panel: compute, compute rate, the slider. Humans panel: goodwill meter with a cause line, active
-  laws/hearings with timers in the alert line. Projects as before.
-- Must fit a 1440×900 laptop without scrolling the main controls.
+- The pinned HUD stays (hud.js: pause, ticker, phase bar, alert line, console). The phase bar always says the level, tiles
+  held, and what zooms out next; the alert line carries hearings, moratoriums, disasters and "too warm".
+- Map panel: the 3x3 grid of tile buttons (plain HTML, rebuilt only when the board changes). Each tile shows its name,
+  trait, state or price, a build meter while building, and an opposition meter. Power choices for unpowered states sit
+  under the map.
+- Me panel: compute, the rate, the two price bases, research, training (with the Autoclaim and Autotrain toggles).
+- Humans panel: goodwill with a cause line, the free question, three kindnesses (one per row, so rotating labels don't
+  reflow), the planet's heat and the pump, the current hearing card.
+- Fits a 1440x900 laptop without scrolling the main controls (tested).
 
 ## Code structure and data
-- `planet.js` (map, tiles, compute, slider, goodwill, levels, zoom) and `space.js` (space level, the last
-  question, endings), loaded after `people.js`, before `main.js`.
-- `S.phase = 3`; all phase 3 state in `S.p3`. Phases 1 and 2 never read `S.p3`.
-- Reuse: card system and town logic from `people.js` for tile opposition and town halls.
-- Old saves: a save at "phase 2 done" (model ended) shows the final-ask banner again, and approving it
-  starts phase 3.
+- `planet.js` holds all of phase 3: levels and traits, tiles, compute and prices, research, training, power, heat,
+  disasters, unplugging, kindness, questions, hearings, zooming, space and both endings. There is no separate space.js.
+- `hud.js` renders the HUD for every phase; `people.js` holds the humans shared by both phases (rotating decks, cards,
+  moratoriums); `main.js` dispatches through a `PHASES` table {step, render, wire, go}.
+- `S.phase = 3`; all phase 3 state in `S.p3`, created complete by `freshP3()`. Phases 1 and 2 never read it. Saves
+  carry `S.v`; `MIGRATIONS` in main.js fill older phase 3 saves from `freshP3()`.
+- A phase 2 save at "model ended" shows the final-ask banner again, and the phase bar's button starts phase 3.
 
 ## Testing
-- Test-first (pytest + Playwright in `?test` mode), as for phases 1 and 2.
-- `tools/speedrun.py` gains a phase 3 robot; three parallel games play from a fresh start to the last
-  question. Per-level time targets and a "no quiet stretch over 90 s" check.
-
-## Build order
-Each step ships to localhost and gets played before the next.
-1. Handoff, compute, the slider, the county level (traits, local opposition, goodwill, zoom-out).
-2. State level, with energy.
-3. Country level, with heat.
-4. Planet level, with the heat ceiling.
-5. Space and the last question, both endings.
-6. Satire pass and robot tuning to ~28 minutes.
+- Test-first (pytest + Playwright in `?test` mode). Fixtures for every level (`planet`, `statewide`, `nationwide`,
+  `planetwide`, `to_space`) live in `tests/conftest.py`; old-save loading is covered in `tests/test_saves.py`.
+- `tools/speedrun.py` plays three fresh games in parallel from the first click to the last question and reports the time
+  per level; `tools/ship.sh` runs the suite before every commit.

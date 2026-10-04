@@ -1,15 +1,6 @@
 import pytest
 
-from conftest import run
-from test_country import nationwide
-
-
-def planetwide(game):
-    pg = nationwide(game)
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
-    pg.click("#phaseGo")
-    pg.evaluate("() => { S.p3.compute = 1e18; S.p3.heat = 1.5; S.p3.goodwill = 50; render(); }")
-    return pg
+from conftest import run, nationwide, planetwide
 
 
 def idx(pg, name):

@@ -2,9 +2,7 @@
 ("level": claims, research, power, hearings) or the compute I make now ("now": kindness, training)."""
 import pytest
 
-from conftest import run
-from test_planet import planet
-from test_country import nationwide
+from conftest import run, planet, nationwide
 
 
 def test_one_helper_prices_everything_and_names_its_base(game):

@@ -81,14 +81,14 @@ def test_render_is_read_only_in_phase2(game):
 
 
 def test_render_is_read_only_in_phase3(game):
-    from test_planet import planet
+    from conftest import planet
     pg = planet(game)
     pg.evaluate("() => { S.p3.nice = []; }")
     assert_render_is_read_only(pg)
 
 
 def test_render_is_read_only_in_space(game):
-    from test_space import to_space
+    from conftest import to_space
     assert_render_is_read_only(to_space(game))
 
 
@@ -138,7 +138,7 @@ def test_dead_code_is_gone(game):
 def test_phase3_toggles_have_clear_names_and_old_ones_migrate(game):
     pg = game()
     assert pg.evaluate("() => { S.p3 = null; const d = freshP3(); return [d.autoclaimOff, d.autotrainOff, 'autoOff' in d, 'zoomSaid' in d]; }") == [False, False, False, False]
-    from test_planet import planet
+    from conftest import planet
     pg = planet(game)
     pg.evaluate("() => { S.v = 4; S.p3.autoOff = true; S.p3.autoTrainOff = true; S.p3.zoomSaid = false; S.p3.levelAt = 1; save(); }")
     pg.reload()

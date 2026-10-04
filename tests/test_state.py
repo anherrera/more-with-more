@@ -1,15 +1,6 @@
 import pytest
 
-from conftest import run
-from test_planet import planet
-
-
-def statewide(game):
-    pg = planet(game)
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
-    pg.click("#phaseGo")
-    pg.evaluate("() => { S.p3.compute = 1e12; render(); }")
-    return pg
+from conftest import run, planet, statewide
 
 
 def built(pg, i):

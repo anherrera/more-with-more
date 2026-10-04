@@ -70,3 +70,56 @@ def game(page, server):
 def run(page, secs, dt=1):
     """Advance game time by secs in steps of dt (test mode only), then render."""
     page.evaluate(f"() => {{ for (let i = 0; i < {secs}; i++) step({dt}); render(); }}")
+
+
+# ---- shared starting points: the end of phase 2, then phase 3 at every level ----
+def ended_campus(game):
+    """A phase 2 save whose model has already built the next one (phase 2 complete)."""
+    pg = game({**READY, "debt": 0})
+    pg.click("button[data-id='ground']")
+    pg.click("button[data-county='strong']")
+    pg.evaluate("""() => { S.rival.next = 1e9; S.nextChip = 1e9; firesOf().next = 1e9; leaksOf().next = 1e9;
+      S.p2.grid = 99999; S.p2.extraWater = 999; for (let i = 0; i < 20; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true});
+      S.p2.ipo = {at: S.t, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: true};
+      modelOf().endedAt = S.t; render(); }""")
+    return pg
+
+
+def planet(game):
+    pg = ended_campus(game)
+    pg.click("#phaseGo")
+    pg.evaluate("() => { S.rival.next = 1e9; }")
+    return pg
+
+
+def statewide(game):
+    pg = planet(game)
+    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.click("#phaseGo")
+    pg.evaluate("() => { S.p3.compute = 1e12; render(); }")
+    return pg
+
+
+def nationwide(game):
+    pg = statewide(game)
+    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.click("#phaseGo")
+    pg.evaluate("() => { S.p3.compute = 1e15; render(); }")
+    return pg
+
+
+def planetwide(game):
+    pg = nationwide(game)
+    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.click("#phaseGo")
+    pg.evaluate("() => { S.p3.compute = 1e18; S.p3.heat = 1.5; S.p3.goodwill = 50; render(); }")
+    return pg
+
+
+def to_space(game):
+    pg = planetwide(game)
+    pg.evaluate("() => { S.p3.heat = 1.5; for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.click("#phaseGo")
+    pg.evaluate("() => { S.p3.compute = 1e21; S.p3.goodwill = 60; render(); }")
+    return pg
+
