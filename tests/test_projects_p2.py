@@ -126,8 +126,9 @@ def test_money_and_hype_projects(game):
 
 def test_campus_robots_build_on_their_own(game):
     pg = campus(game)
+    pg.evaluate("() => { S.p2.builds = []; render(); }")
     assert not has(pg, "robots")
-    pg.evaluate("() => { S.p2.round = 1; S.p2.grid = 60; }")
+    pg.evaluate("() => { S.p2.grid = 60; S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
     assert has(pg, "robots")
     pg.click("button[data-id='robots']")
     before = pg.evaluate("() => S.p2.builds.length")
@@ -140,7 +141,7 @@ def test_campus_robots_build_on_their_own(game):
 def test_robots_say_what_they_are_doing(game):
     pg = campus(game)
     assert not pg.is_visible("#robotLine")
-    pg.evaluate("() => { S.p2.round = 1; S.p2.grid = 60; render(); }")
+    pg.evaluate("() => { S.p2.builds = [{kind: 'hall', done: 0, announced: true}]; S.p2.grid = 60; render(); }")
     pg.click("button[data-id='robots']")
     run(pg, 25)
     line = pg.inner_text("#robotLine")
@@ -255,3 +256,18 @@ def test_second_shift_makes_builds_faster(game):
     before = pg.evaluate("() => buildSecs('hall')")
     pg.evaluate("() => { S.done.secondshift = true; }")
     assert pg.evaluate("() => buildSecs('hall')") == pytest.approx(before * 0.75)
+
+
+def test_robots_unlock_with_the_first_hall_series_d_money(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.p2.builds = []; render(); }")
+    assert not has(pg, "robots")
+    pg.evaluate("() => { S.p2.round = 0; S.p2.builds.push({kind: 'hall', done: S.t + 60}); render(); }")
+    assert has(pg, "robots")
+    assert pg.evaluate("() => projectCost(PROJECTS.find((p) => p.id === 'robots'))") == 40e6
+
+
+def test_second_shift_shows_up_when_crews_are_busy(game):
+    pg = campus(game)
+    pg.evaluate("() => { moraleOf().v = 90; for (let i = 0; i < 3; i++) S.p2.builds.push({kind: 'hall', done: S.t + 60}); render(); }")
+    assert has(pg, "secondshift")

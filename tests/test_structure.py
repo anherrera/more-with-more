@@ -42,3 +42,8 @@ def test_training_advances_deterministically(game):
 def test_project_ids_are_unique(game):
     pg = game(MID)
     assert pg.evaluate("() => { const ids = PROJECTS.map((p) => p.id); return ids.filter((x, i) => ids.indexOf(x) !== i); }") == []
+
+
+def test_project_titles_are_unique(game):
+    pg = game(MID)
+    assert pg.evaluate("() => { const t = PROJECTS.map((p) => p.title); return t.filter((x, i) => t.indexOf(x) !== i); }") == []

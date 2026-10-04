@@ -33,7 +33,7 @@ def test_offers_you_cannot_build_in_time_stay_red(game):
     assert not f["ok"] and "bad" in pg.get_attribute("#offers .fc", "class")
 
 
-@pytest.mark.parametrize("pid,cost", [("robots", 60e6), ("liquid", 50e6), ("sovereign2", 60e6)])
+@pytest.mark.parametrize("pid,cost", [("robots", 40e6), ("liquid", 50e6), ("sovereign2", 60e6)])
 def test_growth_projects_are_priced_for_before_the_ipo(game, pid, cost):
     pg = campus(game)
     assert pg.evaluate(f"() => projectCost(PROJECTS.find((p) => p.id === '{pid}'))") == cost
