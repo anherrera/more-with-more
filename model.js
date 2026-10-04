@@ -154,7 +154,7 @@ function renderModel() {
 function wireModel() {
   $("propYes").addEventListener("click", () => { approveProposal(); render(); });
   $("phaseGo").addEventListener("click", () => {
-    if (S.phase === 3) { zoomOut(); render(); return; }
+    if (S.phase === 3) { const lv = S.p3.level; zoomOut(); if (S.p3.level !== lv) { $("p3").classList.remove("zoomin"); void $("p3").offsetWidth; $("p3").classList.add("zoomin"); } render(); return; }
     if (S.phase === 2 && modelOf().endedAt != null) { startPlanet(); $("p3").classList.add("zoomin"); } else approveProposal();
     render();
   });
@@ -167,9 +167,10 @@ function renderPhaseBar() {
   let text, ask = false;
   if (S.phase === 3) {
     const held = S.p3.tiles.filter((t) => t.state === "online").length;
-    if (S.p3.zoomSaid) text = `County level done: ${held} of ${P3_TILES} counties online. The state level arrives in the next build.`;
-    else if (zoomReady()) { ask = true; text = `County level done: ${held} of ${P3_TILES} counties online.`; go.textContent = "Zoom out: go statewide"; go.disabled = false; }
-    else text = `Phase 3 of 3 \u00b7 County level: ${held} of ${P3_TILES} counties online. Hold ${P3_ZOOM_AT} to go statewide.`;
+    const L = levelOf();
+    if (S.p3.zoomSaid) text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online. The next level arrives in the next build.`;
+    else if (zoomReady()) { ask = true; text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online.`; go.textContent = `Zoom out: go ${L.next}`; go.disabled = false; }
+    else text = `Phase 3 of 3 \u00b7 ${L.name} level: ${held} of ${P3_TILES} ${L.plural} online. Hold ${P3_ZOOM_AT} to go ${L.next}.`;
   } else if (S.phase === 1) {
     text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."
       : `Phase 1 of 3 · Goal: reach Gen 6 (now Gen ${S.gen}), then break ground on your own campus.`;

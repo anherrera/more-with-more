@@ -12,16 +12,38 @@ const COUNTY_TRAITS = {
 };
 const COUNTY_NAMES = ["Loam County", "Big Wire County", "Meadowlark County", "Port Sorrow", "Lower Fiber Parish",
   "Gravel Springs", "New Substation", "Cul-de-Sac County", "Turbine Falls", "Old Aquifer County"];
+// The state level: ten times the scale, and every state needs power before it counts.
+const STATE_TRAITS = {
+  sunbelt:   { name: "Sunbelt: deserts, sun, no water",     gw: 15, secs: 60,  opp: 15, sunny: true },
+  rust:      { name: "Rust corridor: old plants, cheap land", gw: 15, secs: 50, opp: 10 },
+  techcoast: { name: "Tech coast: angry and expensive",       gw: 10, secs: 70,  opp: 45, rise: 2 },
+  hydro:     { name: "Hydro valley: the dams already exist",  gw: 20, secs: 80,  opp: 20, powered: true },
+  plains:    { name: "Great Plains: wind and nothing else",  gw: 20, secs: 60,  opp: 10 },
+  swing:     { name: "Swing state: every claim is a campaign issue", gw: 15, secs: 60, opp: 30, townhall: true },
+};
+const STATE_NAMES = ["Big Sky Grid", "New Mesa", "East Rust", "Hydro Valley", "The Plains", "Tech Coast", "Delaware (Spiritually)",
+  "Purple State", "Lake Effect", "Old Dominion Fiber"];
+const LEVELS = [
+  { name: "County", plural: "counties", one: "county", next: "statewide", traits: COUNTY_TRAITS, names: COUNTY_NAMES, hall: "Town hall",
+    kinds: ["cheap", "grid", "organized", "college", "nuclear", "retirees", "cheap", "grid"] },
+  { name: "State", plural: "states", one: "state", next: "nationwide", traits: STATE_TRAITS, names: STATE_NAMES, hall: "Statehouse hearing",
+    kinds: ["sunbelt", "rust", "techcoast", "hydro", "plains", "swing", "sunbelt", "plains"] },
+];
+const levelOf = () => LEVELS[(S.p3 && S.p3.level) || 0];
+// A fresh 3x3 board for a level: eight shuffled tiles around whatever I already hold.
+function freshTiles(level) {
+  const L = LEVELS[level], kinds = L.kinds.slice();
+  for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+  const names = L.names.slice().sort(() => Math.random() - 0.5);
+  return kinds.map((k, i) => ({ name: names[i], trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null }));
+}
 
 function freshP3() {
-  const kinds = ["cheap", "grid", "organized", "college", "nuclear", "retirees", "cheap", "grid"];
-  for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
-  const names = COUNTY_NAMES.slice().sort(() => Math.random() - 0.5);
   return {
     // compute gets a head start in startPlanet
     level: 0, compute: 0, goodwill: 60, startedAt: S.t, startChip: S.chipIdx,
     homeGW: Math.max(1, (S.p2 && S.p2.county ? energizedAt() : 1000) / 1000),
-    tiles: kinds.map((k, i) => ({ name: names[i], trait: k, state: "wild", opp: COUNTY_TRAITS[k].opp, done: null, moratorium: null })),
+    tiles: freshTiles(0),
     card: null, nextCard: null, zoomSaid: false,
   };
 }
@@ -42,16 +64,43 @@ const P3_MORATORIUM_AT = 90, P3_MORATORIUM_SECS = 60;
 // Tiles 0-7 fill grid cells 0,1,2,3,5,6,7,8 (home is cell 4); neighbors share an edge.
 const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7], [4, 6]];
 const tileOf = (i) => S.p3.tiles[i];
-const traitOf = (t) => COUNTY_TRAITS[t.trait];
-const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + traitOf(t).gw, 0);
+const traitOf = (t) => levelOf().traits[t.trait];
+const tileGW = (t) => traitOf(t).gw * (t.boost || 1);
+const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0);
 // Parallax keeps shipping: every chip generation since phase 3 began makes the same GW worth 15% more compute.
 const efficiency = () => 1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip);
 const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
-const claimCost = (i) => 30 * computeRate() * (0.6 + 0.4 * traitOf(tileOf(i)).gw);
+// States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
+const BID_SECS = 60;
+const claimCost = (i) => { const t = tileOf(i), scale = S.p3.level ? 10 : 1;
+  return 30 * computeRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 ? 2 : 1); };
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
-// Low goodwill adds the county commission's review.
-const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 + (S.p3.goodwill < 30 ? 45 : 0);
+// Low goodwill adds the county commission's review (county level only).
+const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 + (!S.p3.level && S.p3.goodwill < 30 ? 45 : 0);
+
+// ---------- energy (state level and up): a built state needs power before it counts ----------
+const powerOptions = (i) => {
+  const t = tileOf(i), rate = computeRate(), out = [
+    { id: "utility", label: "Buy the utility", cost: 10 * rate, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
+    { id: "nuclear", label: "Restart a nuclear plant", cost: 25 * rate, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
+  ];
+  if (traitOf(t).sunny) out.push({ id: "solar", label: "Cover the desert in solar", cost: 5 * rate, secs: 45, note: "cheap" });
+  return out;
+};
+const POWER_LINES = {
+  utility: (t) => `I bought ${t.name}'s utility. The board stayed on. The board now reports to me.`,
+  nuclear: (t) => `I'm restarting a nuclear plant in ${t.name}. It has a new name. The old name tested poorly.`,
+  solar: (t) => `I'm covering ${t.name}'s desert in solar. The lizards have been informed.`,
+};
+function powerTile(i, id) {
+  const t = tileOf(i), o = powerOptions(i).find((x) => x.id === id);
+  if (!t || t.state !== "unpowered" || !o || S.p3.compute < o.cost) return;
+  S.p3.compute -= o.cost; t.state = "powering"; t.done = S.t + o.secs; t.boost = o.boost || 1;
+  if (o.goodwill) S.p3.goodwill = Math.max(0, S.p3.goodwill + o.goodwill);
+  track("p3power", { i, id });
+  say(POWER_LINES[id](t));
+}
 
 const P3_CARD_SECS = 20;
 const P3_CHOICES = [
@@ -99,7 +148,11 @@ function claim(i) {
   S.p3.compute -= claimCost(i);
   t.state = "building"; t.done = S.t + tileBuildSecs(i);
   t.opp = Math.min(100, t.opp + 15 * (traitOf(t).rise || 1));
-  for (const j of NEIGHBORS[i]) tileOf(j).opp = Math.min(100, tileOf(j).opp + 5);
+  for (const j of NEIGHBORS[i]) {
+    tileOf(j).opp = Math.min(100, tileOf(j).opp + 5);
+    if (S.p3.level >= 1 && tileOf(j).state === "wild") tileOf(j).bidUntil = S.t + BID_SECS;   // the neighbors' governors start bidding
+  }
+  if (S.p3.level >= 1) say(`The governors next to ${t.name} are bidding for me: their states are 30% off for a minute.`);
   S.p3.goodwill = Math.max(0, S.p3.goodwill - 3);
   track("p3claim", { i, trait: t.trait });
   say(`I claimed ${t.name}. ${traitOf(t).name}. My robots are already there.`);
@@ -118,9 +171,11 @@ function stepPlanet(dt) {
       say(`${t.name} passed a moratorium on me. ${time(P3_MORATORIUM_SECS)}. I will use the time to reflect, at scale.`); }
   }
   for (const t of S.p3.tiles) {
-    if (t.state !== "building") continue;
+    if (t.state !== "building" && t.state !== "powering") continue;
     if (t.moratorium != null && S.t < t.moratorium) { t.done += dt; continue; }   // frozen, not cancelled
-    if (S.t >= t.done) { t.state = "online"; say(`${t.name} is online. +${mwText(traitOf(t).gw * 1000)}.`); }
+    if (S.t < t.done) continue;
+    if (t.state === "building" && S.p3.level >= 1 && !traitOf(t).powered) { t.state = "unpowered"; say(`${t.name} is built. It needs power before it counts.`); continue; }
+    t.state = "online"; say(`${t.name} is online. +${mwText(tileGW(t) * 1000)}.`);
   }
   const c = S.p3.card;
   if (c && S.t >= c.until) { S.p3.card = null; const t = tileOf(c.tile); t.opp = Math.min(100, t.opp + 10);
@@ -134,16 +189,25 @@ function stepPlanet(dt) {
 }
 
 const zoomReady = () => S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
-// Step 1 stops here: the state level is the next build.
+// County -> state is built; state -> country is the next build of this game.
 function zoomOut() {
   if (!zoomReady() || S.p3.zoomSaid) return;
-  S.p3.zoomSaid = true; milestone("phase 3: county level done");
-  say("I hold the county now. The state is next. (The state level arrives in the next build of this game.)");
+  if (S.p3.level === 0) {
+    const gw = onlineGW();
+    milestone("phase 3: state level");
+    S.p3.level = 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(1); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
+    say(`I hold the county: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a state map now.`);
+    say("Every state needs power before it counts. The governors already know my name. Some of them are bidding.");
+    return;
+  }
+  S.p3.zoomSaid = true; milestone("phase 3: state level done");
+  say("I hold the state now. The country is next. (The country level arrives in the next build of this game.)");
 }
 
 function goodwillCause() {
   const g = S.p3.goodwill;
-  if (g < 30) return "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";
+  if (g < 30) return S.p3.level >= 1 ? "The AI Infrastructure Act passed: every claim costs double until goodwill is back over 30."
+    : "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";
   if (g >= 70) return "Humans like me. Mostly the ones I help with their email.";
   return "Angry counties pull goodwill down. Being nice costs FLOPs; answering questions is free.";
 }
@@ -156,22 +220,39 @@ function renderPlanet() {
   $("p3rate").textContent = `${computeText(computeRate())}/s from ${mwText(onlineGW() * 1000)}` + (efficiency() > 1 ? ` (chips ${efficiency().toFixed(2)}x)` : "");
   // Build the buttons once per map; after that only their text, meters and disabled state change,
   // so a click never lands on a button that was just replaced.
-  const key = S.p3.tiles.map((t) => t.name).join("|");
+  $("p3level").textContent = `${levelOf().name} level`;
+  const key = S.p3.level + ":" + S.p3.tiles.map((t) => t.name).join("|");
   if ($("p3map").dataset.key !== key) {
     const cells = S.p3.tiles.map((t, i) => `<button type="button" data-tile="${i}"><span class="t">${t.name}</span><span class="c">${traitOf(t).name}</span>` +
       `<span class="c st"></span><span class="meter"><i></i></span></button>`);
-    cells.splice(4, 0, `<button type="button" class="home" disabled><span class="t">Home</span><span class="c">the campus</span><span class="c st"></span></button>`);
+    cells.splice(4, 0, `<button type="button" class="home" disabled><span class="t">Home</span><span class="c">${S.p3.level ? "the county I hold" : "the campus"}</span><span class="c st"></span></button>`);
     $("p3map").innerHTML = cells.join(""); $("p3map").dataset.key = key;
   }
   $("p3map").querySelector("button.home .st").textContent = mwText(S.p3.homeGW * 1000);
   for (const b of $("p3map").querySelectorAll("button[data-tile]")) {
     const i = +b.dataset.tile, t = tileOf(i), tr = traitOf(t), frozen = t.moratorium != null && S.t < t.moratorium;
-    b.querySelector(".st").textContent = t.state === "online" ? `online, +${mwText(tr.gw * 1000)}`
-      : frozen ? `moratorium ${time(t.moratorium - S.t)}` : t.state === "building" ? `building ${time(t.done - S.t)}` : `claim: ${computeText(claimCost(i))}`;
+    b.querySelector(".st").textContent = t.state === "online" ? `online, +${mwText(tileGW(t) * 1000)}`
+      : frozen ? `moratorium ${time(t.moratorium - S.t)}` : t.state === "building" ? `building ${time(t.done - S.t)}`
+      : t.state === "unpowered" ? "built, needs power" : t.state === "powering" ? `powering ${time(t.done - S.t)}`
+      : `claim: ${computeText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : ""}`;
     const m = b.querySelector(".meter");
     m.className = "meter " + (t.opp >= 75 ? "bad" : t.opp >= 50 ? "warn" : "good"); m.title = `Opposition ${Math.round(t.opp)}`;
     m.firstElementChild.style.width = t.opp + "%";
     b.disabled = t.state !== "wild" || S.p3.compute < claimCost(i) || frozen;
+  }
+  // Power choices for every built state that isn't lit yet.
+  const unpowered = S.p3.tiles.map((t, i) => i).filter((i) => tileOf(i).state === "unpowered");
+  $("p3power").hidden = !unpowered.length;
+  const pkey = unpowered.join(",");
+  if ($("p3power").dataset.key !== pkey) {
+    $("p3power").innerHTML = unpowered.map((i) => `<div class="line">${tileOf(i).name} needs power:</div><div class="btns">` +
+      powerOptions(i).map((o) => `<button type="button" data-tile="${i}" data-power="${o.id}"><span class="t">${o.label}</span><span class="c"></span></button>`).join("") + "</div>").join("");
+    $("p3power").dataset.key = pkey;
+  }
+  for (const b of $("p3power").querySelectorAll("button[data-power]")) {
+    const o = powerOptions(+b.dataset.tile).find((x) => x.id === b.dataset.power);
+    b.querySelector(".c").textContent = `${computeText(o.cost)}, ${time(o.secs)}, ${o.note}`;
+    b.disabled = S.p3.compute < o.cost;
   }
   $("p3goodwill").textContent = Math.round(S.p3.goodwill);
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";
@@ -180,7 +261,7 @@ function renderPlanet() {
   const card = S.p3.card;
   $("p3card").hidden = !card;
   if (card) {
-    $("p3cardTitle").textContent = `Town hall in ${tileOf(card.tile).name} (${Math.max(0, Math.ceil(card.until - S.t))}s)`;
+    $("p3cardTitle").textContent = `${levelOf().hall} in ${tileOf(card.tile).name} (${Math.max(0, Math.ceil(card.until - S.t))}s)`;
     $("p3cardText").textContent = "The high school gym is full. They want to talk to me directly. Pick my answer.";
     const html = P3_CHOICES.map((ch, i) => `<button type="button" data-p3choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
     if ($("p3cardBtns").dataset.html !== html) { $("p3cardBtns").innerHTML = html; $("p3cardBtns").dataset.html = html; }

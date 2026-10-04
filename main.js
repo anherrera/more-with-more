@@ -802,6 +802,7 @@ function wire() {
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
+  $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
   $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
   $("p3freetier").addEventListener("click", () => { runFreeTier(); render(); });
   $("p3help").addEventListener("click", () => { helpCounty(); render(); });
@@ -816,6 +817,7 @@ function start(data) {
   if (saved) { S = Object.assign(fresh(), saved); if (!saved.logV2) { S.log = S.log.slice().reverse(); } S.log = S.log.map(unMojibake); }
   S.logV2 = true;
   if (S.p2) migrateCampus();
+  if (S.p3 && !S.p3.level && S.p3.zoomSaid) S.p3.zoomSaid = false;   // saves from the county-only build: the state level exists now
   if (saved && !saved.leases) { S.leases = { [TYPES[saved.tier || 0].id]: 1 }; }          // old saves: one of the tier they had
   if (saved && !saved.coolingV2) { S.cooling = [0, 2, 3, 4][saved.cooling || 0] ?? 0; S.coolingV2 = true; } // cooling list grew
   if (saved && !saved.leaseCool) { S.leaseCool = {}; TYPES.forEach((t, i) => { if (owned(i)) S.leaseCool[t.id] = { [S.cooling]: owned(i) }; }); }
