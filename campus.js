@@ -279,14 +279,17 @@ function recheckActive() {
   }
 }
 
-// Campus expansion robots: every 10 s, if cash allows, build whichever side (halls or power) is short.
+// Campus expansion robots: every 10 s, if cash allows, build whichever is short: halls, water or power. They read the
+// room: once the town is restless (40+) they put up quiet solar instead of loud turbines, if there's land for it.
 const ROBOT_EVERY = 10, ROBOT_RESERVE = 50e6;
 // What the robots would build next, and whether they can: { kind, blocked } where blocked names the reason.
 function robotPlan() {
   const halls = S.p2.builds.filter((b) => b.kind === "hall").length * hallSize();
   const power = S.p2.grid + (S.p2.queue ? S.p2.queue.mw : 0) + S.p2.builds.filter((b) => b.kind === "turbine").length * turbineMW()
     + S.p2.builds.filter((b) => b.kind === "solar").length * POWER.solar.mw;
-  const kind = halls <= power ? "hall" : "turbine";
+  const water = waterMWAt(1e12);   // everything ordered, once it's built
+  const quiet = townOf().v >= 40 && acresFree() >= POWER.solar.acres + HALL.acres;
+  const kind = halls <= Math.min(power, water) ? "hall" : water < power ? "reclaimed" : quiet ? "solar" : "turbine";
   const blocked = kind === "hall" && acresFree() < HALL.acres ? "out of land: buy a parcel"
     : S.funds - buildCost(kind) < ROBOT_RESERVE ? `waiting for cash (keeps ${money(ROBOT_RESERVE)} in reserve)` : null;
   return { kind, blocked };
@@ -300,7 +303,7 @@ function stepRobots() {
   build(kind);
   if (S.p2.builds.length > n) {
     S.p2.robotBuilt = S.p2.robotBuilt || { hall: 0, turbine: 0 };
-    S.p2.robotBuilt[kind] += 1;
+    S.p2.robotBuilt[kind] = (S.p2.robotBuilt[kind] || 0) + 1;
     if (!S.p2.robotsSaid) { S.p2.robotsSaid = true; say("The robots started building. Nobody told them to stop, so nobody will."); }
   }
 }
@@ -497,7 +500,8 @@ function renderCampus() {
   $("robotLine").hidden = !S.done.robots;
   if (S.done.robots) {
     const rb = p.robotBuilt || { hall: 0, turbine: 0 }, plan = robotPlan();
-    $("robotLine").textContent = `Robots: built ${rb.hall} hall${rb.hall === 1 ? "" : "s"} and ${rb.turbine} turbine${rb.turbine === 1 ? "" : "s"} \u00b7 ` +
+    const built = Object.entries(rb).filter(([, n]) => n).map(([k, n]) => `${n} ${k === "solar" ? "solar farm" : k === "reclaimed" ? "water plant" : k}${n === 1 ? "" : "s"}`);
+    $("robotLine").textContent = `Robots: built ${built.length ? built.join(", ") : "nothing yet"} \u00b7 ` +
       (plan.blocked || `next: a ${plan.kind} in ${Math.max(0, Math.ceil((p.robotsAt || 0) - S.t))}s`);
   }
   $("underway").textContent = pending.length

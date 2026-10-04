@@ -147,3 +147,32 @@ def test_robots_say_what_they_are_doing(game):
     assert line.startswith("Robots: built") and "hall" in line and "turbine" in line and "next:" in line
     pg.evaluate("() => { S.funds = 1e6; render(); }")
     assert "waiting for cash" in pg.inner_text("#robotLine")
+
+
+def robots_on(pg, **state):
+    pg.evaluate("() => { S.p2.round = 1; S.done.robots = true; S.p2.robotsAt = 0; S.p2.extraWater = 999; }")
+    for k, v in state.items():
+        pg.evaluate(f"() => {{ {k} = {v}; }}")
+
+
+def test_robots_pick_solar_when_the_town_is_restless(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.p2.grid": 0, "townOf().v": 45})
+    pg.evaluate("() => { S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
+    assert pg.evaluate("() => robotPlan().kind") == "solar"
+
+
+def test_robots_pick_turbines_when_the_town_is_calm_or_land_is_tight(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.p2.grid": 0, "townOf().v": 10})
+    pg.evaluate("() => { S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
+    assert pg.evaluate("() => robotPlan().kind") == "turbine"
+    pg.evaluate("() => { townOf().v = 45; S.p2.extraAcres = -acresFree() + 100; }")   # no room for 150 acres of panels
+    assert pg.evaluate("() => robotPlan().kind") == "turbine"
+
+
+def test_robots_build_water_when_water_is_short(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.p2.grid": 5000, "S.p2.extraWater": 0})
+    pg.evaluate("() => { for (let i = 0; i < 40; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
+    assert pg.evaluate("() => robotPlan().kind") == "reclaimed"
