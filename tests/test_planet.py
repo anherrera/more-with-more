@@ -182,3 +182,13 @@ def test_angriest_county_calls_town_halls_now_and_then(game):
     pg.evaluate("() => { S.p3.tiles[2].opp = 70; S.p3.nextCard = S.t + 1; }")
     run(pg, 2)
     assert pg.evaluate("() => S.p3.card && S.p3.card.tile") == 2
+
+
+def test_six_counties_online_offers_the_zoom_out(game):
+    pg = planet(game)
+    pg.evaluate("() => { for (let i = 0; i < 5; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    assert not pg.is_visible("#phaseGo")
+    pg.evaluate("() => { S.p3.tiles[5].state = 'online'; render(); }")
+    assert pg.is_visible("#phaseGo") and "statewide" in pg.inner_text("#phaseGo").lower()
+    pg.click("#phaseGo")
+    assert "state" in pg.evaluate("() => S.log.at(-1)").lower()

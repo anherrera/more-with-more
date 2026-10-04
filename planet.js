@@ -103,6 +103,14 @@ function stepPlanet(dt) {
   }
 }
 
+const zoomReady = () => S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
+// Step 1 stops here: the state level is the next build.
+function zoomOut() {
+  if (!zoomReady()) return;
+  S.p3.zoomSaid = true; milestone("phase 3: county level done");
+  say("I hold the county now. The state is next. (The state level arrives in the next build of this game.)");
+}
+
 function goodwillCause() {
   const g = S.p3.goodwill;
   if (g < 30) return "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";

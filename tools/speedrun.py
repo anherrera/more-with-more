@@ -42,6 +42,20 @@ PHASE1 = """(secs) => {
 }"""
 
 
+# Phase 3 (county level): keep goodwill up, answer town halls, claim the cheapest county whenever affordable.
+PHASE3 = """(secs) => {
+  for (let i = 0; i < secs && S.phase === 3 && !zoomReady(); i++) {
+    S.p3.slider = S.p3.goodwill < 40 ? 20 : 60;
+    if (S.p3.card) chooseP3Card(0);
+    const wild = S.p3.tiles.map((t, i) => i).filter((i) => S.p3.tiles[i].state === 'wild' && !(S.p3.tiles[i].moratorium > S.t))
+      .sort((a, b) => claimCost(a) - claimCost(b));
+    if (wild.length && S.p3.compute >= claimCost(wild[0])) claim(wild[0]);
+    step(1);
+  }
+  return S.phase === 3 && zoomReady();
+}"""
+
+
 class _Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
 
@@ -71,9 +85,17 @@ def run_once(browser, base, seed, county):
             pg.evaluate(PHASE2, [chunk, []]); pg.evaluate("() => render()")
             if pause: pg.wait_for_timeout(pause)
             if pg.evaluate("() => S.p2.model.endedAt") is not None: break
+    p3 = None
+    if pg.evaluate("() => S.phase === 2 && S.p2.model.endedAt != null"):
+        pg.evaluate("() => render()"); pg.click("#phaseGo")
+        for _ in range(3600 // chunk):
+            done = pg.evaluate(PHASE3, chunk); pg.evaluate("() => render()")
+            if pause: pg.wait_for_timeout(pause)
+            if done: p3 = pg.evaluate("() => S.t - S.p3.startedAt"); break
     s = pg.evaluate("""() => ({t: S.t, gen: S.gen, ended: S.p2 && S.p2.model && S.p2.model.endedAt, ipo: S.p2 && S.p2.ipo && S.p2.ipo.at,
       fires: firesOf().n, leaks: leaksOf().n, morale: S.p2 && S.p2.people ? Math.round(S.p2.people.v) : null, pizzas: S.p2 && S.p2.people ? S.p2.people.perkN || 0 : 0, town: S.p2 && S.p2.town ? Math.round(S.p2.town.v) : null, jobs: S.p2 && S.p2.town ? S.p2.town.jobs : 0, ceos: S.p2 && S.p2.ceo ? S.p2.ceo.n : 0, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
     ctx.close()
+    s["p3"] = p3
     return ground, s, errs
 
 
@@ -106,8 +128,8 @@ def main():
             ground, s, errs = run_once(b, base, r + 1, county)
             p2 = (s["ended"] - ground) if s["ended"] and ground else None
             print(f"run {r + 1} ({county}): phase 1 {mmss(ground)}, phase 2 {mmss(p2)}, IPO at {mmss(s['ipo'])}, "
-                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
-            ok = ok and not errs and s["ended"] is not None
+                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, county level {mmss(s['p3'])}, you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
+            ok = ok and not errs and s["ended"] is not None and s["p3"] is not None
         b.close()
     httpd.shutdown()
     print("ALL CLEAN" if ok else "PROBLEMS FOUND")
