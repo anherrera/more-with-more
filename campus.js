@@ -598,7 +598,14 @@ export function renderFleet() {
     fl.textContent = `${chip(g).name} \u00b7 ${S.fleet[g].toLocaleString("en-US")} GPUs \u00b7 ${kwText(kwOf(g))} \u00b7 ${status} \u00b7 ` +
       `${money(odRate(g) * OD_UTIL)}/MW-s on-demand`;
     const b = d.querySelector("[data-tradegen]");
-    if (b) b.textContent = `Trade in ${tradeCount(g).toLocaleString("en-US")}: ${money(tradeValue(g))} in credits, frees ${kwText(tradeCount(g) * chip(g).kw)}`;
+    if (b) {
+      // What a swap buys: the same megawatts of the newest chip earn more on-demand (and qualify for new contracts).
+      const n = tradeCount(g), mw = n * chip(g).kw / 1000, now = mw * odRate(g) * OD_UTIL, then = mw * odRate(S.chipIdx) * OD_UTIL;
+      const refill = Math.max(0, Math.floor(mw * 1000 / newest().kw) * gpuPrice() - tradeValue(g)), gain = then - now;
+      b.innerHTML = `<span class="t">Trade in ${n.toLocaleString("en-US")}: ${money(tradeValue(g))} in credits, frees ${kwText(n * chip(g).kw)}</span>` +
+        `<span class="c">${money(now)}/s now; newest would earn ${money(then)}/s. Refill ${money(refill)}` +
+        (gain > 0 ? `, pays back in ${time(refill / gain)}` : ", never pays back") + `</span>`;
+    }
   }
 }
 

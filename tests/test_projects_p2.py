@@ -108,7 +108,8 @@ def test_chip_projects(game):
     pg.evaluate("() => { S.chipIdx = 6; S.fleet = {3: 1000, 6: 100}; S.gpus = 1100; }")
     v = pg.evaluate("() => tradeValue(3)")
     buy(pg, "refurb")
-    assert pg.evaluate("() => tradeValue(3)") == pytest.approx(v * 0.4 / 0.25)
+    rate = pg.evaluate("() => tradeRate(3)")
+    assert pg.evaluate("() => tradeValue(3)") == pytest.approx(v * rate / (rate - 0.15))   # the refurb shop adds 15 points
     pg.evaluate("() => { S.chipIdx = 20; }")
     floor = pg.evaluate("() => odRate(3) / (OD_RATE * genPrice(3))")
     buy(pg, "inference")

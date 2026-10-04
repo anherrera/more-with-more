@@ -182,17 +182,19 @@ export function sellSpot() {
     : `Spot sale: ${n.toLocaleString("en-US")} GPUs for 30s, ${money(pay)} (${spotMult().toFixed(1)}x query revenue).`);
 }
 
-// Trade the oldest chips back to Parallax for 25% of today's price, in credits. Frees power for new chips.
+// Trade old chips back to Parallax for credits: a secondhand market, so last generation is worth a lot more than
+// two generations ago. Frees power for new chips.
 // Phase 2: GPUs under contract can't be traded in; only the free part of a cohort can go.
 export const tradeCount = (c) => Math.min(S.fleet[c] || 0, S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
 export const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && tradeCount(c) > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
-export const tradeRate = () => (S.done.refurb ? 0.4 : 0.25);   // your own refurb shop pays better
-export const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * tradeRate();
+export const tradeRate = (c) => { const age = S.chipIdx - c;
+  return (age <= 1 ? 0.6 : age === 2 ? 0.4 : 0.25) + (S.done.refurb ? 0.15 : 0); };   // your own refurb shop pays better
+export const tradeValue = (c) => tradeCount(c) * basePrice() * chip(c).priceMult * tradeRate(c);
 export function tradeIn(gen) {
   const c = gen ?? oldestOld(); if (c === null || c === undefined || c >= S.chipIdx) return;
   const n = Math.min(tradeCount(c), Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0)));
   if (n <= 0) return;
-  const val = n * basePrice() * chip(c).priceMult * tradeRate();
+  const val = n * basePrice() * chip(c).priceMult * tradeRate(c);
   S.fleet[c] -= n; if (S.fleet[c] <= 0) delete S.fleet[c]; S.gpus -= n; S.credits += val; S.vendorCap += val * 25;
   track("tradein", { chip: chip(c).name, n, val: Math.round(val) });
   say(`Traded in ${n.toLocaleString("en-US")} ${chip(c).name}s for ${money(val)} in Parallax credits. Parallax will refurbish them and sell them to someone else.`);
@@ -638,13 +640,15 @@ export function renderComputePanels() {
   $("tradeNote").hidden = oc === null || S.phase === 2;
   if (oc !== null) {
     $("tradein").textContent = `Trade in ${tradeCount(oc).toLocaleString("en-US")} ${chip(oc).name}s for ${money(tradeValue(oc))} in credits`;
-    // Preview: the credits buy fewer, faster chips. Only worth it when power, not money, is the limit.
+    // Preview: fill the freed room with the newest chip, paid with the trade-in credits plus whatever cash you have.
     const n = tradeCount(oc), before = n * chip(oc).perf, freedKW = n * chip(oc).kw + Math.max(0, capKW() - usedKW());
-    const k = Math.max(0, Math.min(Math.floor(tradeValue(oc) / gpuPrice()), Math.floor(freedKW / nc.kw)));
+    const budget = tradeValue(oc) + S.credits + Math.max(0, S.funds);
+    const k = Math.max(0, Math.min(Math.floor(budget / gpuPrice()), Math.floor(freedKW / nc.kw)));
+    const cash = Math.max(0, k * gpuPrice() - tradeValue(oc));
     const after = k * nc.perf, worse = after < before;
     $("tradeNote").className = "line sub " + (worse ? "bad" : "good");
-    $("tradeNote").textContent = `Credits buy ~${k.toLocaleString("en-US")} ${nc.name}s: compute ${fmt(before)} \u2192 ${fmt(after)}` +
-      (worse ? ". You'd lose compute. Trade in when you're out of power, not money." : ". Worth it.");
+    $("tradeNote").textContent = `Trade in, then refill with ~${k.toLocaleString("en-US")} ${nc.name}s (credits${cash > 0 ? ` + ${money(cash)} cash` : ""}): compute ${fmt(before)} \u2192 ${fmt(after)}` +
+      (worse ? ". You'd lose compute: not enough room or cash to refill." : ". Worth it.");
   }
   $("gpuPrice").textContent = `${money(gpuPrice())} per ${nc.name}` + (basePrice() >= PMAX ? " (Parallax volume pricing)" : "");
   const room = roomNewest();

@@ -69,7 +69,7 @@ export const PROJECTS = [
     when: () => S.p2.contractN >= 5, buy: () => {} },
   { id: "partner", phase: 2, title: "Parallax preferred-partner status", cost: 60e6, desc: "A plaque and an allocation. New GPUs cost 10% less.",
     when: () => S.chipIdx > (S.p2.startChip ?? S.chipIdx), buy: () => {} },
-  { id: "refurb", phase: 2, title: "Buy a refurb shop", cost: 50e6, desc: "Trade-ins now pay 40% instead of 25%. Parallax is not thrilled.",
+  { id: "refurb", phase: 2, title: "Buy a refurb shop", cost: 50e6, desc: "Trade-ins pay 15 points more at every age. Parallax is not thrilled.",
     when: () => Object.keys(S.fleet).some((g) => +g < S.chipIdx && S.fleet[g] > 0), buy: () => {} },
   { id: "inference", phase: 2, title: "Inference-only tier", cost: 80e6, desc: "Old chips get a second life. Their on-demand floor doubles.",
     when: () => Object.keys(S.fleet).some((g) => +g < S.chipIdx && S.fleet[g] > 0), buy: () => {} },
