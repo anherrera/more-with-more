@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 [ $# -eq 1 ] || { echo "usage: tools/ship.sh \"commit message\"" >&2; exit 2; }
 for f in *.js; do node --check "$f"; done
-uv run --with pytest --with playwright --with pytest-rerunfailures pytest -q --reruns 1   # a load hiccup gets one retry; a real bug fails twice
+caffeinate -dimsu uv run --with pytest --with playwright --with pytest-rerunfailures --with pytest-xdist pytest -q --reruns 1 -n 4   # 4 browsers at once; a load hiccup gets one retry, a real bug fails twice; caffeinate: an idle Mac stalls the browsers
 git add -A
 git commit -q -m "$1
 
