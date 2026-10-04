@@ -122,7 +122,8 @@ function buyLand() {
   say(S.p2.landN === 1 ? "Bought the adjacent parcel. The farmer said it had been in the family for four generations. The check cleared in one."
     : `Bought another ${LAND.acres} acres. The county assessor has started waving at you.`);
 }
-const queueSecs = () => modelDone("utility") ? 0
+// Owning the utility skips the line, but energizing still takes 30 s a request.
+const queueSecs = () => modelDone("utility") ? 30
   : countyOf().queueSecs * Math.pow(QUEUE_GROWTH, S.p2.queueN) * (modelDone("lobbyist") ? 0.5 : 1) * (S.done.lawyer ? 0.7 : 1);
 
 // Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered.
@@ -509,7 +510,8 @@ function renderCampus() {
   $("buildSolar").textContent = `Solar + batteries (+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}): ${money(buildCost("solar"))}`;
   $("buildSolar").disabled = S.funds < buildCost("solar") || acresFree() < POWER.solar.acres;
   $("requestQueue").textContent = p.queue
-    ? `Interconnection queue: +${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`
+    ? (modelDone("utility") ? `Energizing +${mwText(p.queue.mw)} from your utility: ${time(p.queue.done - S.t)}` : `Interconnection queue: +${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`)
+    : modelDone("utility") ? `Energize +${mwText(countyOf().queueMW)} from your utility (${time(queueSecs())}): ${money(QUEUE_DEPOSIT)}`
     : `Join the interconnection queue (+${mwText(countyOf().queueMW)} in ~${time(queueSecs())}): ${money(QUEUE_DEPOSIT)} deposit`;
   $("requestQueue").disabled = !!p.queue || S.funds < QUEUE_DEPOSIT;
   $("buyLand").textContent = `Buy the adjacent parcel (+${LAND.acres} acres): ${money(landCost())}`;

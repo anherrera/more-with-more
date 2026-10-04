@@ -190,6 +190,9 @@ function renderPeople() {
   $("townBox").hidden = !on;
   const c = on && S.p2.card;
   $("card").hidden = !c;
+  // Town halls show up in Community; everything else in the deals column.
+  if (c && c.kind === "townhall") { if ($("card").parentElement !== $("townBox")) $("townBox").appendChild($("card")); }
+  else if ($("card").parentElement !== $("colDeals")) $("colDeals").prepend($("card"));
   if (!on) return;
   const m = moraleOf();
   $("morale").textContent = Math.round(m.v);

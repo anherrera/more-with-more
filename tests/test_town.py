@@ -133,3 +133,11 @@ def test_community_has_its_own_section(game):
     assert pg.is_visible("#townBox")
     assert pg.inner_text("#townBox h3") == "Community"
     assert pg.evaluate("() => !!document.querySelector('#townBox #townMeter') && !document.querySelector('#campusBox #townMeter')")
+
+
+def test_town_hall_card_sits_in_community_and_tender_in_deals(game):
+    pg = campus(game)
+    pg.evaluate("() => { openCard('townhall'); render(); }")
+    assert pg.evaluate("() => !!document.querySelector('#townBox #card')")
+    pg.evaluate("() => { S.p2.card = null; openCard('tender'); render(); }")
+    assert pg.evaluate("() => !!document.querySelector('#colDeals #card')")

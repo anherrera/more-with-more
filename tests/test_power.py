@@ -139,3 +139,17 @@ def test_land_total_includes_bought_parcels(game):
     pg.click("#buyLand")
     pg.click("#buyLand")
     assert pg.inner_text("#land") == "1,900 of 1,900 acres free (2 parcels bought)"
+
+
+def test_owning_the_utility_makes_the_queue_fast_not_instant(game):
+    pg = campus(game, county="strong")
+    pg.evaluate("() => { S.funds = 1e10; S.p2.model.done.utility = true; S.p2.queueN = 40; render(); }")
+    assert pg.evaluate("() => queueSecs()") == 30
+    grid = pg.evaluate("() => S.p2.grid")
+    pg.click("#requestQueue")
+    pg.evaluate("() => { for (let i = 0; i < 4; i++) requestQueue(); }")   # spamming does nothing
+    run(pg, 2)
+    assert pg.evaluate("() => S.p2.grid") == grid               # nothing yet
+    assert "your utility" in pg.inner_text("#requestQueue").lower()
+    run(pg, 30)
+    assert pg.evaluate("() => S.p2.grid") > grid
