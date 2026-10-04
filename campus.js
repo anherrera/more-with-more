@@ -22,7 +22,7 @@ const POWER = {
   turbine: { name: "gas turbine", mw: 50, cost: 25e6, secs: 60, acres: 0 },
   solar: { name: "solar + batteries", mw: 30, cost: 20e6, secs: 180, acres: 150 },
 };
-const LAND = { acres: 200, cost: 15e6, growth: 1.1 };       // adjacent parcels: each one costs 10% more than the last
+const LAND = { acres: 200, cost: 15e6, growth: 1.03 };      // adjacent parcels: each one costs 3% more than the last, like builds
 // Water: every MW of energized hall evaporates cooling water. Measured in million gallons a day (MGD).
 const WATER_PER_MW = 0.01, DROUGHT_CUT = 0.6, DROUGHT_SECS = 180, AQUIFER_DRAIN = 0.05;   // aquifer % per second per well
 const WATER = {

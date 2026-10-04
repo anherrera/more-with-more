@@ -85,7 +85,7 @@ def test_buy_adjacent_land(game):
     pg.click("#buyLand")
     assert pg.evaluate("() => acresFree()") == acres + 200
     assert pg.evaluate("() => S.funds") == pytest.approx(funds - 15e6)
-    assert "$16.5M" in pg.inner_text("#buyLand")          # next parcel costs 10% more
+    assert "$15.4M" in pg.inner_text("#buyLand")          # next parcel costs 3% more
 
 
 def test_big_power_reads_in_gw(game):
@@ -153,3 +153,9 @@ def test_owning_the_utility_makes_the_queue_fast_not_instant(game):
     assert "your utility" in pg.inner_text("#requestQueue").lower()
     run(pg, 30)
     assert pg.evaluate("() => S.p2.grid") > grid
+
+
+def test_land_stays_sane_after_many_parcels(game):
+    pg = campus(game, county="strong")
+    pg.evaluate("() => { S.p2.landN = 60; townOf().v = 0; }")
+    assert pg.evaluate("() => landCost()") < 150e6
