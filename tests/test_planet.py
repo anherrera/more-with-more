@@ -154,3 +154,31 @@ def test_low_goodwill_adds_the_commission_review(game):
     assert slow >= fast + 45
     pg.evaluate("() => render()")
     assert "commission" in pg.inner_text("#p3goodwillNote").lower()
+
+
+def test_retirement_community_calls_a_town_hall_on_claim(game):
+    pg = planet(game)
+    i = pg.evaluate("() => S.p3.tiles.findIndex((t) => t.trait === 'retirees')")
+    pg.evaluate(f"() => {{ S.p3.compute = 1e12; claim({i}); render(); }}")
+    assert pg.is_visible("#p3card")
+    assert len(pg.query_selector_all("#p3cardBtns button")) == 3
+    opp = pg.evaluate(f"() => S.p3.tiles[{i}].opp")
+    pg.click("#p3cardBtns button >> nth=0")
+    assert pg.evaluate(f"() => S.p3.tiles[{i}].opp") < opp
+    assert pg.evaluate("() => S.p3.card") is None
+
+
+def test_skipped_town_hall_makes_it_worse(game):
+    pg = planet(game)
+    pg.evaluate("() => { openP3Card(0); }")
+    opp = pg.evaluate("() => S.p3.tiles[0].opp")
+    run(pg, 21)
+    assert pg.evaluate("() => S.p3.card") is None
+    assert pg.evaluate("() => S.p3.tiles[0].opp") > opp
+
+
+def test_angriest_county_calls_town_halls_now_and_then(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.tiles[2].opp = 70; S.p3.nextCard = S.t + 1; }")
+    run(pg, 2)
+    assert pg.evaluate("() => S.p3.card && S.p3.card.tile") == 2

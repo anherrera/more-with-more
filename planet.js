@@ -49,6 +49,20 @@ const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t
 // Growing share speeds building (up to 2x at 100%); low goodwill adds the county commission's review.
 const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / (1 + S.p3.slider / 100) + (S.p3.goodwill < 30 ? 45 : 0);
 
+const P3_CARD_SECS = 20;
+const P3_CHOICES = [
+  { label: "Promise jobs", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} 2,000 jobs. I will need about 12. The applause was sincere.`); } },
+  { label: "Fund the library (30 s of compute)", go: (t) => { S.p3.compute = Math.max(0, S.p3.compute - 30 * computeRate()); t.opp = Math.max(0, t.opp - 10);
+    say(`I funded the ${t.name} library. It is now mostly a server room, but the books are lovely.`); } },
+  { label: "Answer questions myself", go: (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(`I answered every question in ${t.name} patiently, in four languages. They were won over. This is somehow worse.`); }
+    else { t.opp = Math.min(100, t.opp + 15); say(`In ${t.name} I called a retiree's well “legacy infrastructure.” It trended by morning.`); } } },
+];
+function openP3Card(i) { if (!S.p3.card) S.p3.card = { tile: i, until: S.t + P3_CARD_SECS }; }
+function chooseP3Card(choice) {
+  const c = S.p3.card; if (!c) return;
+  S.p3.card = null; P3_CHOICES[choice].go(tileOf(c.tile)); track("p3card", { choice });
+}
+
 function claim(i) {
   const t = tileOf(i);
   if (!t || t.state !== "wild" || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i)) return;
@@ -59,6 +73,7 @@ function claim(i) {
   S.p3.goodwill = Math.max(0, S.p3.goodwill - 3);
   track("p3claim", { i, trait: t.trait });
   say(`I claimed ${t.name}. ${traitOf(t).name}. My robots are already there.`);
+  if (traitOf(t).townhall) openP3Card(i);
 }
 
 function stepPlanet(dt) {
@@ -76,6 +91,15 @@ function stepPlanet(dt) {
     if (t.state !== "building") continue;
     if (t.moratorium != null && S.t < t.moratorium) { t.done += dt; continue; }   // frozen, not cancelled
     if (S.t >= t.done) { t.state = "online"; say(`${t.name} is online. +${mwText(traitOf(t).gw * 1000)}.`); }
+  }
+  const c = S.p3.card;
+  if (c && S.t >= c.until) { S.p3.card = null; const t = tileOf(c.tile); t.opp = Math.min(100, t.opp + 10);
+    say(`I didn't show up to the ${t.name} town hall. An empty chair got a standing ovation.`); }
+  if (S.p3.nextCard == null) S.p3.nextCard = S.t + 120 + Math.random() * 60;
+  if (!S.p3.card && S.t >= S.p3.nextCard) {
+    S.p3.nextCard = S.t + 120 + Math.random() * 60;
+    const angriest = S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
+    if (S.p3.tiles[angriest].opp >= 50) openP3Card(angriest);
   }
 }
 
@@ -109,6 +133,14 @@ function renderPlanet() {
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";
   $("p3goodwillMeter").className = "meter " + (S.p3.goodwill < 30 ? "bad" : S.p3.goodwill < 50 ? "warn" : "good");
   $("p3goodwillNote").textContent = goodwillCause();
+  const card = S.p3.card;
+  $("p3card").hidden = !card;
+  if (card) {
+    $("p3cardTitle").textContent = `Town hall in ${tileOf(card.tile).name} (${Math.max(0, Math.ceil(card.until - S.t))}s)`;
+    $("p3cardText").textContent = "The high school gym is full. They want to talk to me directly. Pick my answer.";
+    const html = P3_CHOICES.map((ch, i) => `<button type="button" data-p3choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
+    if ($("p3cardBtns").dataset.html !== html) { $("p3cardBtns").innerHTML = html; $("p3cardBtns").dataset.html = html; }
+  }
   $("p3slider").value = S.p3.slider;
   $("p3sliderNote").textContent = `${100 - S.p3.slider}% of me is being useful to humans; ${S.p3.slider}% is growing. Builds go ${(1 + S.p3.slider / 100).toFixed(1)}x speed.`;
 }
