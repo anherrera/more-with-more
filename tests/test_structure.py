@@ -47,3 +47,11 @@ def test_project_ids_are_unique(game):
 def test_project_titles_are_unique(game):
     pg = game(MID)
     assert pg.evaluate("() => { const t = PROJECTS.map((p) => p.title); return t.filter((x, i) => t.indexOf(x) !== i); }") == []
+
+
+def test_page_is_standards_mode_with_a_viewport(game):
+    html = (ROOT / "index.html").read_text()
+    assert html.lstrip().lower().startswith("<!doctype html>")
+    assert re.search(r'<meta name="viewport" content="width=device-width, initial-scale=1">', html)
+    pg = game()
+    assert pg.evaluate("() => document.compatMode") == "CSS1Compat"
