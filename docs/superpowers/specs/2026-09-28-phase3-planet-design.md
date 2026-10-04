@@ -1,6 +1,6 @@
 # More With More, phase 3 ("The Planet"): design
 
-Status: draft for review, 2026-09-28. Phase 3 is the endgame: the last phase and the game's final ending.
+Status: **superseded** by `2026-10-03-phase3-map-design.md` (2026-10-03). Kept for history; its Earth and space ideas live on as that spec's top zoom levels.
 
 ## Intent
 
