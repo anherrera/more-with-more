@@ -87,6 +87,19 @@
   .btns { margin: 2px 0; }
   .deal .line.good { color: var(--good); } .deal .line.bad { color: var(--bad); }
   .empty { color: var(--muted); font-size: 13px; }
+  #hud { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: 4px; }
+  .deal .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 1px 0 2px; }
+  .deal .row .line { flex: 1 1 180px; }
+  .deal .row .fc { flex-basis: 100%; }
+  .buildgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 4px 0; }
+  .buildgrid button { width: 100%; padding: 3px 6px; }
+  .buildgrid .wide { grid-column: 1 / -1; }
+  button .t { display: block; }
+  button .c { display: block; font-size: 11px; color: var(--muted); }
+  button.primary:not(:disabled) .c { color: var(--accent-ink); opacity: .75; }
+  button:disabled .c { color: var(--btn-off); }
+  button.on { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  h3 .sub { font-weight: normal; float: right; }
   .phasebar { font-size: 13px; color: var(--muted); margin: 2px 0 4px; }
   .phasebar.go { color: var(--ink); border: 2px solid var(--accent); padding: 8px 10px; margin: 6px 0 10px; font-size: 16px; }
   .phasebar.go button { margin-left: 8px; font-size: 15px; }
@@ -99,9 +112,11 @@
 <div class="wrap">
   <div class="count"><span id="countLabel">GPUs</span>: <span id="gpuCount">0</span></div>
   <div class="ticker" id="ticker"></div>
+  <div id="hud">
   <div class="phasebar" id="phaseBar"><span id="phaseText"></span> <button id="phaseGo" type="button" class="primary" hidden></button></div>
   <div class="line bad" id="alerts" hidden></div>
   <div id="console" aria-live="polite"></div>
+  </div>
 
   <div class="ending" id="ending" hidden>
     <p>&ldquo;I could do more with more.&rdquo;</p>
@@ -243,8 +258,7 @@
 
     <div class="col">
       <div id="campusBox" hidden>
-        <h3>Campus</h3>
-        <div class="line">County: <span id="countyName"></span></div>
+        <h3>Campus <span class="sub" id="countyName"></span></h3>
         <div class="line">Halls: <span id="halls"></span></div>
         <div class="meter" id="mHalls"><i></i></div>
         <div class="line">Power: <span id="p2power"></span></div>
@@ -253,13 +267,13 @@
         <div class="meter" id="mWater"><i></i></div>
         <div class="line">Land: <span id="land"></span></div>
         <div class="meter" id="mLand"><i></i></div>
-        <div class="line">Capacity: <span id="p2cap"></span></div>
         <div class="line sub">Limited by <span id="p2limit"></span></div>
-        <div class="btns"><button id="buildHall" type="button" class="primary"></button></div>
-        <div class="btns"><button id="buildTurbine" type="button"></button><button id="buildSolar" type="button"></button></div>
-        <div class="btns"><button id="buildWell" type="button"></button><button id="buildReclaimed" type="button"></button></div>
-        <div class="btns"><button id="requestQueue" type="button"></button></div>
-        <div class="btns"><button id="buyLand" type="button"></button></div>
+        <div class="buildgrid">
+          <button id="buildHall" type="button" class="primary wide"></button>
+          <button id="buildTurbine" type="button"></button><button id="buildSolar" type="button"></button>
+          <button id="buildWell" type="button"></button><button id="buildReclaimed" type="button"></button>
+          <button id="requestQueue" type="button"></button><button id="buyLand" type="button"></button>
+        </div>
         <div class="line sub" id="underway"></div>
         <div class="line sub" id="robotLine" hidden></div>
       </div>
@@ -272,13 +286,17 @@
       </div>
       <div id="facilitiesBox">
         <h3>Facilities</h3>
+        <div id="p1site">
         <div class="line">Site: <span id="site">1 rack in a colo</span></div>
         <div class="line">Racks: <span id="racks">1</span></div>
+        </div>
         <div class="line">Cooling: <span id="cooling">Air, 10 kW/rack</span></div>
         <div class="btns"><button id="retrofit" type="button" hidden></button></div>
+        <div id="p1power">
         <div class="line">Power: <span id="power">0 / 10 kW</span></div>
         <div class="meter" id="powerMeter"><i></i></div>
         <div class="line sub">Limited by <span id="limit">cooling</span></div>
+        </div>
         <div class="racks" id="rackStrip" aria-hidden="true"></div>
         <div class="line sub" id="rentLine">Market rent: <span id="rent">1.0</span>x (rises with every rack you lease)</div>
         <div class="btns" id="leases"></div>

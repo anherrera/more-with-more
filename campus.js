@@ -475,9 +475,9 @@ function renderCampus() {
       (doneBuilds("well") ? ` \u00b7 ${doneBuilds("well")} wells, aquifer ${Math.max(0, Math.round(p.aquifer))}%${p.aquifer <= 0 ? " (dry)" : ""}` : "") +
       (doneBuilds("reclaimed") ? ` \u00b7 ${doneBuilds("reclaimed")} reclaimed` : "");
     $("p2water").className = droughtOn() || waterMWAt() < hallMWAt() ? "bad" : "";
-    $("buildWell").textContent = `Drill a well (+${WATER.well.mgd} MGD, drains the aquifer): ${money(buildCost("well"))}`;
+    buildBtn("buildWell", "Drill a well", buildCost("well"), `+${WATER.well.mgd} MGD, drains the aquifer`);
     $("buildWell").disabled = S.funds < buildCost("well") || p.aquifer <= 0;
-    $("buildReclaimed").textContent = `Reclaimed water plant (+${WATER.reclaimed.mgd} MGD, ${time(WATER.reclaimed.secs)}): ${money(buildCost("reclaimed"))}`;
+    buildBtn("buildReclaimed", "Reclaimed water plant", buildCost("reclaimed"), `+${WATER.reclaimed.mgd} MGD, ${time(WATER.reclaimed.secs)}`);
     $("buildReclaimed").disabled = S.funds < buildCost("reclaimed");
   }
   {
@@ -485,7 +485,6 @@ function renderCampus() {
     $("land").textContent = `${acresFree().toLocaleString("en-US")} of ${owned.toLocaleString("en-US")} acres free` +
       (p.landN ? ` (${p.landN} parcel${p.landN > 1 ? "s" : ""} bought)` : "");
   }
-  $("p2cap").textContent = `${mwText(leasedKW() / 1000)} leased + ${mwText(energizedAt())} campus; ${mwText(usedKW() / 1000)} of GPUs racked, room for ${mwText(Math.max(0, capKW() - usedKW()) / 1000)} more`;
   {
     // Meters: green with headroom, amber when nearly used, red when it's the bottleneck.
     const meter = (id, used, cap, limiting) => {
@@ -502,19 +501,18 @@ function renderCampus() {
     meter("mLand", acres - acresFree(), acres, acresFree() < HALL.acres);
   }
   $("p2limit").textContent = campusLimit();
-  $("buildHall").textContent = `Build a hall (${hallSize()} MW, ${HALL.acres} acres, ${time(HALL.secs * (S.done.prefab ? 0.6 : 1))}): ${money(buildCost("hall"))}`;
-  if (moratoriumOn()) $("buildHall").textContent = `Moratorium on new halls: ${time(townOf().moratorium - S.t)}`;
+  if (moratoriumOn()) buildBtn("buildHall", `Moratorium on new halls: ${time(townOf().moratorium - S.t)}`, null, "the county board will \u201crevisit it\u201d");
+  else buildBtn("buildHall", "Build a hall", buildCost("hall"), `${hallSize()} MW shell, ${HALL.acres} acres, ${time(HALL.secs * (S.done.prefab ? 0.6 : 1))}`);
   $("buildHall").disabled = S.funds < buildCost("hall") || acresFree() < HALL.acres || moratoriumOn();
-  $("buildTurbine").textContent = `Gas turbine (+${turbineMW()} MW, ${time(POWER.turbine.secs)}): ${money(buildCost("turbine"))}`;
+  buildBtn("buildTurbine", "Gas turbine", buildCost("turbine"), `+${turbineMW()} MW, ${time(POWER.turbine.secs)}`);
   $("buildTurbine").disabled = S.funds < buildCost("turbine");
-  $("buildSolar").textContent = `Solar + batteries (+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}): ${money(buildCost("solar"))}`;
+  buildBtn("buildSolar", "Solar + batteries", buildCost("solar"), `+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}`);
   $("buildSolar").disabled = S.funds < buildCost("solar") || acresFree() < POWER.solar.acres;
-  $("requestQueue").textContent = p.queue
-    ? (modelDone("utility") ? `Energizing +${mwText(p.queue.mw)} from your utility: ${time(p.queue.done - S.t)}` : `Interconnection queue: +${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`)
-    : modelDone("utility") ? `Energize +${mwText(countyOf().queueMW)} from your utility (${time(queueSecs())}): ${money(QUEUE_DEPOSIT)}`
-    : `Join the interconnection queue (+${mwText(countyOf().queueMW)} in ~${time(queueSecs())}): ${money(QUEUE_DEPOSIT)} deposit`;
+  if (p.queue) buildBtn("requestQueue", modelDone("utility") ? "Energizing from your utility" : "In the interconnection queue", null, `+${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`);
+  else if (modelDone("utility")) buildBtn("requestQueue", "Energize from your utility", QUEUE_DEPOSIT, `+${mwText(countyOf().queueMW)}, ${time(queueSecs())}`);
+  else buildBtn("requestQueue", "Join the interconnection queue", QUEUE_DEPOSIT, `+${mwText(countyOf().queueMW)} in ~${time(queueSecs())}, deposit`);
   $("requestQueue").disabled = !!p.queue || S.funds < QUEUE_DEPOSIT;
-  $("buyLand").textContent = `Buy the adjacent parcel (+${LAND.acres} acres): ${money(landCost())}`;
+  buildBtn("buyLand", "Buy the adjacent parcel", landCost(), `+${LAND.acres} acres`);
   $("buyLand").disabled = S.funds < landCost();
   const pending = p.builds.filter((b) => b.done > S.t).sort((a, b) => a.done - b.done);
   $("robotLine").hidden = !S.done.robots;
@@ -526,8 +524,13 @@ function renderCampus() {
     $("robotLine").textContent = `Robots: built ${built.length ? built.join(", ") : "nothing yet"} \u00b7 ` +
       (plan.blocked || `next: ${plan.kind === "colo" ? "a colo lease" : "a " + (noun[plan.kind] || plan.kind)} in ${Math.max(0, Math.ceil((p.robotsAt || 0) - S.t))}s`) + why;
   }
-  $("underway").textContent = pending.length
-    ? "Under construction: " + pending.map((b) => `${b.kind} ${time(b.done - S.t)}`).join(", ") : "";
+  {
+    // One line, grouped by kind: "Under construction: 4 halls (next 0:37), 1 solar farm (5:07)".
+    const noun = { hall: "hall", turbine: "turbine", solar: "solar farm", well: "well", reclaimed: "water plant" }, by = {};
+    for (const b of pending) (by[b.kind] = by[b.kind] || []).push(b);
+    $("underway").textContent = pending.length ? "Under construction: " + Object.entries(by).map(([k, bs]) =>
+      `${bs.length} ${noun[k] || k}${bs.length === 1 ? "" : "s"} (${bs.length > 1 ? "next " : ""}${time(bs[0].done - S.t)})`).join(", ") : "";
+  }
   renderContracts();
 }
 
@@ -635,7 +638,7 @@ function renderContracts() {
     $("offers").innerHTML = p.offers.length ? "" : `<div class="empty">No offers right now. They come every minute or two.</div>`;
     for (const o of p.offers) {
       const d = document.createElement("div"); d.className = "deal"; d.dataset.offer = o.id;
-      d.innerHTML = `<div class="line what"></div><div class="line sub fc"></div><div class="btns">` +
+      d.innerHTML = `<div class="line what"></div><div class="row"><span class="line sub fc"></span>` +
         `<button type="button" class="primary" data-accept="${o.id}"></button><button type="button" data-decline="${o.id}">Pass</button></div>`;
       $("offers").appendChild(d);
     }
@@ -643,11 +646,12 @@ function renderContracts() {
   for (const d of $("offers").querySelectorAll("[data-offer]")) {
     const o = p.offers.find((x) => x.id === d.dataset.offer); if (!o) continue;
     const f = forecast(o);
-    d.querySelector(".what").textContent = `${o.who}: ${mwText(o.mw)} of ${genName(o.minGen)} for ${time(o.term)}, starts in ${time(o.start - S.t)}. ${money(o.fee)}/s while delivered.`;
+    d.querySelector(".what").textContent = `${o.who}: ${mwText(o.mw)} of ${genName(o.minGen)} for ${time(o.term)}, starts in ${time(o.start - S.t)}, ${money(o.fee)}/s.`;
     const fc = d.querySelector(".fc");
     fc.className = "line sub fc " + forecastClass(f);
-    fc.textContent = `${f.text} Offer good for ${Math.ceil(o.expires - S.t)}s.`;
+    fc.textContent = f.text;
     d.querySelector("[data-accept]").textContent = `Sign: ${money(o.upfront)} up front`;
+    d.querySelector("[data-decline]").textContent = `Pass (${Math.ceil(o.expires - S.t)}s left)`;
   }
   // Running contracts collapse into one line; only contracts that can still need you are listed.
   const running = p.contracts.filter((c) => c.status === "active");
@@ -664,8 +668,8 @@ function renderContracts() {
     $("contracts").innerHTML = shown.length || running.length ? "" : `<div class="empty">Nothing signed.</div>`;
     for (const c of shown) {
       const d = document.createElement("div"); d.className = "deal"; d.dataset.contract = c.id;
-      d.innerHTML = `<div class="line st"></div>` + (!c.reneg && c.status !== "active"
-        ? `<div class="btns"><button type="button" data-reneg="${c.id}">Push the date ${time(RENEGOTIATE_SECS)} (−${RENEGOTIATE_HYPE} hype)</button></div>` : "");
+      d.innerHTML = `<div class="row"><span class="line st"></span>` + (!c.reneg && c.status !== "active"
+        ? `<button type="button" data-reneg="${c.id}">Push ${time(RENEGOTIATE_SECS)} (−${RENEGOTIATE_HYPE} hype)</button>` : "") + `</div>`;
       $("contracts").appendChild(d);
     }
   }
@@ -732,11 +736,16 @@ function pickVendor(id) {
   track("vendor", { id });
   say(vendorOf().quip);
 }
+// Campus buttons: name and price on top, the details underneath.
+function buildBtn(id, name, cost, detail) {
+  const html = `<span class="t">${name}${cost != null ? ": " + money(cost) : ""}</span><span class="c">${detail}</span>`;
+  if ($(id).dataset.html !== html) { $(id).innerHTML = html; $(id).dataset.html = html; }
+}
 function renderVendors() {
   const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
   $("vendorRow").hidden = !on;
   if (!on) return;
   const cur = vendorOf().id;
-  const html = VENDORS.map((v) => `<button type="button" data-vendor="${v.id}" class="${v.id === cur ? "on" : ""}" title="${v.blurb}">${v.name}: ${v.blurb}</button>`).join("");
+  const html = VENDORS.map((v) => `<button type="button" data-vendor="${v.id}" class="${v.id === cur ? "on" : ""}" aria-pressed="${v.id === cur}" title="${v.blurb}"><span class="t">${v.name}</span><span class="c">${v.blurb}</span></button>`).join("");
   if ($("vendors").dataset.html !== html) { $("vendors").innerHTML = html; $("vendors").dataset.html = html; }
 }

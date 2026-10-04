@@ -616,7 +616,8 @@ function renderPhase1() {
   $("gpuPrice").textContent = `${money(gpuPrice())} per ${nc.name}` + (basePrice() >= PMAX ? " (Parallax volume pricing)" : "");
   const room = roomNewest();
   const wallet = S.funds + S.credits;
-  $("failRow").hidden = S.fails === 0 || S.phase === 2;   // GPUs don't fail one by one in phase 2
+  $("failRow").hidden = S.fails === 0 || S.phase === 2;
+  $("p1site").hidden = $("p1power").hidden = S.phase === 2;   // phase 2 shows space on Campus and Fleet   // GPUs don't fail one by one in phase 2
   $("rentLine").hidden = S.phase === 2;                  // phase 2 shows rent on the colo button
   $("failed").textContent = S.failed.toLocaleString("en-US");
   $("rmaNote").textContent = inRMA() ? `(${inRMA().toLocaleString("en-US")} in RMA)` : (S.done.hands ? "(remote hands on it)" : "");
