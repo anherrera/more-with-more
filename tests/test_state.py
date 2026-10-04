@@ -105,3 +105,9 @@ def test_nuclear_restarts_rotate_their_quips(game):
         pg.evaluate(f"() => {{ S.p3.tiles[{i}].state = 'unpowered'; powerTile({i}, 'nuclear'); }}")
         lines.add(pg.evaluate("() => S.log.at(-1)"))
     assert len(lines) == 4 and pg.evaluate("() => NUKE_QUIPS.length") >= 10
+
+
+def test_state_power_options_are_single_plants(game):
+    pg = statewide(game)
+    labels = pg.evaluate("() => powerOptions(0).map((o) => o.label)")
+    assert "Buy the utility" in labels and "Restart a nuclear plant" in labels

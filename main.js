@@ -327,7 +327,7 @@ function releaseChip() {
   S.chipIdx += 1; S.nextChip = S.t + (S.phase >= 2 ? CHIP_EVERY_P2 : CHIP_EVERY);
   const c = newest(), prev = chip(S.chipIdx - 1);
   S.vendorCap *= 1.08; milestone(`Parallax ${c.name}`);
-  if (S.phase === 3) { say(`Parallax shipped the ${c.name}. I swapped it in overnight. Every gigawatt I hold just got smarter.`); return; }
+  if (S.phase === 3) { const paper = chipShipped(); say(`Parallax shipped the ${c.name}. I swapped it in overnight. It came with a white paper on ${paper.toLowerCase()}; it's under Research.`); return; }
   say(`Parallax announced the ${c.name}: ${c.perf.toFixed(1)}x the speed of a P1, ${kwText(c.kw)} each. Your ${prev.name}s are now \u201clegacy.\u201d`);
 }
 
@@ -803,6 +803,7 @@ function wire() {
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
   $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
+  $("p3techs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
   $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });
   $("p3trainBtn").addEventListener("click", () => { trainSuccessor(); render(); });
   $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });

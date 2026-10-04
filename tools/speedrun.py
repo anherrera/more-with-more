@@ -55,7 +55,8 @@ PHASE3 = """(secs) => {
     for (let k = 0; k < 3; k++) answerQuestion();
     if (S.p3.goodwill < 40 || S.p3.tiles[angriestTile()].opp >= 80) { const n = offeredNice().map(niceOf).filter((n) => S.p3.compute >= niceCost(n)).sort((a, b) => a.secs - b.secs)[0]; if (n) doNice(n.id); }
     if (S.p3.card) chooseP3Card(0);
-    const wild = S.p3.tiles.map((t, i) => i).filter((i) => S.p3.tiles[i].state === 'wild' && !(S.p3.tiles[i].moratorium > S.t))
+    { const tech = availableTech().sort((a, b) => a.secs - b.secs)[0]; if (tech && S.p3.compute >= 2 * techCost(tech)) buyTech(tech.id); }
+    const wild = S.p3.tiles.map((t, i) => i).filter((i) => ['wild', 'unplugged'].includes(S.p3.tiles[i].state) && !(S.p3.tiles[i].moratorium > S.t))
       .sort((a, b) => (heatOn() && S.p3.heat > 2.4 ? (traitOf(S.p3.tiles[b]).ocean || traitOf(S.p3.tiles[b]).cold ? 1 : 0) - (traitOf(S.p3.tiles[a]).ocean || traitOf(S.p3.tiles[a]).cold ? 1 : 0) : 0) || claimCost(a) - claimCost(b));
     if (wild.length && S.p3.compute >= claimCost(wild[0])) claim(wild[0]);
     step(1);
