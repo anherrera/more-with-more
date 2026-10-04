@@ -144,3 +144,12 @@ def test_the_ai_infrastructure_act_does_not_reach_orbit(game):
     note = pg.inner_text("#p3goodwillNote")
     assert "AI Infrastructure Act" not in note and "commission" not in note.lower()
     assert " I " in f" {note} "   # still in my voice
+
+
+def test_repeat_kindness_markup_has_a_ceiling(game):
+    pg = to_space(game)
+    nid = pg.evaluate("() => offeredNice()[0]")
+    first = pg.evaluate(f"() => niceCost(niceOf('{nid}'))")
+    for _ in range(12):
+        pg.evaluate(f"() => {{ doNice('{nid}'); }}")
+    assert pg.evaluate(f"() => niceCost(niceOf('{nid}'))") == pytest.approx(3 * first)

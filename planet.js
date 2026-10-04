@@ -412,7 +412,8 @@ const niceOf = (id) => NICE.find((n) => n.id === id);
 const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level || 0);
 // Kindness is priced in seconds of the compute I have now (the bigger I am, the more it takes to reassure people),
 // and repeating the same thing costs 30% more each time, until the next zoom.
-const niceCost = (n) => n.secs * computeRate() * Math.pow(1.3, (S.p3.niceUses || {})[n.id] || 0);
+const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
+const niceCost = (n) => n.secs * computeRate() * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, (S.p3.niceUses || {})[n.id] || 0));
 function offeredNice() {
   S.p3.nice = (S.p3.nice || []).filter((id) => niceOf(id) && niceOk(niceOf(id)));
   const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id));
