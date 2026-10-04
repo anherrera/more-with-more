@@ -339,3 +339,12 @@ def test_tiles_label_opposition_and_show_build_progress(game):
     w = pg.evaluate("() => parseFloat(document.querySelector('#p3map button[data-tile=\"0\"] .prog i').style.width)")
     assert 30 < w < 70
     assert not pg.is_visible("#p3map button[data-tile='1'] .prog")
+
+
+def test_headline_keeps_the_raw_gpu_count(game):
+    pg = planet(game)
+    pg.evaluate("() => render()")
+    assert pg.is_visible("#gpuTotal")
+    n = pg.evaluate("() => p3GPUs()")
+    assert f"{n:,} GPUs" in pg.inner_text(".count")
+    assert n == pg.evaluate("() => Math.round(onlineGW() * 1e6 / newest().kw)")

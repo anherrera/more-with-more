@@ -394,10 +394,13 @@ function goodwillCause() {
   return `Goodwill slips ${(60 * (0.04 + 0.03 * (S.p3.level || 0))).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs FLOPs; answering questions is free.`;
 }
 
+// Every gigawatt I hold, filled with the newest chip.
+const p3GPUs = () => Math.round(onlineGW() * 1e6 / newest().kw);
 const computeText = (x) => `${fmt(x)} EF`;   // exaFLOPS; later levels change the unit
 function renderPlanet() {
   $("p3").hidden = false;
-  $("countLabel").textContent = "Compute"; $("gpuCount").textContent = computeText(S.p3.compute); $("gpuTotal").hidden = true;
+  $("countLabel").textContent = "Compute"; $("gpuCount").textContent = computeText(S.p3.compute);
+  $("gpuTotal").hidden = false; $("gpuTotal").textContent = `${p3GPUs().toLocaleString("en-US")} GPUs`;   // the raw count, always, because it is ridiculous
   $("p3compute").textContent = computeText(S.p3.compute);
   $("p3rate").textContent = `${computeText(computeRate())}/s from ${mwText(onlineGW() * 1000)}` + (efficiency() > 1 ? ` (chips ${efficiency().toFixed(2)}x)` : "");
   // Build the buttons once per map; after that only their text, meters and disabled state change,
