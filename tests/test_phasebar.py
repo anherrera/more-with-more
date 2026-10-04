@@ -35,7 +35,7 @@ def test_final_ask_takes_over_the_bar_with_its_own_button(game):
     assert "go" in pg.get_attribute("#phaseBar", "class")
     pg.click("#phaseGo")
     assert pg.evaluate("() => modelOf().endedAt") is not None
-    assert "go" not in (pg.get_attribute("#phaseBar", "class") or "")
+    assert "begin phase 3" in pg.inner_text("#phaseGo").lower()       # the bar now offers phase 3
 
 
 def test_self_approving_countdown_shows_in_the_bar(game):

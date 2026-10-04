@@ -3,7 +3,7 @@ import pathlib, re
 from conftest import MID, run
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SCRIPTS = ["globals.js", "projects.js", "campus.js", "model.js", "market.js", "fires.js", "people.js", "main.js"]
+SCRIPTS = ["globals.js", "projects.js", "campus.js", "model.js", "market.js", "fires.js", "people.js", "planet.js", "main.js"]
 
 
 def test_scripts_load_in_order():

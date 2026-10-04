@@ -408,7 +408,7 @@ function step(dt) {
   stepLeaks();
   if (S.nextBuzz == null) S.nextBuzz = S.t + 120;
   if (S.phase <= 2 && S.gen >= 1 && S.t >= S.nextBuzz) buzz();
-  if (S.phase === 1) stepPhase1(dt); else stepCampus(dt);
+  if (S.phase === 1) stepPhase1(dt); else if (S.phase === 2) stepCampus(dt); else stepPlanet(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
   if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
   S.funds -= interestPerSec() * dt;
@@ -475,7 +475,25 @@ function hints() {
 }
 
 // ---------- render ----------
+function renderConsole() {
+  if (S.log.length !== lastLogLen || S.log[S.log.length - 1] !== lastLogTail) {
+    lastLogLen = S.log.length; lastLogTail = S.log[S.log.length - 1];
+    const con = $("console");
+    con.innerHTML = S.log.map((l) => `<div>${l}</div>`).join("");
+    con.scrollTop = con.scrollHeight;
+  }
+}
+
 function render() {
+  $("p3").hidden = S.phase !== 3;
+  document.querySelector(".cols").hidden = S.phase === 3;
+  if (S.phase === 3) {   // phase 3 has its own screen; phases 1-2 panels are folded away
+    $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> \u00b7 it reports to me now`;
+    renderConsole(); renderPhaseBar(); renderAlerts(); renderPlanet();
+    $("ending").hidden = $("ending2").hidden = true;
+    $("clock").textContent = `${time(S.t)} played`;
+    return;
+  }
   $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>`;
   $("creditsRow").hidden = S.gen < 1;
   $("credits").textContent = moneyFull(S.credits);
@@ -483,12 +501,7 @@ function render() {
   $("deal").hidden = S.gen < 1;
   $("deal").disabled = !dealReady();
   $("deal").textContent = dealReady() ? `Take Parallax's strategic investment: ${money(dealSize())} in credits` : `Parallax will call back in ${time(S.nextDeal - S.t)}`;
-  if (S.log.length !== lastLogLen || S.log[S.log.length - 1] !== lastLogTail) {
-    lastLogLen = S.log.length; lastLogTail = S.log[S.log.length - 1];
-    const con = $("console");
-    con.innerHTML = S.log.map((l) => `<div>${l}</div>`).join("");
-    con.scrollTop = con.scrollHeight;
-  }
+  renderConsole();
   $("funds").textContent = moneyFull(S.funds);
   $("credits").className = S.credits > 0 ? "hot" : "";
   $("debtRow").hidden = S.debt <= 0;
@@ -786,6 +799,7 @@ function wire() {
   $("rentRival").addEventListener("click", () => { rentRival(); render(); });
   $("retrofit").addEventListener("click", () => { retrofit(); render(); });
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
+  $("p3slider").addEventListener("input", (e) => { S.p3.slider = Number(e.target.value); render(); });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
   $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; lastOfferKey = lastContractKey = lastFleetKey = null; clockOn = false; render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
@@ -803,6 +817,7 @@ function start(data) {
   S.tier = highestType();
   if (saved && !saved.fleet) { S.fleet = S.gpus ? { 0: S.gpus } : {}; S.chipIdx = 0; S.nextChip = Math.max(S.t + 60, FIRST_CHIP_AT); }
   $("split").value = S.split;
+  if (S.p3) $("p3slider").value = S.p3.slider;
   ensureRun(); track("session", { resumedAt: Math.round(S.t) });
   wire();
   // A new game's clock waits for the first click (saved games keep going).

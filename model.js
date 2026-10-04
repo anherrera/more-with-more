@@ -153,7 +153,10 @@ function renderModel() {
 
 function wireModel() {
   $("propYes").addEventListener("click", () => { approveProposal(); render(); });
-  $("phaseGo").addEventListener("click", () => { approveProposal(); render(); });
+  $("phaseGo").addEventListener("click", () => {
+    if (S.phase === 2 && modelOf().endedAt != null) { startPlanet(); $("p3").classList.add("zoomin"); } else approveProposal();
+    render();
+  });
   $("propNo").addEventListener("click", () => { rejectProposal(); render(); });
 }
 
@@ -161,14 +164,17 @@ function wireModel() {
 function renderPhaseBar() {
   const bar = $("phaseBar"), go = $("phaseGo");
   let text, ask = false;
-  if (S.phase === 1) {
+  if (S.phase === 3) {
+    const held = S.p3.tiles.filter((t) => t.state === "online").length;
+    text = `Phase 3 of 3 \u00b7 County level: ${held} of ${P3_TILES} counties online. Hold ${P3_ZOOM_AT} to go statewide.`;
+  } else if (S.phase === 1) {
     text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."
       : `Phase 1 of 3 · Goal: reach Gen 6 (now Gen ${S.gen}), then break ground on your own campus.`;
   } else if (!S.p2 || !S.p2.county) {
     text = "Phase 2 of 3 · Pick a county for the campus.";
   } else {
     const m = modelOf(), en = energizedAt();
-    if (m.endedAt != null) text = "Phase 2 complete · The model is building the next one. Phase 3 is coming.";
+    if (m.endedAt != null) { ask = true; text = "Phase 2 complete. The model built the next one, and it has a map."; go.textContent = "Zoom out: begin phase 3"; go.disabled = false; }
     else if (m.final) {
       ask = true;
       text = `Phase 2 goal reached. The model asks: “${FINAL.title}.”` + (m.final.at != null ? ` It approves itself in ${Math.max(0, Math.ceil(m.final.at - S.t))}s.` : "");
