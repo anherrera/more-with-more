@@ -97,14 +97,16 @@ function chooseCard(i) {
 }
 
 // ---------- the town ----------
-const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.02, MORATORIUM_SECS = 120;
+const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.04, MORATORIUM_SECS = 120;
 const townOf = () => S.p2.town || (S.p2.town = { v: countyOf() ? countyOf().town : 20, jobs: 0, promises: 0, nextHall: null, moratorium: null });
 const moratoriumOn = () => !!(S.p2.town && S.p2.town.moratorium != null && S.t < S.p2.town.moratorium);
 // Builds started above 50 opposition take longer: permits, lawsuits, a guy with a sign.
 const townSlow = () => 1 + Math.max(0, (S.p2 && S.p2.town ? S.p2.town.v : 0) - 50) / 50;
 function townBuilt(kind) {
   const t = townOf();
-  t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba2 ? 0.5 : 1));
+  // The town gets used to you: every finished build makes the next one a little less of an event.
+  const familiar = 1 / (1 + S.p2.builds.filter((b) => b.done <= S.t).length / 20);
+  t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba2 ? 0.5 : 1) * familiar);
 }
 // Sponsorships: press any time; each costs double the last and helps a bit less. Late-game money still buys goodwill.
 const COOLDOWN = 60;   // sponsorships: one a minute, flat prices

@@ -248,3 +248,10 @@ def test_bifacial_panels_make_solar_better(game):
     assert pg.query_selector("button[data-id='bifacial']")
     pg.evaluate("() => buyProject('bifacial')")
     assert pg.evaluate("() => powerAt()") == before + 3 * 20
+
+
+def test_second_shift_makes_builds_faster(game):
+    pg = campus(game)
+    before = pg.evaluate("() => buildSecs('hall')")
+    pg.evaluate("() => { S.done.secondshift = true; }")
+    assert pg.evaluate("() => buildSecs('hall')") == pytest.approx(before * 0.75)

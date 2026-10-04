@@ -122,7 +122,7 @@ const specOf = (kind) => (kind === "hall" ? HALL : POWER[kind] || WATER[kind]);
 const LEARN = 0.95, LEARN_FLOOR = 0.4;
 const practice = (kind) => Math.max(LEARN_FLOOR, Math.pow(LEARN, S.p2.builds.filter((b) => b.kind === kind && b.done <= S.t).length));
 // How long a build started now takes: base time, prefab halls, practice, and the people slowing it down.
-const buildSecs = (kind) => specOf(kind).secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * practice(kind) * moraleSlow() * townSlow() * ceoSlow();
+const buildSecs = (kind) => specOf(kind).secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * practice(kind) * (S.done.secondshift ? 0.75 : 1) * moraleSlow() * townSlow() * ceoSlow();
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + specOf(b.kind).acres, 0);
 const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
 const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0) * (S.done.paytaxes ? 0.8 : 1) * townSlow();   // above 50 opposition, sellers want a premium too   // the county likes taxpayers

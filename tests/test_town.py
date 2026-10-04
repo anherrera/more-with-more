@@ -141,3 +141,19 @@ def test_town_hall_card_sits_in_community_and_tender_in_deals(game):
     assert pg.evaluate("() => !!document.querySelector('#townBox #card')")
     pg.evaluate("() => { S.p2.card = null; openCard('tender'); render(); }")
     assert pg.evaluate("() => !!document.querySelector('#colDeals #card')")
+
+
+def test_the_town_gets_used_to_you(game):
+    pg = campus(game, funds=1e10)
+    pg.evaluate("() => { townOf().v = 30; S.p2.extraAcres = 1e5; build('hall'); }")
+    first = pg.evaluate("() => townOf().v") - 30
+    pg.evaluate("() => { for (let i = 0; i < 40; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); townOf().v = 30; build('hall'); }")
+    later = pg.evaluate("() => townOf().v") - 30
+    assert 0 < later < first / 2
+
+
+def test_opposition_eases_faster(game):
+    pg = campus(game)
+    pg.evaluate("() => { townOf().v = 60; }")
+    run(pg, 60)
+    assert pg.evaluate("() => townOf().v") <= 60 - 2.4 + 0.01

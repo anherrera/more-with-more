@@ -125,7 +125,7 @@ const PROJECTS = [
   { id: "firecrew", phase: 0, title: "A 24/7 on-site fire crew", cost: scaledCost(2000, 10e6), desc: "They have their own chili cook-off. Fires are out in 1 minute instead of 2.",
     when: () => firesOf().n >= 1, buy: () => {} },
   { id: "secondshift", phase: 2, title: "Hire a second construction shift", cost: 20e6,
-    desc: "Twice the crews, half the overtime. Builds wear people down half as fast.", when: () => !!S.p2.people && S.p2.people.v < 60, buy: () => {} },
+    desc: "Twice the crews, half the overtime. Builds go 25% faster and wear people down half as fast.", when: () => !!S.p2.people && S.p2.people.v < 60, buy: () => {} },
   { id: "cba2", phase: 2, title: "Community benefits agreement", cost: 25e6,
     desc: "A new library, a splash pad and a 40-page PDF. Opposition \u221220 now, and it rises half as fast.", when: () => !!S.p2.town && S.p2.town.v >= 50,
     buy: () => { S.p2.town.v = Math.max(0, S.p2.town.v - 20); } },
