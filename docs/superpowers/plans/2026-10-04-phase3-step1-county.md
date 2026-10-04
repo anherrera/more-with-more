@@ -488,7 +488,8 @@ In `planet.js`:
 ```js
 const P3_MORATORIUM_AT = 90, P3_MORATORIUM_SECS = 60;
 const usefulShare = () => (100 - S.p3.slider) / 100;
-const NEIGHBORS = [[1, 3], [0, 2, 4], [1, 5], [0, 5, 6], [1, 6, 7], [2, 3, 7], [3, 4], [4, 5]];   // around the home tile
+// Tiles 0-7 fill grid cells 0,1,2,3,5,6,7,8 (home is cell 4); neighbors share an edge.
+const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7], [4, 6]];
 ```
 
 In `claim(i)`, after `t.state = "building"`:
