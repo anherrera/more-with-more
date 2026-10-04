@@ -8,9 +8,10 @@ cd "$(dirname "$0")/.."
 for f in *.js; do node --check "$f"; done
 npx --yes -p typescript@5.6 tsc -p .   # type-check the JS against tsconfig.json; nothing is built or emitted
 caffeinate -dimsu uv run --with pytest --with playwright --with pytest-rerunfailures --with pytest-xdist pytest -q --reruns 1 -n 4   # 4 browsers at once; a load hiccup gets one retry, a real bug fails twice; caffeinate: an idle Mac stalls the browsers
+# Whoever ships says who they are: SHIP_COAUTHOR="Claude Fable 5.1" tools/ship.sh "..." (default below).
 git add -A
 git commit -q -m "$1
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: ${SHIP_COAUTHOR:-Claude Opus 5.5 (1M context)} <noreply@anthropic.com>"
 git -C ../more-with-more-play checkout -q --detach main
 echo "shipped locally: $(git log --oneline -1)  (not pushed; run tools/publish.sh when ready for GitHub + the public site)"
