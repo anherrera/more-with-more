@@ -63,7 +63,7 @@ def test_hall_projects(game):
     assert pg.evaluate("() => hallMWAt()") == 150                  # two halls at 75 MW
     buy(pg, "prefab")
     pg.click("#buildHall")
-    assert pg.evaluate("() => S.p2.builds[S.p2.builds.length - 1].done - S.t") == pytest.approx(90 * 0.6)
+    assert pg.evaluate("() => S.p2.builds[S.p2.builds.length - 1].done - S.t") == pytest.approx(90 * 0.6 * 0.95 ** 2)   # two halls of practice
 
 
 def test_turbines_and_grid_projects(game):
@@ -187,11 +187,11 @@ def test_robots_lease_colo_when_a_contract_is_due_before_a_hall_could_finish(gam
     pg = campus(game)
     robots_on(pg, **{"S.funds": 1e10, "S.p2.market": 200})
     due(pg, 300, 45)
+    pg.evaluate("() => render()")
+    assert "A lab you have never heard of" in pg.inner_text("#robotLine")
     colo = pg.evaluate("() => S.p2.colo || 0")
     run(pg, 11)
     assert pg.evaluate("() => S.p2.colo || 0") > colo
-    pg.evaluate("() => render()")
-    assert "A lab you have never heard of" in pg.inner_text("#robotLine")
 
 
 def test_robots_spend_their_reserve_when_something_is_due(game):
@@ -203,3 +203,48 @@ def test_robots_spend_their_reserve_when_something_is_due(game):
     n = pg.evaluate("() => S.p2.builds.length")
     run(pg, 11)
     assert pg.evaluate("() => S.p2.builds.length") == n + 1
+
+
+def test_builds_get_faster_with_practice(game):
+    pg = campus(game)
+    first = pg.evaluate("() => buildSecs('hall')")
+    pg.evaluate("() => { for (let i = 0; i < 10; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
+    assert pg.evaluate("() => buildSecs('hall')") < first * 0.7
+    pg.evaluate("() => { for (let i = 0; i < 100; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
+    assert pg.evaluate("() => buildSecs('hall')") == pytest.approx(first * 0.4)
+    pg.evaluate("() => { S.funds = 1e10; S.p2.extraAcres = 1e5; build('hall'); }")
+    assert pg.evaluate("() => S.p2.builds.at(-1).done - S.t") == pytest.approx(first * 0.4)
+
+
+def test_robots_buy_land_when_they_run_out(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.funds": 1e10, "S.p2.grid": 99999})
+    pg.evaluate("() => { S.p2.extraAcres = -acresFree() + 5; }")
+    n = pg.evaluate("() => S.p2.landN || 0")
+    run(pg, 11)
+    assert pg.evaluate("() => S.p2.landN || 0") > n
+
+
+def test_rich_robots_place_several_builds_per_tick(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.funds": 1e10, "S.p2.grid": 99999})
+    n = pg.evaluate("() => S.p2.builds.length")
+    run(pg, 11)
+    assert pg.evaluate("() => S.p2.builds.length") - n >= 3
+
+
+def test_robots_energize_from_their_utility_first(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.funds": 1e10, "S.p2.grid": 0})
+    pg.evaluate("() => { S.p2.model.done.utility = true; S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
+    run(pg, 11)
+    assert pg.evaluate("() => !!S.p2.queue")
+
+
+def test_bifacial_panels_make_solar_better(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.funds = 1e10; S.p2.extraAcres = 1e5; for (let i = 0; i < 3; i++) S.p2.builds.push({kind: 'solar', done: 0, announced: true}); render(); }")
+    before = pg.evaluate("() => powerAt()")
+    assert pg.query_selector("button[data-id='bifacial']")
+    pg.evaluate("() => buyProject('bifacial')")
+    assert pg.evaluate("() => powerAt()") == before + 3 * 20

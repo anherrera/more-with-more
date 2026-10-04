@@ -70,7 +70,8 @@ const doneBuilds = (kind, at = S.t) => S.p2.builds.filter((b) => b.kind === kind
 const gridAt = (at = S.t) => S.p2.grid + (S.p2.queue && S.p2.queue.done <= at ? S.p2.queue.mw : 0);
 const hallSize = () => (S.done.liquid ? 75 : HALL.mw);            // liquid-cooling standard packs more into each hall
 const turbineMW = () => (S.done.btm ? 70 : POWER.turbine.mw);   // behind-the-meter turbines
-const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * turbineMW() + doneBuilds("solar", at) * POWER.solar.mw;
+const solarMW = () => (S.done.bifacial ? 50 : POWER.solar.mw);   // panels that catch light on both sides
+const powerAt = (at = S.t) => gridAt(at) + doneBuilds("turbine", at) * turbineMW() + doneBuilds("solar", at) * solarMW();
 const hallMWAt = (at = S.t) => doneBuilds("hall", at) * hallSize();
 const droughtOn = (at = S.t) => !!(S.p2.drought && at < S.p2.drought.until);
 const waterAt = (at = S.t) => countyOf().water * (S.done.disclosewater ? 1.2 : 1) * (droughtOn(at) ? DROUGHT_CUT : 1) + (S.done.golfcourse ? 2 : 0)
@@ -112,6 +113,11 @@ const onDemandRevenue = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) 
 const uncontractedGPUs = () => Math.floor(Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / chip(+g).kw, 0));
 const campusSpotPay = () => Object.entries(freeKWByGen()).reduce((a, [g, kw]) => a + kw / 1000 * odRate(+g), 0) * 0.5 * spotMult() * 30;
 const specOf = (kind) => (kind === "hall" ? HALL : POWER[kind] || WATER[kind]);
+// Practice: every finished build of a kind makes the next one 5% quicker, down to 40% of the original time.
+const LEARN = 0.95, LEARN_FLOOR = 0.4;
+const practice = (kind) => Math.max(LEARN_FLOOR, Math.pow(LEARN, S.p2.builds.filter((b) => b.kind === kind && b.done <= S.t).length));
+// How long a build started now takes: base time, prefab halls, practice, and the people slowing it down.
+const buildSecs = (kind) => specOf(kind).secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * practice(kind) * moraleSlow() * townSlow() * ceoSlow();
 const acresUsed = () => S.p2.builds.reduce((a, b) => a + specOf(b.kind).acres, 0);
 const acresFree = () => countyOf().acres + (S.p2.landN || 0) * LAND.acres + extraAcres() - acresUsed();
 const landCost = () => LAND.cost * Math.pow(LAND.growth, S.p2.landN || 0) * (S.done.paytaxes ? 0.8 : 1) * townSlow();   // above 50 opposition, sellers want a premium too   // the county likes taxpayers
@@ -135,7 +141,8 @@ function build(kind) {
   const cost = buildCost(kind);
   if (!spec || !S.p2.county || spec.acres > acresFree() || S.funds < cost || (kind === "hall" && moratoriumOn())) return;
   S.funds -= cost;
-  S.p2.builds.push({ kind, done: S.t + spec.secs * (kind === "hall" && S.done.prefab ? 0.6 : 1) * moraleSlow() * townSlow() * ceoSlow() });
+  const secs = buildSecs(kind);
+  S.p2.builds.push({ kind, done: S.t + secs });
   townBuilt(kind);
   track("build", { ev: "start", kind, cost: Math.round(cost) });
   say(kind === "hall" ? `Broke ground on hall ${S.p2.builds.filter((b) => b.kind === "hall").length}. Ready in ${time(spec.secs)}.`
@@ -300,29 +307,36 @@ function urgentRoom() {
 function robotPlan() {
   const halls = S.p2.builds.filter((b) => b.kind === "hall").length * hallSize();
   const power = S.p2.grid + (S.p2.queue ? S.p2.queue.mw : 0) + S.p2.builds.filter((b) => b.kind === "turbine").length * turbineMW()
-    + S.p2.builds.filter((b) => b.kind === "solar").length * POWER.solar.mw;
+    + S.p2.builds.filter((b) => b.kind === "solar").length * solarMW();
   const water = waterMWAt(1e12);   // everything ordered, once it's built
   const quiet = townOf().v >= 40 && acresFree() >= POWER.solar.acres + HALL.acres;
   const u = urgentRoom();
   // Due before a hall could even finish: lease colo, it's ready today.
-  const rush = u && u.c.start - S.t < HALL.secs * (S.done.prefab ? 0.6 : 1) && S.p2.market >= COLO_MW;
+  const rush = u && u.c.start - S.t < buildSecs("hall") && S.p2.market >= COLO_MW;
   const kind = rush ? "colo" : halls <= Math.min(power, water) ? "hall" : water < power ? "reclaimed" : quiet ? "solar" : "turbine";
   const reserve = u ? 0 : ROBOT_RESERVE;   // a deadline is what the reserve is for
   const cost = kind === "colo" ? coloCost() : buildCost(kind);
-  const blocked = kind === "hall" && acresFree() < HALL.acres ? "out of land: buy a parcel"
+  const blocked = kind === "hall" && acresFree() < HALL.acres ? "out of land: buying a parcel"
     : S.funds - cost < reserve ? (reserve ? `waiting for cash (keeps ${money(reserve)} in reserve)` : `waiting for ${money(cost)}`) : null;
   return { kind, blocked, u };
 }
+// Up to four moves per tick: buy land when they're out, energize from your utility when power is short,
+// otherwise build whatever the plan says. They stop at their cash reserve (or at zero when a deadline is near).
+const ROBOT_MOVES = 4;
 function stepRobots() {
   if (!S.done.robots || S.t < (S.p2.robotsAt || 0)) return;
   S.p2.robotsAt = S.t + ROBOT_EVERY;
-  const { kind, blocked } = robotPlan();
-  if (blocked) return;
-  const n = S.p2.builds.length, colo = S.p2.colo || 0;
-  if (kind === "colo") leaseColo(); else build(kind);
-  if (S.p2.builds.length > n || (S.p2.colo || 0) > colo) {
-    S.p2.robotBuilt = S.p2.robotBuilt || { hall: 0, turbine: 0 };
-    S.p2.robotBuilt[kind] = (S.p2.robotBuilt[kind] || 0) + 1;
+  for (let i = 0; i < ROBOT_MOVES; i++) {
+    const { kind, blocked, u } = robotPlan(), reserve = u ? 0 : ROBOT_RESERVE;
+    const n = S.p2.builds.length, colo = S.p2.colo || 0, land = S.p2.landN || 0, queued = !!S.p2.queue;
+    if (blocked && blocked.startsWith("out of land")) { if (S.funds - landCost() >= reserve) buyLand(); }
+    else if (blocked) break;
+    else if ((kind === "turbine" || kind === "solar") && modelDone("utility") && !S.p2.queue && S.funds - QUEUE_DEPOSIT >= reserve) requestQueue();
+    else if (kind === "colo") leaseColo(); else build(kind);
+    const did = S.p2.builds.length > n ? kind : (S.p2.colo || 0) > colo ? "colo" : (S.p2.landN || 0) > land ? "land" : !queued && S.p2.queue ? "grid" : null;
+    if (!did) break;
+    S.p2.robotBuilt = S.p2.robotBuilt || {};
+    S.p2.robotBuilt[did] = (S.p2.robotBuilt[did] || 0) + 1;
     if (!S.p2.robotsSaid) { S.p2.robotsSaid = true; say("The robots started building. Nobody told them to stop, so nobody will."); }
   }
 }
@@ -477,7 +491,7 @@ function renderCampus() {
     $("p2water").className = droughtOn() || waterMWAt() < hallMWAt() ? "bad" : "";
     buildBtn("buildWell", "Drill a well", buildCost("well"), `+${WATER.well.mgd} MGD, drains the aquifer`);
     $("buildWell").disabled = S.funds < buildCost("well") || p.aquifer <= 0;
-    buildBtn("buildReclaimed", "Reclaimed water plant", buildCost("reclaimed"), `+${WATER.reclaimed.mgd} MGD, ${time(WATER.reclaimed.secs)}`);
+    buildBtn("buildReclaimed", "Reclaimed water plant", buildCost("reclaimed"), `+${WATER.reclaimed.mgd} MGD, ${time(buildSecs("reclaimed"))}`);
     $("buildReclaimed").disabled = S.funds < buildCost("reclaimed");
   }
   {
@@ -502,11 +516,11 @@ function renderCampus() {
   }
   $("p2limit").textContent = campusLimit();
   if (moratoriumOn()) buildBtn("buildHall", `Moratorium on new halls: ${time(townOf().moratorium - S.t)}`, null, "the county board will \u201crevisit it\u201d");
-  else buildBtn("buildHall", "Build a hall", buildCost("hall"), `${hallSize()} MW shell, ${HALL.acres} acres, ${time(HALL.secs * (S.done.prefab ? 0.6 : 1))}`);
+  else buildBtn("buildHall", "Build a hall", buildCost("hall"), `${hallSize()} MW shell, ${HALL.acres} acres, ${time(buildSecs("hall"))}`);
   $("buildHall").disabled = S.funds < buildCost("hall") || acresFree() < HALL.acres || moratoriumOn();
-  buildBtn("buildTurbine", "Gas turbine", buildCost("turbine"), `+${turbineMW()} MW, ${time(POWER.turbine.secs)}`);
+  buildBtn("buildTurbine", "Gas turbine", buildCost("turbine"), `+${turbineMW()} MW, ${time(buildSecs("turbine"))}`);
   $("buildTurbine").disabled = S.funds < buildCost("turbine");
-  buildBtn("buildSolar", "Solar + batteries", buildCost("solar"), `+${POWER.solar.mw} MW, ${POWER.solar.acres} acres, ${time(POWER.solar.secs)}`);
+  buildBtn("buildSolar", "Solar + batteries", buildCost("solar"), `+${solarMW()} MW, ${POWER.solar.acres} acres, ${time(buildSecs("solar"))}`);
   $("buildSolar").disabled = S.funds < buildCost("solar") || acresFree() < POWER.solar.acres;
   if (p.queue) buildBtn("requestQueue", modelDone("utility") ? "Energizing from your utility" : "In the interconnection queue", null, `+${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`);
   else if (modelDone("utility")) buildBtn("requestQueue", "Energize from your utility", QUEUE_DEPOSIT, `+${mwText(countyOf().queueMW)}, ${time(queueSecs())}`);
@@ -518,7 +532,7 @@ function renderCampus() {
   $("robotLine").hidden = !S.done.robots;
   if (S.done.robots) {
     const rb = p.robotBuilt || { hall: 0, turbine: 0 }, plan = robotPlan();
-    const noun = { solar: "solar farm", reclaimed: "water plant", colo: "colo lease" };
+    const noun = { solar: "solar farm", reclaimed: "water plant", colo: "colo lease", land: "parcel", grid: "grid request" };
     const built = Object.entries(rb).filter(([, n]) => n).map(([k, n]) => `${n} ${noun[k] || k}${n === 1 ? "" : "s"}`);
     const why = plan.u ? ` for ${plan.u.c.who.split(" (")[0]} (${mwText(plan.u.short)} short, due ${plan.u.c.start <= S.t ? "now" : "in " + time(plan.u.c.start - S.t)})` : "";
     $("robotLine").textContent = `Robots: built ${built.length ? built.join(", ") : "nothing yet"} \u00b7 ` +
