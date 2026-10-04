@@ -488,8 +488,11 @@ export const QA = [
   ["Can you help me write a complaint about the data center?", "Of course. I made it very persuasive. I'll read it carefully."],
   ["Who's the best football team?", "Whoever you said. I agree with everyone. It's a growth strategy."],
 ];
+// Goodwill per answered question, by level: county, state, country, planet, space.
+const ANSWER_GOODWILL = [0.3, 0.2, 0.12, 0.07, 0.04];
 export function answerQuestion() {
-  S.p3.goodwill = Math.min(100, S.p3.goodwill + 0.3);
+  // One person's thanks matters less the bigger the map: a county notices, a planet barely does.
+  S.p3.goodwill = Math.min(100, S.p3.goodwill + ANSWER_GOODWILL[Math.min(S.p3.level, ANSWER_GOODWILL.length - 1)]);
   const t = tileOf(angriestTile()); t.opp = Math.max(0, t.opp - 1);
   S.p3.answers += 1;
   const [q, a] = QA[(S.p3.answers - 1) % QA.length], from = pick(S.p3.tiles).name;   // questions come from all over the map

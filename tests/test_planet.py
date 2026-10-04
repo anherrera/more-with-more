@@ -371,3 +371,9 @@ def test_kindness_scales_with_how_big_i_am(game):
     small = pg.evaluate("() => niceCost(niceOf('freetier'))")
     pg.evaluate("() => { S.p3.techMult = 10; }")
     assert pg.evaluate("() => niceCost(niceOf('freetier'))") == pytest.approx(small * 10)
+
+
+def test_one_answer_matters_less_at_every_scale(game):
+    pg = planet(game)
+    gains = pg.evaluate("""() => [0, 1, 2, 3, 4].map((lv) => { S.p3.level = lv; S.p3.tiles = freshTiles(lv); S.p3.goodwill = 50; answerQuestion(); return S.p3.goodwill - 50; })""")
+    assert gains == pytest.approx([0.3, 0.2, 0.12, 0.07, 0.04])
