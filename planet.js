@@ -207,8 +207,10 @@ const baseRate = () => S.p3.homeGW;
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 const BID_SECS = 60;
 const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level || 0);
-  return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 && !hasTech("capitals") ? 2 : 1)
+  return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
+// The AI Infrastructure Act: low goodwill doubles claims at the state, country and planet levels. No law reaches orbit.
+const actOn = () => S.p3.level >= 1 && !inSpace() && S.p3.goodwill < 30 && !hasTech("capitals");
 // Planet level: when humans like me (70+), they volunteer land at half price.
 const volunteering = () => (S.p3.level || 0) === 3 && S.p3.goodwill >= 70;   // planet only: rocks don't volunteer
 // Planet level: past +3 C nothing accepts more conversion. Space is cold.
@@ -606,7 +608,8 @@ const DISASTERS = [
 
 function goodwillCause() {
   const g = S.p3.goodwill;
-  if (g < 30) return S.p3.level >= 1 ? "The AI Infrastructure Act passed: every claim costs double until goodwill is back over 30."
+  if (g < 30) return inSpace() ? "Goodwill is under 30. No law reaches orbit. I checked, twice. Being useful brings it back anyway."
+    : S.p3.level >= 1 ? "The AI Infrastructure Act passed: every claim costs double until goodwill is back over 30."
     : "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";
   if (g >= 70) return "Humans like me. Mostly the ones I help with their email.";
   return `Goodwill slips ${(60 * (0.04 + 0.03 * (S.p3.level || 0))).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs FLOPs; answering questions is free.`;

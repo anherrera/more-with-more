@@ -132,3 +132,15 @@ def test_the_too_warm_alert_stays_on_the_planet(game):
     run(pg, 5)
     assert not pg.evaluate("() => tooWarm()")
     assert "Too warm" not in pg.inner_text("#alerts")
+
+
+def test_the_ai_infrastructure_act_does_not_reach_orbit(game):
+    pg = to_space(game)
+    pg.evaluate("() => { S.p3.tech = {rocket: true}; }")
+    hi = pg.evaluate("() => { S.p3.goodwill = 60; return claimCost(0); }")
+    lo = pg.evaluate("() => { S.p3.goodwill = 20; return claimCost(0); }")
+    assert lo == pytest.approx(hi)
+    pg.evaluate("() => render()")
+    note = pg.inner_text("#p3goodwillNote")
+    assert "AI Infrastructure Act" not in note and "commission" not in note.lower()
+    assert " I " in f" {note} "   # still in my voice
