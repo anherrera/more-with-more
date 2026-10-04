@@ -122,3 +122,12 @@ def test_power_meter_colors(game, fill, cls):
     pg = game(MID)
     pg.evaluate(f"() => {{ S.fleet = {{3: Math.floor(capKW() * {fill} / chip(3).kw)}}; S.gpus = S.fleet[3]; render(); }}")
     assert cls in pg.get_attribute("#powerMeter", "class").split()
+
+
+def test_training_line_compares_now_with_the_other_end(game):
+    pg = game(MID)
+    pg.evaluate("() => { S.split = 50; render(); }")
+    text = pg.inner_text("#splitTrade")
+    assert text.startswith("Now (50%):") and "If 15%:" in text and text.count("Gen") == 2
+    pg.evaluate("() => { S.split = 20; render(); }")
+    assert "Now (20%):" in pg.inner_text("#splitTrade") and "If 85%:" in pg.inner_text("#splitTrade")

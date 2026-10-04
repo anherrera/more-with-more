@@ -679,7 +679,7 @@ function renderPhase1() {
   $("trainMeter").firstElementChild.style.width = Math.min(100, 100 * S.progress / need) + "%";
   $("trainMeter").className = "meter " + (rate > 0 ? "good" : "bad");
   if (!S.spike) $("trainEta").textContent = rate > 0 ? `${pctDone}%, ${time((need - S.progress) / rate)} left` : `${pctDone}%, paused`;
-  // What the other end of the slider would buy you: with dynamic pricing, serving less raises the price, so revenue barely drops.
+  // Now versus the other end of the slider: with dynamic pricing, serving less raises the price, so revenue barely drops.
   {
     const alt = S.split < 50 ? 85 : 15, compute = workingGPUs() * avgPerf();
     const revAt = (split) => {
@@ -688,9 +688,11 @@ function renderPhase1() {
       if (S.done.dynprice) return cap * Math.max(0.0001, 0.25 * Math.pow(demandAt(0.25) / cap, 1 / 1.3));
       return Math.min(cap, demandAt(S.price)) * S.price;
     };
-    const altRate = compute * alt / 100 * trainMult(), show = S.gen >= 1 && compute > 0;
+    const rateAt = (split) => compute * split / 100 * trainMult(), show = S.gen >= 1 && compute > 0;
+    const genIn = (split) => (rateAt(split) > 0 ? time((need - S.progress) / rateAt(split)) : "never");
     $("splitTrade").hidden = !show;
-    if (show) $("splitTrade").textContent = `At ${alt}% training: Gen ${S.gen + 1} in ${time((need - S.progress) / altRate)}, revenue ${money(revAt(alt))}/s (now ${money(revAt(S.split))}/s)`;
+    if (show) $("splitTrade").textContent = `Now (${S.split}%): Gen ${S.gen + 1} in ${genIn(S.split)}, ${money(revAt(S.split))}/s \u00b7 ` +
+      `If ${alt}%: Gen ${S.gen + 1} in ${genIn(alt)}, ${money(revAt(alt))}/s`;
   }
 
   const cool = COOLING[S.cooling], cap = capKW(), used = usedKW();
