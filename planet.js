@@ -186,7 +186,7 @@ const POWER_LINES = {
 function powerTile(i, id) {
   const t = tileOf(i), o = powerOptions(i).find((x) => x.id === id);
   if (!t || t.state !== "unpowered" || !o || S.p3.compute < o.cost) return;
-  S.p3.compute -= o.cost; t.state = "powering"; t.done = S.t + o.secs; t.boost = o.boost || 1;
+  S.p3.compute -= o.cost; t.state = "powering"; t.started = S.t; t.done = S.t + o.secs; t.boost = o.boost || 1;
   if (o.goodwill) S.p3.goodwill = Math.max(0, S.p3.goodwill + o.goodwill);
   track("p3power", { i, id });
   say(POWER_LINES[id](t));
@@ -313,7 +313,7 @@ function claim(i) {
   if (!t || t.state !== "wild" || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm()) return;
   const volunteered = volunteering();
   S.p3.compute -= claimCost(i);
-  t.state = "building"; t.done = S.t + tileBuildSecs(i);
+  t.state = "building"; t.started = S.t; t.done = S.t + tileBuildSecs(i);
   t.opp = Math.min(100, t.opp + 15 * (traitOf(t).rise || 1));
   for (const j of NEIGHBORS[i]) {
     tileOf(j).opp = Math.min(100, tileOf(j).opp + 5);
@@ -406,7 +406,7 @@ function renderPlanet() {
   const key = S.p3.level + ":" + S.p3.tiles.map((t) => t.name).join("|");
   if ($("p3map").dataset.key !== key) {
     const cells = S.p3.tiles.map((t, i) => `<button type="button" data-tile="${i}"><span class="t">${t.name}</span><span class="c">${traitOf(t).name}</span>` +
-      `<span class="c st"></span><span class="meter"><i></i></span></button>`);
+      `<span class="c st"></span><span class="meter prog good" hidden><i></i></span><span class="c opp"></span><span class="meter oppm"><i></i></span></button>`);
     cells.splice(4, 0, `<button type="button" class="home" disabled><span class="t">Home</span><span class="c">${S.p3.level ? "the county I hold" : "the campus"}</span><span class="c st"></span></button>`);
     $("p3map").innerHTML = cells.join(""); $("p3map").dataset.key = key;
   }
@@ -417,8 +417,13 @@ function renderPlanet() {
       : frozen ? `moratorium ${time(t.moratorium - S.t)}` : t.state === "building" ? `building ${time(t.done - S.t)}`
       : t.state === "unpowered" ? "built, needs power" : t.state === "powering" ? `powering ${time(t.done - S.t)}`
       : tooWarm() ? "too warm to claim" : `claim: ${computeText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : volunteering() ? " (volunteered)" : ""}`;
-    const m = b.querySelector(".meter");
-    m.className = "meter " + (t.opp >= 75 ? "bad" : t.opp >= 50 ? "warn" : "good"); m.title = `Opposition ${Math.round(t.opp)}`;
+    // Two bars: build/power progress (only while it's happening) and opposition (always, labeled).
+    const pg = b.querySelector(".prog"), going = t.state === "building" || t.state === "powering";
+    pg.hidden = !going;
+    if (going) pg.firstElementChild.style.width = Math.min(100, 100 * (S.t - (t.started ?? S.t)) / Math.max(1, t.done - (t.started ?? S.t))) + "%";
+    b.querySelector(".opp").textContent = `opposition ${Math.round(t.opp)}`;
+    const m = b.querySelector(".oppm");
+    m.className = "meter oppm " + (t.opp >= 75 ? "bad" : t.opp >= 50 ? "warn" : "good"); m.title = `Opposition ${Math.round(t.opp)}`;
     m.firstElementChild.style.width = t.opp + "%";
     b.disabled = t.state !== "wild" || S.p3.compute < claimCost(i) || frozen;
   }

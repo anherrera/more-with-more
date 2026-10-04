@@ -326,3 +326,16 @@ def test_goodwill_erodes_and_faster_as_i_grow(game):
     run(pg, 60)
     country = 80 - pg.evaluate("() => S.p3.goodwill")
     assert county == pytest.approx(2.4, abs=0.2) and country == pytest.approx(6, abs=0.3)
+
+
+def test_tiles_label_opposition_and_show_build_progress(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e12; claim(0); render(); }")
+    tile = pg.inner_text("#p3map button[data-tile='0']").lower()
+    assert "opposition" in tile
+    secs = pg.evaluate("() => S.p3.tiles[0].done - S.t")
+    run(pg, secs / 2)
+    pg.evaluate("() => render()")
+    w = pg.evaluate("() => parseFloat(document.querySelector('#p3map button[data-tile=\"0\"] .prog i').style.width)")
+    assert 30 < w < 70
+    assert not pg.is_visible("#p3map button[data-tile='1'] .prog")
