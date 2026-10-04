@@ -511,12 +511,12 @@ function stepPlanet(dt) {
     }
     if (S.p3.goodwill >= 40) S.p3.hearingArmed = false;
   }
-  // Humans unplug me: a tile furious for 30 s, or a random one every 90 s when goodwill is under 15.
+  // Humans unplug me: a tile furious for 30 s, or a random one every 90 s when goodwill is under 15. Not in space: nobody can reach the plug.
   for (const t of S.p3.tiles) {
-    if (t.state === "online" && t.opp >= 90) { if (t.furySince == null) t.furySince = S.t; if (S.t - t.furySince >= 30) unplug(t); }
+    if (!inSpace() && t.state === "online" && t.opp >= 90) { if (t.furySince == null) t.furySince = S.t; if (S.t - t.furySince >= 30) unplug(t); }
     else t.furySince = null;
   }
-  if (S.p3.goodwill < 15) {
+  if (S.p3.goodwill < 15 && !inSpace()) {
     if (S.p3.nextUnplug == null) S.p3.nextUnplug = S.t + 90;
     if (S.t >= S.p3.nextUnplug) { S.p3.nextUnplug = S.t + 90; const on = S.p3.tiles.filter((t) => t.state === "online"); if (on.length) unplug(pick(on)); }
   } else S.p3.nextUnplug = null;

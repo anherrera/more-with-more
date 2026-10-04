@@ -115,3 +115,12 @@ def test_nothing_in_space_volunteers(game):
     pg = to_space(game)
     pg.evaluate("() => { S.p3.goodwill = 90; }")
     assert not pg.evaluate("() => volunteering()")
+
+
+def test_nothing_up_here_can_unplug_me(game):
+    pg = to_space(game)
+    assert "Nothing up here can unplug me" in pg.inner_text("#console")
+    pg.evaluate("() => { S.p3.tiles[0].state = 'online'; S.p3.tiles[0].opp = 95; S.p3.goodwill = 5; }")
+    run(pg, 95)
+    assert pg.evaluate("() => S.p3.tiles[0].state") == "online"
+    assert pg.evaluate("() => S.p3.tiles.filter((t) => t.state === 'unplugged').length") == 0
