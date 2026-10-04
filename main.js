@@ -1,7 +1,7 @@
 // main.js: phase 1 (the lab), the company screen phases 1 and 2 share, the PHASES table, the tick, wiring, start(),
 // and the debug surface (window.game). It is the page's only script: every other module is imported from here.
 import { $, $all, $q, chip, CHIP_EVERY, CHIP_EVERY_P2, COOLING, countAnswer, countAutoSwaps, ensureRun, FIRST_CHIP_AT, flush, fmt, fresh, GROUND_KW, hit, HYPE_TO_RAISE, KW_PER_GPU, kwText, load, milestone, MODEL_LINES, money, moneyFull, mwText, rebuildOn, RENT_EXP, RENT_K, ROUNDS, S, save, SAVE_VERSION, say, setState, snap, time, track, TYPES, unMojibake } from "./globals.js";
-import { PROJECTS, projectCost } from "./projects.js";
+import { projectChips, projectCost, PROJECTS } from "./projects.js";
 import { campusDealSize, campusDrawSize, campusKWAt, campusRevenue, campusRound, campusSpotPay, COLO_MW, COLO_RACKS, freeKWByGen, migrateCampus, P2_RATE, raiseCampus, renderCampusPhase, renderRaiseCampus, renderVendors, roundNoteCampus, spotLineCampus, startCampus, stepCampus, uncontractedGPUs, vendorOf, waitingOnCounty, wireCampus } from "./campus.js";
 import { campusGo, gpuDiscount } from "./model.js";
 import { DILUTION, deriveCap, dilute, publicRaise, renderMarket } from "./market.js";
@@ -609,7 +609,7 @@ export function renderCompany() {
     for (const p of avail) {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.id = p.id;
-      b.innerHTML = `<span class="t"></span><span class="c">${p.desc}</span>`;
+      b.innerHTML = `<span class="t"></span><span class="fxs">${projectChips(p).map((c) => `<span class="fx ${c.kind}">${c.text}</span>`).join("")}</span><span class="c">${p.desc}</span>`;
       el.appendChild(b);
     }
   });

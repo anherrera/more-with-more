@@ -146,3 +146,50 @@ export const PROJECTS = [
   { id: "driptrays", phase: 2, title: "Drip trays", cost: 15e6,
     desc: "A $40 idea in a $15M rollout. Leaks no longer kill GPUs.", when: () => leaksOf().n >= 1, buy: () => {} },
 ];
+
+// ---------- effect chips ----------
+// Small tags on each project button saying what it touches, read from the project's own description so they can't drift.
+// kind: hype (Investors), cost (spends hype), money (demand, contracts, prices), ops (cooling, power, builds, water),
+// town (opposition), risk (fires, leaks, crashes), auto (does something for you).
+/** @type {[RegExp, (m: RegExpMatchArray) => string[]][]} */
+const FX_RULES = [
+  [/\+(\d+) hype/, (m) => [`+${m[1]} hype`, "hype"]],
+  [/Demand x(\d+(?:\.\d+)?)/, (m) => [`demand ×${m[1]}`, "money"]],
+  [/Training \+(\d+)%/, (m) => [`training +${m[1]}%`, "money"]],
+  [/(\d+) kW per rack/, (m) => [`cooling: ${m[1]} kW/rack`, "ops"]],
+  [/[Cc]ontracts pay (\d+)% more|pay (\d+)% more up front|pay (\d+)% more/, (m) => [`contracts +${m[1] || m[2] || m[3]}%`, "money"]],
+  [/Offers arrive (\d+)% more often/, (m) => [`offers +${m[1]}%`, "money"]],
+  [/Offers are (\d+)% bigger/, (m) => [`bigger offers`, "money"]],
+  [/\+(\d+) MW of grid/, (m) => [`+${m[1]} MW grid`, "ops"]],
+  [/(\d+) MW instead of (\d+)/, (m) => [`${m[2]}→${m[1]} MW`, "ops"]],
+  [/build (\d+)% faster|go (\d+)% faster/, (m) => [`builds +${m[1] || m[2]}%`, "ops"]],
+  [/queue moves (\d+)% faster/, (m) => [`queue +${m[1]}%`, "ops"]],
+  [/[Ww]ater allocation \+(\d+)%/, (m) => [`water +${m[1]}%`, "ops"]],
+  [/\+(\d+) MGD/, (m) => [`+${m[1]} MGD water`, "ops"]],
+  [/half the water/, () => ["water ½", "ops"]],
+  [/Opposition −(\d+)/, (m) => [`opposition −${m[1]}`, "town"]],
+  [/land (\d+)% cheaper/, (m) => [`land −${m[1]}%`, "money"]],
+  [/Fires happen half as often/, () => ["fires ½ as often", "risk"]],
+  [/Fires are half as big/, () => ["fires ½ as big", "risk"]],
+  [/Fires are out in/, () => ["fires shorter", "risk"]],
+  [/Leaks are found/, () => ["leaks shorter", "risk"]],
+  [/Leaks no longer kill/, () => ["leaks harmless", "risk"]],
+  [/Debt draws (\d+)% bigger/, (m) => [`draws +${m[1]}%`, "money"]],
+  [/New GPUs cost (\d+)% less/, (m) => [`GPUs −${m[1]}%`, "money"]],
+];
+const FX_EXTRA = {
+  dynprice: [["auto price", "auto"]], hands: [["auto GPU swaps", "auto"]], autockpt: [["auto rollback", "auto"]],
+  ground: [["phase 2", "money"]], substation: [["power caps ×2", "ops"]], refurb: [["trade-ins +15", "money"]],
+  inference: [["old chips earn ×2", "money"]], robots: [["auto build", "auto"]], hallucinate: [["crashes ½", "risk"]],
+  honestcall: [["steadier stock", "risk"]], evals: [["posts +50% hype", "hype"]], keynote: [["viral ×2", "hype"]],
+  modelcard: [["hype fades slower", "hype"]], ratepayer: [], waterpositive: [], secondshift: [["morale drain ½", "town"]],
+  cba2: [["opposition rises ½", "town"]], sovereign2: [["sovereign funds +30%", "money"]],
+};
+export function projectChips(p) {
+  const out = [];
+  if (p.hype) out.push({ text: `−${p.hype} hype`, kind: "cost" });
+  for (const [re, f] of FX_RULES) { const m = p.desc.match(re); if (m) { const [text, kind] = f(m); if (!out.some((c) => c.text === text)) out.push({ text, kind }); } }
+  for (const [text, kind] of FX_EXTRA[p.id] || []) if (!out.some((c) => c.text === text)) out.push({ text, kind });
+  return out;
+}
+

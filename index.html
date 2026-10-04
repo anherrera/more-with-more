@@ -81,6 +81,12 @@
   #projects { display: grid; gap: 6px; align-content: start; height: 18em; overflow-y: auto; padding-right: 4px; }   /* fixed height: new projects never shove the panels below */
   #projects button { width: 100%; padding: 4px 8px; }
   #projects .t { display: block; }
+  /* effect chips: what a project touches, at a glance */
+  #projects .fxs { display: flex; flex-wrap: wrap; gap: 3px; margin: 2px 0 1px; }
+  .fx { font: 11px/1.3 var(--mono); padding: 0 5px; border: 1px solid currentColor; border-radius: 3px; color: var(--muted); }
+  .fx.hype { color: var(--accent); } .fx.cost { color: var(--bad); } .fx.money { color: var(--good); }
+  .fx.town, .fx.risk { color: var(--ink); opacity: .75; }
+  #projects button:disabled .fx { opacity: .55; }
   #projects .c { display: block; font-size: 12px; color: var(--muted); }
   #projects button:disabled .c { color: var(--btn-off); }
   .choices { display: grid; gap: 6px; }
