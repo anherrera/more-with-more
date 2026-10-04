@@ -45,6 +45,8 @@ const fresh = () => ({
   t: 0, funds: 0, price: 0.25, gpus: 0, queue: 5, served: 0, gpuSeconds: 0, phase: 1, p2: null, p3: null,
   split: 50, gen: 0, progress: 0, hype: 20, tier: 0, cooling: 0, round: 0, leases: { rack: 1 }, powerBoost: 1, coolingV2: true, fleet: {}, chipIdx: 0, nextChip: 300,
   leaseCool: { rack: { 0: 1 } }, rival: { px: 40, prev: 40, next: 150, n: 0 }, rentals: 0, rentUntil: 0,
+  fires: { next: null, out: null, payout: null, premium: 0, n: 0, lost: 0 }, leaks: { next: null, out: null, n: 0, lost: 0 },
+  cap: { shares: 1e9, founder: 1e9, liquidity: 0, lastVal: 0 },
   demandMult: 1, done: {}, log: ["A model with no name is waiting for its first question."], ended: false,
   credits: 0, vendorCap: 2e12, roundTrip: 0, nextDeal: 0, deals: 0, hints: {}, debt: 0, nextDraw: 0, draws: 0, failed: 0, rma: [], spike: null, lastCkpt: 0, fails: 0, spikes: 0, nextPost: 0, posts: 0, fatigue: 0, runId: null, chunkNo: 0, milestones: [], started: null, spotHist: [], spotWalk: 0, block: null, spotSales: 0,
 });

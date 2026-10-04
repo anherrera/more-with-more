@@ -854,6 +854,7 @@ function start(data) {
   const saved = (data && data.state) || load();
   if (saved) { S = Object.assign(fresh(), saved); if (!saved.logV2) { S.log = S.log.slice().reverse(); } S.log = S.log.map(unMojibake); }
   S.logV2 = true;
+  if (saved && !saved.cap) S.cap = deriveCap();   // saves from before the cap table
   if (S.p2) migrateCampus();
   if (S.p3 && S.p3.zoomSaid && (S.p3.level || 0) < LEVELS.length - 1) S.p3.zoomSaid = false;   // a save that hit a placeholder: that level exists now
   if (saved && !saved.leases) { S.leases = { [TYPES[saved.tier || 0].id]: 1 }; }          // old saves: one of the tier they had

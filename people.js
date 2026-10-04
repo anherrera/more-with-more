@@ -10,7 +10,8 @@ const QUIT_LINES = [
   "The construction lead left to farm alpacas. He sent a photo. The alpacas look rested.",
 ];
 
-const moraleOf = () => S.p2.people || (S.p2.people = { v: MORALE_START, nextQuit: null, lastTender: -1e9 });
+const freshPeople = () => ({ v: MORALE_START, nextQuit: null, lastTender: -1e9 });
+const moraleOf = () => S.p2.people;   // created with the campus (startCampus) or on load (migrateCampus)
 const buildsInFlight = () => S.p2.builds.filter((b) => b.done > S.t).length;
 const lateContracts = () => S.p2.contracts.filter((c) => c.status === "late").length;
 const incidents = () => (firesOf().out ? 1 : 0) + (leaksOf().out ? 1 : 0);
@@ -20,7 +21,7 @@ const moraleDrain = () => (0.04 * Math.sqrt(buildsInFlight()) * (S.done.secondsh
 // Builds started below 50 morale take longer, up to twice as long at zero.
 const moraleSlow = () => 1 + Math.max(0, 50 - (S.p2 && S.p2.people ? S.p2.people.v : MORALE_START)) / 50;
 // Perks: three on offer at a time; using one swaps it for another. One perk per 45 s, and each helps
-// less every time you repeat it (the third offsite is a Zoom call).
+// less every time you repeat it (the third offsite is a Zoom call). The deck is refilled by step() and usePerk(), never by a redraw.
 const PERK_COOLDOWN = 45, PERK_FADE = 0.7;
 const PERKS = [
   { id: "pizza", name: "Pizza party", cost: 1e6, gain: 8, line: "Pizza party. People were genuinely happy, which surprised everyone." },
@@ -38,10 +39,10 @@ const PERKS = [
 const perkOf = (id) => PERKS.find((p) => p.id === id);
 const perkWait = () => Math.max(0, (moraleOf().perkAt ?? -1e9) + PERK_COOLDOWN - S.t);
 const perkGain = (p) => p.gain * Math.pow(PERK_FADE, (moraleOf().perkUses || {})[p.id] || 0);
-function offeredPerks() {
+function offeredPerks(used) {   // used: the perk just spent, which doesn't come straight back
   const m = moraleOf();
   m.perks = (m.perks || []).filter((id) => perkOf(id) && (!perkOf(id).when || perkOf(id).when()));
-  const pool = PERKS.filter((p) => !m.perks.includes(p.id) && (!p.when || p.when()));
+  const pool = PERKS.filter((p) => !m.perks.includes(p.id) && p.id !== used && (!p.when || p.when()));
   while (m.perks.length < 3 && pool.length) m.perks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
   return m.perks;
 }
@@ -53,7 +54,7 @@ function usePerk(id) {
   m.perkUses = m.perkUses || {}; m.perkUses[id] = (m.perkUses[id] || 0) + 1; m.perkN = (m.perkN || 0) + 1; m.perkAt = S.t;
   if (p.hype) S.hype += p.hype;
   if (p.slip) for (const b of S.p2.builds) if (b.done > S.t) b.done += p.slip;
-  m.perks = (m.perks || []).filter((x) => x !== id); offeredPerks();
+  m.perks = (m.perks || []).filter((x) => x !== id); offeredPerks(id);
   track("perk", { id });
   say(p.line);
 }
@@ -98,7 +99,8 @@ function chooseCard(i) {
 
 // ---------- the town ----------
 const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.04, MORATORIUM_SECS = 120;
-const townOf = () => S.p2.town || (S.p2.town = { v: countyOf() ? countyOf().town : 20, jobs: 0, promises: 0, nextHall: null, moratorium: null });
+const freshTown = () => ({ v: countyOf() ? countyOf().town : 20, jobs: 0, promises: 0, nextHall: null, moratorium: null });
+const townOf = () => S.p2.town;   // created when the county is picked (chooseCounty) or on load (migrateCampus)
 const moratoriumOn = () => !!(S.p2.town && S.p2.town.moratorium != null && S.t < S.p2.town.moratorium);
 // Builds started above 50 opposition take longer: permits, lawsuits, a guy with a sign.
 const townSlow = () => 1 + Math.max(0, (S.p2 && S.p2.town ? S.p2.town.v : 0) - 50) / 50;
@@ -171,6 +173,7 @@ function stepTown(dt) {
 
 function stepPeople(dt) {
   const m = moraleOf(), drain = moraleDrain();
+  offeredPerks();
   m.v = Math.max(0, Math.min(100, m.v + (MORALE_REST - drain) * dt));
   if (m.v < 25) {
     if (m.nextQuit == null) m.nextQuit = S.t + 60;
@@ -202,7 +205,7 @@ function renderPeople() {
   $("moraleMeter").className = "meter " + (m.v < 25 ? "bad" : m.v < 50 ? "warn" : "good");
   $("moraleCause").textContent = moraleCause();
   const wait = perkWait();
-  const html = offeredPerks().map((id) => { const p = perkOf(id);
+  const html = (m.perks || []).map((id) => { const p = perkOf(id);
     return `<button type="button" data-perk="${id}">${p.name} (+${Math.round(perkGain(p))}): ${p.cost ? money(p.cost) : "free"}</button>`; }).join("")
     + (wait > 0 ? `<span class="sub"> next perk in ${Math.ceil(wait)}s</span>` : "");
   if ($("perks").dataset.html !== html) { $("perks").innerHTML = html; $("perks").dataset.html = html; }
@@ -238,7 +241,8 @@ const MANDATES = {
     hello: "brought 400 slides of process. Customers love it. Every build needs three more sign-offs." },
 };
 const CEO_NAMES = ["Brentley Vance", "Dana Okafor-Reyes", "Chip Hollister", "Margaux Lindqvist", "Tad Pemberton III", "Priya Castellano", "Rex Moldova"];
-const ceoOf = () => S.p2.ceo || (S.p2.ceo = { n: 0, strikes: 0, mandate: null, name: "you", lastAt: -1e9 });
+const freshCeo = () => ({ n: 0, strikes: 0, mandate: null, name: "you", lastAt: -1e9 });
+const ceoOf = () => S.p2.ceo;   // created with the campus (startCampus) or on load (migrateCampus)
 const mandate = () => (S.phase === 2 && S.p2 && S.p2.ceo && S.p2.ceo.mandate ? MANDATES[S.p2.ceo.mandate] : null);
 const ceoBuild = () => (mandate() ? mandate().build : 1);
 const ceoSlow = () => (mandate() ? mandate().slow : 1);

@@ -23,7 +23,7 @@ function deriveCap() {
   if (last) c.lastVal = last.amount / DILUTION[last.name];
   return c;
 }
-const capOf = () => S.cap || (S.cap = deriveCap());
+const capOf = () => S.cap;   // created in fresh(); older saves derive it in start()
 const ownership = () => capOf().founder / capOf().shares;
 
 // Mint shares for a raise: the new holders get `fraction` of the company after the round.

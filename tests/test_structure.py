@@ -55,3 +55,49 @@ def test_page_is_standards_mode_with_a_viewport(game):
     assert re.search(r'<meta name="viewport" content="width=device-width, initial-scale=1">', html)
     pg = game()
     assert pg.evaluate("() => document.compatMode") == "CSS1Compat"
+
+
+# render() only reads: it never creates state or rolls dice, so a redraw can't change the game or a save.
+RNG_COUNTER = "() => { window.__rng = 0; const r = Math.random; Math.random = () => { window.__rng++; return r(); }; }"
+
+
+def assert_render_is_read_only(pg):
+    pg.evaluate(RNG_COUNTER)
+    before = pg.evaluate("() => JSON.stringify(S)")
+    pg.evaluate("() => { window.__rng = 0; render(); render(); }")
+    assert pg.evaluate("() => JSON.stringify(S)") == before
+    assert pg.evaluate("() => window.__rng") == 0
+
+
+def test_render_is_read_only_in_phase1(game):
+    assert_render_is_read_only(game(MID))
+
+
+def test_render_is_read_only_in_phase2(game):
+    from test_phasebar import campus
+    pg = campus(game)
+    pg.evaluate("() => { moraleOf().perks = []; }")   # an empty perk deck is refilled by step(), not by a redraw
+    assert_render_is_read_only(pg)
+
+
+def test_render_is_read_only_in_phase3(game):
+    from test_planet import planet
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.nice = []; }")
+    assert_render_is_read_only(pg)
+
+
+def test_render_is_read_only_in_space(game):
+    from test_space import to_space
+    assert_render_is_read_only(to_space(game))
+
+
+def test_a_loaded_save_has_every_field_before_the_first_render(game):
+    from test_phasebar import campus
+    pg = campus(game)
+    pg.evaluate("() => { delete S.fires; delete S.leaks; delete S.cap; delete S.p2.people; delete S.p2.town; delete S.p2.ceo; delete S.p2.model; save(); }")
+    pg.reload()
+    have = pg.evaluate("() => [S.fires, S.leaks, S.cap, S.p2.people, S.p2.town, S.p2.ceo, S.p2.model].map((x) => !!x)")
+    assert have == [True] * 7
+    assert pg.evaluate("() => S.p2.town.v") == 20                        # the strong-grid county's starting opposition
+    assert pg.evaluate("() => ownership()") < 1                           # the cap table is rebuilt from the rounds raised

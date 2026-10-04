@@ -4,7 +4,7 @@
 
 const GOAL_MW = 1000, SELF_APPROVE_AT = 70, FINAL_COUNTDOWN = 30, REJECT_WAIT = 240, REJECT_GROWTH = 1.3;
 const freshModel = () => ({ autonomy: 0, current: null, rejected: {}, next: {}, done: {}, final: null, endedAt: null, nextLine: 0 });
-const modelOf = () => S.p2.model || (S.p2.model = freshModel());
+const modelOf = () => S.p2.model;   // created with the campus (startCampus) or on load (migrateCampus)
 const modelDone = (id) => !!(S.p2 && S.p2.model && S.p2.model.done[id]);
 const scaleOf = (id) => Math.pow(REJECT_GROWTH, modelOf().rejected[id] || 0);   // every "no" makes the next ask bigger
 

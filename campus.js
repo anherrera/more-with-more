@@ -388,7 +388,10 @@ const campusDealSize = () => 20000 / newest().kw * gpuPrice();   // Parallax cre
 
 // Saves from before chip generations mattered: default missing fields.
 function migrateCampus() {
-  modelOf();
+  if (!S.p2.model) S.p2.model = freshModel();
+  if (!S.p2.people) S.p2.people = freshPeople();
+  if (!S.p2.ceo) S.p2.ceo = freshCeo();
+  if (!S.p2.town && S.p2.county) S.p2.town = freshTown();
   if (S.p2.startChip == null) S.p2.startChip = S.chipIdx;
   if (S.p2.market == null) S.p2.market = MARKET_START_MW;
   for (const x of [...S.p2.offers, ...S.p2.contracts]) if (x.minGen == null) x.minGen = 0;
@@ -396,7 +399,7 @@ function migrateCampus() {
 
 function startCampus() {
   if (S.phase === 2) return;
-  S.phase = 2; S.p2 = freshP2(); S.p2.startChip = S.chipIdx; S.p2.model = freshModel();
+  S.phase = 2; S.p2 = freshP2(); S.p2.startChip = S.chipIdx; S.p2.model = freshModel(); S.p2.people = freshPeople(); S.p2.ceo = freshCeo();
   milestone("phase 2: the campus");
   say("We are an infrastructure company now.");
   say(`Your ${mwText(usedKW() / 1000)} of GPUs stay in the space you already lease. Whatever isn't under contract sells on-demand. The model has opinions about which county is next.`);
@@ -406,7 +409,7 @@ function startCampus() {
 function chooseCounty(id) {
   const c = COUNTIES.find((x) => x.id === id);
   if (!c || S.p2.county) return;
-  S.p2.county = c.id; S.p2.grid = c.gridMW; S.funds += c.cash;
+  S.p2.county = c.id; S.p2.grid = c.gridMW; S.funds += c.cash; S.p2.town = freshTown(); offeredPerks();
   makeOffer(true); S.p2.nextOffer = S.t + 90;
   milestone(`county: ${c.name}`); track("county", { id: c.id });
   say(`Bought land in the ${c.name.toLowerCase()} county. The model: “The river is underutilized.”`);

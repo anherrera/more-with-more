@@ -128,3 +128,12 @@ def test_no_tender_offer_once_public(game):
     pg.evaluate("() => { S.p2.ipo = {at: S.t}; moraleOf().v = 40; }")
     run(pg, 2)
     assert pg.evaluate("() => S.p2.card") is None
+
+
+def test_a_used_perk_does_not_come_straight_back(game):
+    pg = campus(game, funds=1e10)
+    for _ in range(12):
+        pg.evaluate("() => { moraleOf().v = 30; moraleOf().perkAt = -1e9; }")
+        first = pg.evaluate("() => offeredPerks()[0]")
+        pg.evaluate(f"() => usePerk('{first}')")
+        assert first not in pg.evaluate("() => moraleOf().perks")

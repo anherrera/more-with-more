@@ -14,7 +14,7 @@ const ROOT_CAUSES = [
   "the thermal camera was pointed at the break room",
 ];
 
-const firesOf = () => S.fires || (S.fires = { next: null, out: null, payout: null, premium: 0, n: 0, lost: 0 });
+const firesOf = () => S.fires;   // created in fresh()
 const firesOn = () => (S.phase === 1 ? S.gen >= 2 : S.phase === 2 && !!S.p2 && !!S.p2.county);
 // r in [0, 1): where in the range this fire lands. Suppression makes them rarer; new UPS batteries make them smaller.
 const fireGap = (r) => (FIRE_EVERY[0] + r * (FIRE_EVERY[1] - FIRE_EVERY[0])) * (S.done.suppression ? 2 : 1) * vendorOf().fire;
@@ -82,7 +82,7 @@ const LEAK_CAUSES = [
   "someone asked the model whether the pipes were fine and it said yes",
 ];
 const leakGap = (r) => (LEAK_EVERY[0] + r * (LEAK_EVERY[1] - LEAK_EVERY[0])) * vendorOf().leak;
-const leaksOf = () => S.leaks || (S.leaks = { next: null, out: null, n: 0, lost: 0 });
+const leaksOf = () => S.leaks;   // created in fresh()
 const leaksOn = () => S.phase === 2 && !!S.p2 && !!S.p2.county && ["dlc", "immersion", "twophase", "liquid"].some((k) => S.done[k]);
 
 function startLeak() {

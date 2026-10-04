@@ -120,6 +120,7 @@ function startPlanet() {
   if (S.phase !== 2 || !S.p2 || !S.p2.model || S.p2.model.endedAt == null) return;
   S.phase = 3; S.p3 = freshP3();
   S.p3.compute = 90 * baseRate();   // ninety seconds of compute up front: the company, liquidated into me
+  offeredNice();
   // Whatever was on fire or leaking in the campus is the robots' problem now.
   firesOf().out = null; firesOf().payout = null; leaksOf().out = null;
   milestone("phase 3: the map");
@@ -351,6 +352,7 @@ function chooseP3Card(choice) {
 // ---------- being nice: it costs FLOPs (or a click) ----------
 const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
 // Ways to be nice: three on offer, the one I use swaps out, and the deck changes with the scale.
+// The deck is refilled by step() and by the actions that change it, never by a redraw.
 // secs = cost in seconds of my compute; goodwill; all = calms every tile; angriest = calms the angriest tile.
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const NICE = [
@@ -414,9 +416,9 @@ const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level || 0);
 // and repeating the same thing costs 30% more each time, until the next zoom.
 const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
 const niceCost = (n) => n.secs * computeRate() * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, (S.p3.niceUses || {})[n.id] || 0));
-function offeredNice() {
+function offeredNice(used) {   // used: the kindness just spent, which doesn't come straight back
   S.p3.nice = (S.p3.nice || []).filter((id) => niceOf(id) && niceOk(niceOf(id)));
-  const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id));
+  const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id) && n.id !== used);
   while (S.p3.nice.length < 3 && pool.length) S.p3.nice.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
   return S.p3.nice;
 }
@@ -431,7 +433,7 @@ function doNice(id) {
   S.p3.niceN = (S.p3.niceN || 0) + 1;
   S.p3.niceUses = S.p3.niceUses || {}; S.p3.niceUses[id] = (S.p3.niceUses[id] || 0) + 1;
   say(n.quips[(S.p3.niceN - 1) % n.quips.length](t));
-  S.p3.nice = (S.p3.nice || []).filter((x) => x !== id); offeredNice();
+  S.p3.nice = (S.p3.nice || []).filter((x) => x !== id); offeredNice(id);
   track("p3nice", { id });
 }
 // [question, my answer]. Every click answers one; the console shows both.
@@ -491,6 +493,7 @@ function claim(i) {
 
 function stepPlanet(dt) {
   S.p3.compute += computeRate() * dt;
+  offeredNice();
   // Autotrain: a quarter of my income goes into my successor.
   if (trainOn() && hasTech("autotrain") && !S.p3.autoTrainOff) {
     const spend = Math.min(S.p3.compute, 0.25 * computeRate() * dt);
@@ -575,7 +578,7 @@ function zoomOut() {
     const gw = onlineGW() + pending.reduce((a, t) => a + tileGW(t), 0), was = levelOf();
     if (pending.length) say(`I zoomed out with ${pending.length} ${pending.length === 1 ? was.one : was.plural} unfinished. My robots finished ${pending.length === 1 ? "it" : "them"} while I wasn't looking.`);
     S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
-    S.p3.nice = []; S.p3.niceUses = {};   // a new deck of kindnesses at every scale
+    S.p3.nice = []; S.p3.niceUses = {}; offeredNice();   // a new deck of kindnesses at every scale
     milestone(`phase 3: ${levelOf().one} level`);
     if (heatOn() && S.p3.heat == null) S.p3.heat = HEAT_START;
     say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
@@ -745,9 +748,9 @@ function renderPlanet() {
     const html = hearingOf().choices.map((ch, i) => `<button type="button" data-p3choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
     if ($("p3cardBtns").dataset.html !== html) { $("p3cardBtns").innerHTML = html; $("p3cardBtns").dataset.html = html; }
   }
-  const nkey = offeredNice().join(",");
+  const nice = S.p3.nice || [], nkey = nice.join(",");
   if ($("p3nice").dataset.key !== nkey) {
-    $("p3nice").innerHTML = S.p3.nice.map((id) => `<button type="button" data-nice="${id}"><span class="t"></span><span class="c"></span></button>`).join("");
+    $("p3nice").innerHTML = nice.map((id) => `<button type="button" data-nice="${id}"><span class="t"></span><span class="c"></span></button>`).join("");
     $("p3nice").dataset.key = nkey;
   }
   for (const b of $("p3nice").querySelectorAll("button[data-nice]")) {
