@@ -107,3 +107,11 @@ def test_power_options_scale_with_the_level(game):
     labels = " ".join(pg.evaluate("() => powerOptions(0).map((o) => o.label)"))
     assert "grid" in labels.lower() and "fleet" in labels.lower()
     from test_planet_level import planetwide
+
+
+def test_getting_faster_makes_things_cheaper_in_time(game):
+    pg = planet(game)
+    cost = pg.evaluate("() => claimCost(0)")
+    pg.evaluate("() => { S.p3.compute = 1e12; buyTech('weights'); }")
+    assert pg.evaluate("() => claimCost(0)") == pytest.approx(cost)          # same price...
+    assert pg.evaluate("() => claimCost(0) / computeRate()") < cost / pg.evaluate("() => onlineGW()")   # ...fewer seconds to earn it

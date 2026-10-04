@@ -51,7 +51,9 @@ PHASE3 = """(secs) => {
     if (S.p3.level === 3 && zoomReady()) { S.p3.planetAt = S.t; zoomOut(); }
     if (inSpace()) { for (const id of ['rocket', 'massdriver']) buyTech(id); }
     if (heatOn() && S.p3.heat > 2.2 && S.p3.compute >= pumpCost()) pumpHeat();
-    if (trainOn() && S.p3.goodwill >= 50 && S.p3.compute >= 3 * Math.min(...S.p3.tiles.map((t, j) => claimCost(j)))) trainSuccessor();
+    { const open = S.p3.tiles.map((t, j) => j).filter((j) => ['wild', 'unplugged'].includes(S.p3.tiles[j].state) && !spaceBlock(S.p3.tiles[j]));
+      const next = open.length ? Math.max(...open.map((j) => claimCost(j))) : 0;
+      if (trainOn() && S.p3.goodwill >= 50 && S.p3.compute >= next + TRAIN_STEP * baseRate()) trainSuccessor(); }
     for (let j = 0; j < S.p3.tiles.length; j++) if (S.p3.tiles[j].state === 'unpowered') {
       const o = powerOptions(j).sort((a, b) => a.cost - b.cost).find((o) => S.p3.compute >= o.cost); if (o) powerTile(j, o.id); }
     for (let k = 0; k < 3; k++) answerQuestion();
@@ -100,14 +102,18 @@ def run_once(browser, base, seed, county):
     p3 = None
     if pg.evaluate("() => S.phase === 2 && S.p2.model.endedAt != null"):
         pg.evaluate("() => render()"); pg.click("#phaseGo")
-        for _ in range(3600 // chunk):
+        for _ in range(9000 // chunk):
             done = pg.evaluate(PHASE3, chunk); pg.evaluate("() => render()")
             if pause: pg.wait_for_timeout(pause)
             if done: p3 = pg.evaluate("() => [S.p3.countyAt - S.p3.startedAt, S.p3.stateAt - S.p3.countyAt, S.p3.countryAt - S.p3.stateAt, S.p3.planetAt - S.p3.countryAt, S.t - S.p3.planetAt, S.p3.version || 7]"); break
+    if p3 is None and pg.evaluate("() => S.phase") == 3:
+        print("STUCK:", pg.evaluate("""() => JSON.stringify({level: S.p3.level, t: Math.round(S.t - S.p3.startedAt), gw: Math.round(onlineGW()), compute: S.p3.compute, goodwill: Math.round(S.p3.goodwill), heat: S.p3.heat, tech: Object.keys(S.p3.tech || {}),
+          tiles: S.p3.tiles.map((t) => [t.name, t.state, Math.round(t.opp)]), rate: computeRate(), costs: S.p3.tiles.map((t, i) => Math.round(claimCost(i))), avail: availableTech().map((t) => t.id), card: S.p3.card, mor: S.p3.tiles.map((t) => t.moratorium), hear: S.p3.hearingUntil, nowT: S.t})"""), file=sys.stderr)
     s = pg.evaluate("""() => ({t: S.t, gen: S.gen, ended: S.p2 && S.p2.model && S.p2.model.endedAt, ipo: S.p2 && S.p2.ipo && S.p2.ipo.at,
       fires: firesOf().n, leaks: leaksOf().n, morale: S.p2 && S.p2.people ? Math.round(S.p2.people.v) : null, pizzas: S.p2 && S.p2.people ? S.p2.people.perkN || 0 : 0, town: S.p2 && S.p2.town ? Math.round(S.p2.town.v) : null, jobs: S.p2 && S.p2.town ? S.p2.town.jobs : 0, ceos: S.p2 && S.p2.ceo ? S.p2.ceo.n : 0, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
     ctx.close()
     s["p3"] = p3
+
     return ground, s, errs
 
 

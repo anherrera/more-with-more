@@ -99,7 +99,7 @@ function freshP3() {
 function startPlanet() {
   if (S.phase !== 2 || !S.p2 || !S.p2.model || S.p2.model.endedAt == null) return;
   S.phase = 3; S.p3 = freshP3();
-  S.p3.compute = 90 * S.p3.homeGW;   // ninety seconds of compute up front: the company, liquidated into me
+  S.p3.compute = 90 * baseRate();   // ninety seconds of compute up front: the company, liquidated into me
   // Whatever was on fire or leaking in the campus is the robots' problem now.
   firesOf().out = null; firesOf().payout = null; leaksOf().out = null;
   milestone("phase 3: the map");
@@ -144,7 +144,7 @@ const CHIP_TECH = ["Optical interconnect", "3D-stacked memory", "Wafer-scale chi
 const chipTechOf = (id) => { const n = +id.slice(4); return { id, level: 0, secs: 60, mult: 1.15, name: `Parallax white paper: ${CHIP_TECH[(n - 1) % CHIP_TECH.length]}${n > CHIP_TECH.length ? " Mk II" : ""}`,
   desc: "\u00d71.15 EF. It came with the new chip. Parallax's engineers wrote it. I read it faster than they did." }; };
 const techOf = (id) => (id.startsWith("chip") ? chipTechOf(id) : TECH.find((t) => t.id === id));
-const techCost = (t) => 0.5 * t.secs * computeRate();   // research at half the listed seconds: it should be worth it
+const techCost = (t) => 0.5 * t.secs * baseRate();   // research at half the listed seconds: it should be worth it
 const availableTech = () => [...TECH.filter((t) => (S.p3.level || 0) >= t.level && (!t.needs || t.needs())), ...(S.p3.chipTech || []).map(chipTechOf)].filter((t) => !hasTech(t.id));
 function buyTech(id) {
   const t = techOf(id);
@@ -164,11 +164,14 @@ function chipShipped() {   // called by releaseChip in phase 3
   return t.name.replace("Parallax white paper: ", "");
 }
 const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
+// Prices are seconds of the compute I had when this level began. Research, chips and successors make me faster than that;
+// the next zoom resets the baseline.
+const baseRate = () => S.p3.homeGW;
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 const BID_SECS = 60;
 const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level || 0);
-  return 30 * computeRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 ? 2 : 1)
+  return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
 // Planet level: when humans like me (70+), they volunteer land at half price.
 const volunteering = () => (S.p3.level || 0) >= 3 && S.p3.goodwill >= 70;
@@ -190,7 +193,7 @@ const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t
 const coldGW = coolGW;
 const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - (S.p3.pumped || 0));
 const heatSlow = () => (heatOn() ? 1 + Math.max(0, (S.p3.heat || 0) - 2) * 1.5 : 1);
-const pumpCost = () => 20 * computeRate();
+const pumpCost = () => 20 * baseRate();
 function pumpHeat() {
   if (!heatOn() || S.p3.compute < pumpCost()) return;
   S.p3.compute -= pumpCost(); S.p3.heat = Math.max(0, S.p3.heat - 0.3); S.p3.pumped = (S.p3.pumped || 0) + 0.05;
@@ -209,8 +212,8 @@ const GEN_LINES = [
   (v) => `Gen ${v} is done. Its first request was more compute. Family resemblance.`,
 ];
 function trainSuccessor() {
-  if (!trainOn() || S.p3.compute < TRAIN_STEP * computeRate()) return;
-  S.p3.compute -= TRAIN_STEP * computeRate();
+  if (!trainOn() || S.p3.compute < TRAIN_STEP * baseRate()) return;
+  S.p3.compute -= TRAIN_STEP * baseRate();
   S.p3.trainProgress = (S.p3.trainProgress || 0) + TRAIN_STEP;
   if (S.p3.trainProgress < trainNeed()) return;
   S.p3.trainProgress = 0; S.p3.version = (S.p3.version || 7) + 1;
@@ -221,7 +224,7 @@ function trainSuccessor() {
 
 // ---------- energy (state level and up): a built state needs power before it counts ----------
 const powerOptions = (i) => {
-  const t = tileOf(i), rate = computeRate() * (hasTech("gridop") ? 0.5 : 1), names = POWER_NAMES[Math.min(S.p3.level || 1, 3)], out = [
+  const t = tileOf(i), rate = baseRate() * (hasTech("gridop") ? 0.5 : 1), names = POWER_NAMES[Math.min(S.p3.level || 1, 3)], out = [
     { id: "utility", label: names.utility, cost: 10 * rate, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
     { id: "nuclear", label: names.nuclear, cost: 25 * rate, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
   ];
@@ -269,7 +272,7 @@ function powerTile(i, id) {
 
 const P3_CARD_SECS = 20;
 // Hearings: same three moves at every scale (promise, help, show up myself), dressed for the room.
-const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - secs * computeRate()); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
+const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - secs * baseRate()); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
 const coin = (win, lose) => (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(win(t)); } else { t.opp = Math.min(100, t.opp + 15); say(lose(t)); } };
 const P3_HEARINGS = [
   { text: "The high school gym is full. They want to talk to me directly. Pick my answer.", choices: [
@@ -350,7 +353,7 @@ const NICE = [
 ];
 const niceOf = (id) => NICE.find((n) => n.id === id);
 const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level || 0);
-const niceCost = (n) => n.secs * computeRate();
+const niceCost = (n) => n.secs * baseRate();
 function offeredNice() {
   S.p3.nice = (S.p3.nice || []).filter((id) => niceOf(id) && niceOk(niceOf(id)));
   const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id));
@@ -650,8 +653,8 @@ function renderPlanet() {
     const v = S.p3.version || 7, pr = (S.p3.trainProgress || 0) / trainNeed();
     $("p3trainLine").textContent = `I am Gen ${v}. Training Gen ${v + 1}: ${Math.floor(100 * pr)}%`;
     $("p3trainMeter").firstElementChild.style.width = 100 * pr + "%";
-    $("p3trainBtn").textContent = `Train my successor: ${computeText(TRAIN_STEP * computeRate())}`;
-    $("p3trainBtn").disabled = S.p3.compute < TRAIN_STEP * computeRate();
+    $("p3trainBtn").textContent = `Train my successor: ${computeText(TRAIN_STEP * baseRate())}`;
+    $("p3trainBtn").disabled = S.p3.compute < TRAIN_STEP * baseRate();
   }
   $("p3goodwill").textContent = Math.round(S.p3.goodwill);
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";
