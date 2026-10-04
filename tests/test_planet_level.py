@@ -66,3 +66,13 @@ def test_planet_survives_reload_and_zooms_to_space(game):
     assert "space" in pg.inner_text("#phaseGo").lower()
     pg.click("#phaseGo")
     assert pg.evaluate("() => S.p3.level") == 4                      # space exists now
+
+
+def test_powering_a_continent_costs_like_a_continent(game):
+    pg = planetwide(game)
+    i = pg.evaluate("() => S.p3.tiles.findIndex((t) => t.name === 'Africa')")
+    opts = pg.evaluate(f"() => {{ const c = claimCost({i}); return powerOptions({i}).map((o) => [o.id, o.cost / c, o.secs]); }}")
+    by = {o[0]: o for o in opts}
+    assert by["utility"][1] == pytest.approx(0.5) and by["nuclear"][1] == pytest.approx(1) and by["solar"][1] == pytest.approx(0.25)
+    state_secs = pg.evaluate("() => { const lv = S.p3.level; S.p3.level = 1; const s = powerSecs(90); S.p3.level = lv; return s; }")
+    assert by["nuclear"][2] >= 2 * state_secs - 1

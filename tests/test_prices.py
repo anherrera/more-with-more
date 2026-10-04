@@ -12,7 +12,7 @@ def test_one_helper_prices_everything_and_names_its_base(game):
     assert level == pytest.approx(pg.evaluate("() => S.p3.homeGW"))
     assert now == pytest.approx(pg.evaluate("() => computeRate()")) and now == pytest.approx(4 * level)
     r = pg.evaluate("""() => ({ tech: techCost(TECH[0]) / (0.5 * TECH[0].secs), pump: pumpCost() / 20,
-      power: powerOptions(0).find((o) => o.id === 'utility').cost / 10, claim: claimCost(0),
+      power: powerOptions(0).find((o) => o.id === 'utility').cost / (0.5 * tileWorth(0) / price(1, 'level')), claim: claimCost(0),
       nice: niceCost(niceOf(offeredNice()[0])) / niceOf(offeredNice()[0]).secs, train: trainCost() / trainStep() })""")
     assert r["tech"] == pytest.approx(level) and r["pump"] == pytest.approx(level) and r["power"] == pytest.approx(level)
     assert 25 * level <= r["claim"] <= 60 * level

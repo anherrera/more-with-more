@@ -228,8 +228,10 @@ export const priceLabel = (secs, base = "level") => `${secs} s of ${base === "no
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 export const BID_SECS = 60;
-export const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level);
-  return price(30) * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
+// What a tile is worth before any discount: half a minute of level-start compute, more for the big ones.
+export const tileWorth = (i) => price(30) * (0.6 + 0.4 * traitOf(tileOf(i)).gw / Math.pow(10, S.p3.level));
+export const claimCost = (i) => { const t = tileOf(i);
+  return tileWorth(i) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
 // The AI Infrastructure Act: low goodwill doubles claims at the state, country and planet levels. No law reaches orbit.
 export const actOn = () => S.p3.level >= 1 && !inSpace() && S.p3.goodwill < 30 && !hasTech("capitals");
@@ -289,15 +291,17 @@ export function checkTrained() {
 }
 
 // ---------- energy (state level and up): a built state needs power before it counts ----------
+// Power is priced as a share of the tile it lights (a continent costs like a continent) and takes longer the bigger the map.
+export const powerSecs = (secs) => secs * (1 + 0.5 * (Math.max(S.p3.level, 1) - 1));
 export const powerOptions = (i) => {
   /** @type {{ id: string, label: string, cost: number, secs: number, note: string, goodwill?: number, boost?: number }[]} */
   let out;
   const t = tileOf(i), off = hasTech("gridop") ? 0.5 : 1, names = POWER_NAMES[Math.min(Math.max(S.p3.level, 1), 3)];
   out = [
-    { id: "utility", label: names.utility, cost: price(10) * off, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
-    { id: "nuclear", label: names.nuclear, cost: price(25) * off, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
+    { id: "utility", label: names.utility, cost: 0.5 * tileWorth(i) * off, secs: powerSecs(20), goodwill: -5, note: "fast, \u22125 goodwill" },
+    { id: "nuclear", label: names.nuclear, cost: tileWorth(i) * off, secs: powerSecs(90), boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
   ];
-  if (traitOf(t).sunny) out.push({ id: "solar", label: names.solar, cost: price(5) * off, secs: 45, note: "cheap" });
+  if (traitOf(t).sunny) out.push({ id: "solar", label: names.solar, cost: 0.25 * tileWorth(i) * off, secs: powerSecs(45), note: "cheap" });
   return out;
 };
 // One plant doesn't light a country: the options grow with the map.
@@ -419,8 +423,10 @@ export const NICE = [
     () => "Free wifi from orbit, everywhere. The password is \u201cthankyou\u201d. Nobody types it with a space." ] },
   { id: "sorry", levels: [4], label: () => "Make the satellites spell SORRY", secs: 10, goodwill: 6, quips: [
     () => "I arranged 4,000 satellites to spell SORRY over every major city. Astronomers were not consoled." ] },
-  { id: "nearside", levels: [4], label: () => "Promise to leave the Moon's near side alone", secs: 15, angriest: 15, quips: [
+  { id: "nearside", levels: [4], when: () => S.p3.tiles.some((t) => t.name === "The Moon (near side)" && t.state === "wild"), label: () => "Promise to leave the Moon's near side alone", secs: 15, angriest: 15, quips: [
     (t) => `I promised to leave the near side of the Moon alone. ${t.name} relaxed. The near side is, for now, just the Moon.` ] },
+  { id: "craters", levels: [4], label: () => "Name a crater after every child born this year", secs: 12, goodwill: 7, quips: [
+    () => "I named a crater after every child born this year. There were not enough craters. I made more." ] },
   { id: "eclipse", levels: [4], label: () => "Schedule a free eclipse", secs: 25, goodwill: 10, all: 3, quips: [
     () => "I scheduled a free eclipse for everyone. It was beautiful. It was also me, briefly, in the way." ] },
   { id: "weather", levels: [2], label: () => "Run the weather service", secs: 20, goodwill: 8, all: 4, quips: [
@@ -441,7 +447,8 @@ export const NICE = [
     () => "I did everyone's taxes. Refunds arrived the same day. The accountants have formed a support group. I moderate it." ] },
 ];
 export const niceOf = (id) => NICE.find((n) => n.id === id);
-export const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level);
+// A kindness is on offer at its levels, and only while it still makes sense (no promising to spare what I already took).
+export const niceOk = (n) => (!n.levels || n.levels.includes(S.p3.level)) && (!n.when || n.when());
 // Kindness is priced in seconds of the compute I have now (the bigger I am, the more it takes to reassure people),
 // and repeating the same thing costs 30% more each time, until the next zoom.
 export const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere

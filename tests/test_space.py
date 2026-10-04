@@ -144,3 +144,10 @@ def test_repeat_kindness_markup_has_a_ceiling(game):
     for _ in range(12):
         pg.evaluate(f"() => {{ doNice('{nid}'); }}")
     assert pg.evaluate(f"() => niceCost(niceOf('{nid}'))") == pytest.approx(3 * first)
+
+
+def test_no_promising_to_leave_the_near_side_alone_after_taking_it(game):
+    pg = to_space(game)
+    assert pg.evaluate("() => niceOk(niceOf('nearside'))")
+    pg.evaluate("() => { S.p3.tiles.find((t) => t.name === 'The Moon (near side)').state = 'building'; }")
+    assert not pg.evaluate("() => niceOk(niceOf('nearside'))")

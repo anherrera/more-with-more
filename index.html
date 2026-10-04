@@ -108,6 +108,8 @@
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
   @media (prefers-reduced-motion: reduce) { .cols.reveal > .col { animation: none; } }
   @media (max-width: 760px) { body.picking .choices { grid-template-columns: 1fr; } }
+  /* The alert line keeps its one-line slot even when empty, so alerts never push the page around mid-click. */
+  #alerts { min-height: 1.35em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hudtop { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
   #pause { font-size: 15px; padding: 4px 14px; border: 2px solid var(--accent); color: var(--accent); background: var(--btn); font-weight: bold; }
   #pause.on { background: var(--accent); color: var(--accent-ink); }
@@ -169,7 +171,7 @@
   <div id="hud">
   <div class="hudtop"><div class="pausedbanner" id="pausedBanner" hidden>⏸ Paused. Nothing moves until you resume. (P toggles pause.)</div><button id="pause" type="button" title="Pause (P)">⏸ Pause</button></div>
   <div class="phasebar" id="phaseBar"><span id="phaseText"></span> <button id="phaseGo" type="button" class="primary" hidden></button></div>
-  <div class="line bad" id="alerts" hidden></div>
+  <div class="line bad" id="alerts"></div>
   <div id="console" aria-live="polite"></div>
   </div>
 

@@ -36,3 +36,15 @@ def test_console_stays_in_view_while_scrolling(game, page):
     pg.wait_for_timeout(100)
     top, bottom = pg.evaluate("() => { const r = document.getElementById('console').getBoundingClientRect(); return [r.top, r.bottom]; }")
     assert top >= 0 and bottom <= 600
+
+
+def test_alerts_never_push_the_page_around(game):
+    pg = game({**READY, "debt": 0})
+    pg.click("button[data-id='ground']")
+    pg.click("button[data-county='strong']")
+    top = lambda: pg.evaluate("() => document.getElementById('console').getBoundingClientRect().top")
+    pg.evaluate("() => render()")
+    quiet = top()
+    pg.evaluate("() => { S.p2.drought = {until: S.t + 100}; S.fires.out = {gens: {}, n: 10, value: 1, where: 'hall 1', until: S.t + 100}; render(); }")
+    assert pg.is_visible("#alerts")
+    assert top() == quiet

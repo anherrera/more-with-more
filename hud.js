@@ -44,7 +44,7 @@ export function renderAlerts() {
   if (S.phase === 3 && S.p3 && tooWarm()) out.push(`Too warm to think: +${S.p3.heat.toFixed(2)} °C, no claims until it cools`);
   if (S.phase === 3 && S.p3) for (const t of S.p3.tiles) if (t.state === "down") out.push(`${t.disaster[0].toUpperCase() + t.disaster.slice(1)} in ${t.name}: back in ${time(t.downUntil - S.t)}`);
   if (S.phase === 3 && S.p3) for (const t of S.p3.tiles) if (underMoratorium(t)) out.push(`Moratorium in ${t.name}: ${time(t.moratorium - S.t)}`);
-  $("alerts").hidden = !out.length;
+  $("alerts").style.visibility = out.length ? "visible" : "hidden";   // hidden, not removed: the slot stays
   $("alerts").textContent = out.join(" · ");
 }
 
