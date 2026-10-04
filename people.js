@@ -18,15 +18,17 @@ const incidents = () => (firesOf().out ? 1 : 0) + (leaksOf().out ? 1 : 0);
 const moraleDrain = () => (0.03 * buildsInFlight() * (S.done.secondshift ? 0.5 : 1) + 0.12 * lateContracts() + 0.2 * incidents()) * ceoDrain();
 // Builds started below 50 morale take longer, up to twice as long at zero.
 const moraleSlow = () => 1 + Math.max(0, 50 - (S.p2 && S.p2.people ? S.p2.people.v : MORALE_START)) / 50;
-const pizzaCost = () => 500000 * Math.pow(2, moraleOf().pizzas);
-const pizzaGain = () => 10 / (1 + 0.6 * moraleOf().pizzas);
+// Flat prices, one at a time: the limit is how often, not how much.
+const COOLDOWN = 60;
+const pizzaCost = () => 1e6;
+const pizzaGain = () => 8;
+const pizzaWait = () => Math.max(0, (moraleOf().pizzaAt ?? -1e9) + COOLDOWN - S.t);
 
 function pizzaParty() {
   const m = moraleOf();
-  if (S.funds < pizzaCost()) return;
+  if (S.funds < pizzaCost() || pizzaWait() > 0) return;
   S.funds -= pizzaCost();
-  const gain = pizzaGain();
-  m.v = Math.min(100, m.v + gain); m.pizzas += 1;
+  m.v = Math.min(100, m.v + pizzaGain()); m.pizzas += 1; m.pizzaAt = S.t;
   say(m.pizzas === 1 ? "Pizza party. People were genuinely happy, which surprised everyone."
     : `Pizza party number ${m.pizzas}. Someone asked whether the pizza counts as compensation. It does, legally.`);
 }
@@ -80,16 +82,18 @@ function townBuilt(kind) {
   t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba2 ? 0.5 : 1));
 }
 // Sponsorships: press any time; each costs double the last and helps a bit less. Late-game money still buys goodwill.
-const SPONSORED = ["the county fair", "the Little League team", "a new fire truck", "the library's 3D printer",
-  "the Fourth of July fireworks", "a splash pad", "the high school's prom", "a mural of the model, which the model designed"];
-const sponsorCost = () => 2e6 * Math.pow(2, townOf().sponsors || 0);
-const sponsorGain = () => 12 / (1 + 0.4 * (townOf().sponsors || 0));
+const SPONSORED = [["the county fair", 3e6], ["the Little League team", 1e6], ["a new fire truck", 2e6], ["the library's 3D printer", 1e6],
+  ["the Fourth of July fireworks", 2e6], ["a splash pad", 3e6], ["the high school's prom", 1e6], ["a mural of the model, which the model designed", 5e6]];
+const sponsorNext = () => SPONSORED[(townOf().sponsors || 0) % SPONSORED.length];
+const sponsorCost = () => sponsorNext()[1];
+const sponsorGain = () => 10;
+const sponsorWait = () => Math.max(0, (townOf().sponsorAt ?? -1e9) + COOLDOWN - S.t);
 function sponsor() {
   const t = townOf();
-  if (S.funds < sponsorCost()) return;
+  if (S.funds < sponsorCost() || sponsorWait() > 0) return;
   S.funds -= sponsorCost();
-  const gain = sponsorGain(), what = SPONSORED[(t.sponsors || 0) % SPONSORED.length];
-  t.v = Math.max(0, t.v - gain); t.sponsors = (t.sponsors || 0) + 1;
+  const gain = sponsorGain(), what = sponsorNext()[0];
+  t.v = Math.max(0, t.v - gain); t.sponsors = (t.sponsors || 0) + 1; t.sponsorAt = S.t;
   say(`You sponsored ${what}. Your logo is on it now. Opposition −${Math.round(gain)}.`);
 }
 
@@ -164,15 +168,16 @@ function renderPeople() {
   $("moraleMeter").firstElementChild.style.width = m.v + "%";
   $("moraleMeter").className = "meter " + (m.v < 25 ? "bad" : m.v < 50 ? "warn" : "good");
   $("moraleCause").textContent = moraleCause();
-  $("pizza").textContent = `Pizza party (+${Math.round(pizzaGain())}): ${money(pizzaCost())}`;
-  $("pizza").disabled = S.funds < pizzaCost() || m.v >= 100;
+  $("pizza").textContent = pizzaWait() > 0 ? `Pizza party: again in ${Math.ceil(pizzaWait())}s` : `Pizza party (+${pizzaGain()} morale): ${money(pizzaCost())}`;
+  $("pizza").disabled = S.funds < pizzaCost() || m.v >= 100 || pizzaWait() > 0;
   const t = townOf();
   $("town").textContent = Math.round(t.v);
   $("townMeter").firstElementChild.style.width = t.v + "%";
   $("townMeter").className = "meter " + (t.v >= 75 ? "bad" : t.v >= 50 ? "warn" : "good");
   $("townCause").textContent = townCause();
-  $("sponsor").textContent = `Sponsor ${SPONSORED[(t.sponsors || 0) % SPONSORED.length]} (\u2212${Math.round(sponsorGain())}): ${money(sponsorCost())}`;
-  $("sponsor").disabled = S.funds < sponsorCost() || t.v <= 0;
+  $("sponsor").textContent = sponsorWait() > 0 ? `Sponsor something: again in ${Math.ceil(sponsorWait())}s`
+    : `Sponsor ${sponsorNext()[0]} (\u2212${sponsorGain()} opposition): ${money(sponsorCost())}`;
+  $("sponsor").disabled = S.funds < sponsorCost() || t.v <= 0 || sponsorWait() > 0;
   if (c) {
     const k = CARDS[c.kind];
     $("cardTitle").textContent = `${k.title()} (${Math.max(0, Math.ceil(c.until - S.t))}s)`;

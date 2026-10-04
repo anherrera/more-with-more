@@ -82,17 +82,20 @@ def test_skipping_the_town_hall_makes_it_worse(game):
     assert pg.evaluate("() => townOf().v") > v + 5
 
 
-def test_sponsor_button_lowers_opposition_any_time_with_diminishing_returns(game):
+def test_sponsor_button_lowers_opposition_at_sane_prices_with_a_cooldown(game):
     pg = campus(game, funds=1e10)
     pg.evaluate("() => { townOf().v = 80; render(); }")
-    assert pg.is_visible("#sponsor") and pg.is_enabled("#sponsor")
+    assert pg.is_enabled("#sponsor")
     pg.click("#sponsor")
-    first = 80 - pg.evaluate("() => townOf().v")
-    pg.evaluate("() => { townOf().v = 80; render(); }")
-    pg.click("#sponsor")
-    second = 80 - pg.evaluate("() => townOf().v")
-    assert first > second > 0
-    assert pg.evaluate("() => sponsorCost()") > 2e6
+    assert pg.evaluate("() => townOf().v") < 80
+    pg.evaluate("() => render()")
+    assert pg.is_disabled("#sponsor")                          # the town needs a minute
+    run(pg, 61)
+    pg.evaluate("() => render()")
+    assert pg.is_enabled("#sponsor")
+    for _ in range(12):                                        # never balloons into the billions
+        pg.evaluate("() => { townOf().sponsorAt = -1e9; townOf().v = 80; sponsor(); }")
+    assert pg.evaluate("() => sponsorCost()") <= 10e6
 
 
 def test_high_opposition_says_how_to_lower_it(game):

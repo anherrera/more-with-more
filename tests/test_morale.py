@@ -50,15 +50,17 @@ def test_low_morale_slows_new_builds(game):
     assert slow > fast * 1.5
 
 
-def test_pizza_party_helps_less_each_time(game):
+def test_pizza_party_is_cheap_with_a_cooldown(game):
     pg = campus(game, funds=1e10)
     pg.evaluate("() => { moraleOf().v = 30; render(); }")
     pg.click("#pizza")
-    first = pg.evaluate("() => moraleOf().v") - 30
-    pg.evaluate("() => { moraleOf().v = 30; render(); }")
-    pg.click("#pizza")
-    second = pg.evaluate("() => moraleOf().v") - 30
-    assert first > second > 0
+    assert pg.evaluate("() => moraleOf().v") > 30
+    pg.evaluate("() => render()")
+    assert pg.is_disabled("#pizza")
+    run(pg, 61)
+    for _ in range(12):
+        pg.evaluate("() => { moraleOf().pizzaAt = -1e9; moraleOf().v = 30; pizzaParty(); }")
+    assert pg.evaluate("() => pizzaCost()") <= 2e6
 
 
 def test_tender_offer_card_appears_when_morale_sags_and_lifts_it(game):
