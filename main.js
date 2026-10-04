@@ -130,6 +130,13 @@ const POSTS = [
   "a thread (1/47)", "internal evals are... something", "if you know, you know",
   "feeling the scaling laws today", "new model soon. not a promise. a vibe.",
 ];
+// Phase 2: you're an infrastructure company now. The posts are about concrete.
+const CAMPUS_POSTS = [
+  "drone shot of the new hall. no caption needed", "we're going to need a bigger substation",
+  "a gigawatt is just a lot of megawatts if you think about it", "concrete poured. vibes poured.",
+  "announcing an MOU to explore a partnership to discuss a gigawatt", "hiring electricians. all of them.",
+  "the turbines are spinning and so are we", "sunrise over the cooling towers. this is the future",
+];
 const postReady = () => S.gen >= 1 && S.t >= S.nextPost;
 // Each post: base (5 + gen), shrunk by recent-post fatigue, then a roll: viral x3, ratioed x0.3.
 const postBase = () => (5 + S.gen) * (S.done.evals ? 1.5 : 1) / (1 + 0.5 * S.fatigue);
@@ -139,7 +146,8 @@ function vaguePost() {
   const [mult, tag] = roll < (S.done.keynote ? 0.3 : 0.15) ? [3, " It went viral."] : roll < (S.done.keynote ? 0.45 : 0.35) ? [0.3, " Ratioed."] : [1, ""];
   const gain = Math.max(1, Math.round(postBase() * mult));
   S.hype += gain; S.nextPost = S.t + 25; S.fatigue += 1; track("post", { gain, result: mult === 3 ? "viral" : mult < 1 ? "ratioed" : "normal" });
-  say(`Posted: \u201c${POSTS[S.posts % POSTS.length]}\u201d +${gain} hype.${tag}`);
+  const lines = S.phase === 2 ? CAMPUS_POSTS : POSTS;
+  say(`Posted: \u201c${lines[S.posts % lines.length]}\u201d +${gain} hype.${tag}`);
   S.posts += 1;
 }
 
@@ -523,8 +531,8 @@ function render() {
   $("post").hidden = S.gen < 1;
   $("post").disabled = !postReady();
   $("post").textContent = postReady()
-    ? `Vague-post about the next model (~+${Math.max(1, Math.round(postBase()))} hype${S.fatigue >= 1 ? ", timeline is tired" : ""})`
-    : `Vague-post again in ${Math.ceil(S.nextPost - S.t)}s`;
+    ? `${S.phase === 2 ? "Post a drone shot of the campus" : "Vague-post about the next model"} (~+${Math.max(1, Math.round(postBase()))} hype${S.fatigue >= 1 ? ", timeline is tired" : ""})`
+    : `${S.phase === 2 ? "Post" : "Vague-post"} again in ${Math.ceil(S.nextPost - S.t)}s`;
   $("hypeNum").className = S.hype > 100 ? "hot" : S.hype >= HYPE_TO_RAISE ? "good" : "";
   $("hypeMeter").firstElementChild.style.width = Math.min(100, S.hype / 2) + "%";
   // One rule for every meter: green fine, amber act soon, red trouble.

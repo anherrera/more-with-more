@@ -42,3 +42,13 @@ def test_self_approving_countdown_shows_in_the_bar(game):
     pg = campus(game)
     pg.evaluate("() => { const m = modelOf(); m.current = null; m.final = {at: S.t + 30}; render(); }")
     assert "30s" in pg.inner_text("#phaseBar")
+
+
+def test_phase2_posts_like_an_infra_company(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.nextPost = 0; render(); }")
+    label = pg.inner_text("#post")
+    assert "next model" not in label and "campus" in label
+    pg.click("#post")
+    last = pg.evaluate("() => S.log.at(-1)")
+    assert last.startswith("Posted:") and pg.evaluate("() => CAMPUS_POSTS.some((p) => S.log.at(-1).includes(p))")
