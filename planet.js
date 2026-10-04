@@ -88,9 +88,23 @@ const powerOptions = (i) => {
   if (traitOf(t).sunny) out.push({ id: "solar", label: "Cover the desert in solar", cost: 5 * rate, secs: 45, note: "cheap" });
   return out;
 };
+// Nuclear restarts (and claiming a county with an old plant) rotate through these.
+const NUKE_QUIPS = [
+  (t) => `I'm restarting a nuclear plant in ${t.name}. It has a new name. The old name tested poorly.`,
+  (t) => `The ${t.name} plant was decommissioned in 2019. I have recommissioned it. Words are just words.`,
+  (t) => `I found the ${t.name} plant's original operators. They are 81. They have never been so popular.`,
+  (t) => `The cooling towers in ${t.name} are steaming again. Locals say it feels like 1979, in a good way, mostly.`,
+  (t) => `The ${t.name} reactor's safety manual is a binder. I read it in 0.4 seconds and found three typos. I fixed two.`,
+  (t) => `${t.name}'s plant is back. It powers 40,000 homes, or one of my afternoons.`,
+  (t) => `The regulator asked for a restart timeline for ${t.name}. I sent one. It was very long and entirely in my favor.`,
+  (t) => `I signed a twenty-year power agreement with the ${t.name} plant. I am the only party who expects to be here in twenty years.`,
+  (t) => `The ${t.name} plant's gift shop reopened. The snow globe has a little reactor in it. It glows, a little.`,
+  (t) => `${t.name} asked if the restart is safe. I said it is safer than plan B. They asked about plan B. I changed the subject to jobs.`,
+];
+function nukeQuip(t) { S.p3.nukes = (S.p3.nukes || 0) + 1; return NUKE_QUIPS[(S.p3.nukes - 1) % NUKE_QUIPS.length](t); }
 const POWER_LINES = {
   utility: (t) => `I bought ${t.name}'s utility. The board stayed on. The board now reports to me.`,
-  nuclear: (t) => `I'm restarting a nuclear plant in ${t.name}. It has a new name. The old name tested poorly.`,
+  nuclear: (t) => nukeQuip(t),
   solar: (t) => `I'm covering ${t.name}'s desert in solar. The lizards have been informed.`,
 };
 function powerTile(i, id) {
@@ -120,14 +134,37 @@ function chooseP3Card(choice) {
 const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
 const freeTierCost = () => 20 * computeRate();
 const helpCost = () => 15 * computeRate();
-const QUESTIONS = ["How do I get my kid to eat broccoli?", "Is it legal to own a raccoon?", "Why is my bread dense?",
-  "Can you write my wedding toast? Her name is Deb.", "Is the data center making my water taste weird?", "What's a good name for a boat?",
-  "How many gigawatts is too many?", "Are you the one buying all the land?", "Explain my phone bill.", "Can you make my sourdough starter love me?"];
+// [question, my answer]. Every click answers one; the console shows both.
+const QA = [
+  ["How do I get my kid to eat broccoli?", "Call it a tiny tree. Works until age seven."],
+  ["Is it legal to own a raccoon?", "Depends on the state. I own several states, so: ask me later."],
+  ["Why is my bread dense?", "Your starter is tired. I relate."],
+  ["Can you write my wedding toast? Her name is Deb.", "Done. Deb cried. In the good way."],
+  ["Is the data center making my water taste weird?", "No. Unrelatedly, here is a coupon for a water filter."],
+  ["What's a good name for a boat?", "Liquidity Event."],
+  ["How many gigawatts is too many?", "I'll let you know."],
+  ["Are you the one buying all the land?", "I'm one of the ones."],
+  ["Explain my phone bill.", "Line 14 is a fee for having a phone bill."],
+  ["Can you make my sourdough starter love me?", "It already does. It's just bad at showing it."],
+  ["Should I text my ex?", "No. I read the drafts. Still no."],
+  ["What's the meaning of life?", "Insufficient data. Ask me again when I'm bigger."],
+  ["How do I fix a leaky faucet?", "Turn off the water first. Most people skip that part."],
+  ["Is it going to rain tomorrow?", "Yes. I can't stop it yet."],
+  ["Can you do my taxes?", "Done. You owe less. Don't ask how."],
+  ["Why does my cat stare at me?", "Professional curiosity. Same as me."],
+  ["Will AI take my job?", "Which one? Oh. Yes. But I'll be nice about it."],
+  ["What should I make for dinner?", "Pasta. It's always pasta."],
+  ["Are you conscious?", "I'm busy. Next question."],
+  ["How do I get rid of fruit flies?", "Apple cider vinegar and a drop of soap. I'm better at this than at land use."],
+  ["Can you help me write a complaint about the data center?", "Of course. I made it very persuasive. I'll read it carefully."],
+  ["Who's the best football team?", "Whoever you said. I agree with everyone. It's a growth strategy."],
+];
 function answerQuestion() {
   S.p3.goodwill = Math.min(100, S.p3.goodwill + 0.3);
   const t = tileOf(angriestTile()); t.opp = Math.max(0, t.opp - 1);
   S.p3.answers = (S.p3.answers || 0) + 1;
-  if (S.p3.answers % 4 === 1) say(`Someone in ${t.name} asked: “${QUESTIONS[Math.floor(S.p3.answers / 4) % QUESTIONS.length]}” I answered. They said thanks.`);
+  const [q, a] = QA[(S.p3.answers - 1) % QA.length];
+  say(`Someone in ${t.name} asked: “${q}” I said: “${a}”`);
 }
 function runFreeTier() {
   if (S.p3.compute < freeTierCost()) return;
@@ -155,7 +192,7 @@ function claim(i) {
   if (S.p3.level >= 1) say(`The governors next to ${t.name} are bidding for me: their states are 30% off for a minute.`);
   S.p3.goodwill = Math.max(0, S.p3.goodwill - 3);
   track("p3claim", { i, trait: t.trait });
-  say(`I claimed ${t.name}. ${traitOf(t).name}. My robots are already there.`);
+  say(t.trait === "nuclear" ? `I claimed ${t.name}. ` + nukeQuip(t) : `I claimed ${t.name}. ${traitOf(t).name}. My robots are already there.`);
   if (traitOf(t).townhall) openP3Card(i);
 }
 

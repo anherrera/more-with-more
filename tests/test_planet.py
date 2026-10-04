@@ -272,3 +272,14 @@ def test_town_halls_dont_talk_money(game):
 
 def S_name(pg, i):
     return pg.evaluate(f"() => S.p3.tiles[{i}].name")
+
+
+def test_every_answer_prints_a_question_and_my_answer(game):
+    pg = planet(game)
+    n = pg.evaluate("() => S.log.length")
+    for _ in range(3):
+        pg.click("#p3answer")
+    new = pg.evaluate(f"() => S.log.slice({n} - S.log.length)") if pg.evaluate("() => S.log.length") > n else pg.evaluate("() => S.log.slice(-3)")
+    lines = pg.evaluate("() => S.log.slice(-3)")
+    assert all("?" in l for l in lines) and len(set(lines)) == 3
+    assert pg.evaluate("() => QA.length") >= 20

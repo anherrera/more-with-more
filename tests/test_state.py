@@ -106,3 +106,12 @@ def test_a_save_that_hit_the_old_county_stub_can_go_statewide(game):
     pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; S.p3.zoomSaid = true; save(); }")
     pg.reload()
     assert pg.is_visible("#phaseGo") and "statewide" in pg.inner_text("#phaseGo").lower()
+
+
+def test_nuclear_restarts_rotate_their_quips(game):
+    pg = statewide(game)
+    lines = set()
+    for i in range(4):
+        pg.evaluate(f"() => {{ S.p3.tiles[{i}].state = 'unpowered'; powerTile({i}, 'nuclear'); }}")
+        lines.add(pg.evaluate("() => S.log.at(-1)"))
+    assert len(lines) == 4 and pg.evaluate("() => NUKE_QUIPS.length") >= 10
