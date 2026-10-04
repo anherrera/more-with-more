@@ -324,9 +324,10 @@ function buzz() {
 }
 
 function releaseChip() {
-  S.chipIdx += 1; S.nextChip = S.t + (S.phase === 2 ? CHIP_EVERY_P2 : CHIP_EVERY);
+  S.chipIdx += 1; S.nextChip = S.t + (S.phase >= 2 ? CHIP_EVERY_P2 : CHIP_EVERY);
   const c = newest(), prev = chip(S.chipIdx - 1);
   S.vendorCap *= 1.08; milestone(`Parallax ${c.name}`);
+  if (S.phase === 3) { say(`Parallax shipped the ${c.name}. I swapped it in overnight. Every gigawatt I hold just got smarter.`); return; }
   say(`Parallax announced the ${c.name}: ${c.perf.toFixed(1)}x the speed of a P1, ${kwText(c.kw)} each. Your ${prev.name}s are now \u201clegacy.\u201d`);
 }
 
@@ -403,14 +404,14 @@ function step(dt) {
   S.spotWalk = Math.max(-0.4, Math.min(0.4, S.spotWalk + (Math.random() - 0.5) * 0.08 * dt));
   if (Math.floor(S.t) !== Math.floor(S.t - dt)) { S.spotHist.push(spotMult()); if (S.spotHist.length > 90) S.spotHist.shift(); }
   if (S.block && S.t >= S.block.until) S.block = null;
-  if (S.gen >= 2 && S.t >= S.rival.next) rivalNews();
+  if (S.phase <= 2 && S.gen >= 2 && S.t >= S.rival.next) rivalNews();   // phase 3: I don't read the trades
   stepFires(dt);
   stepLeaks();
   if (S.nextBuzz == null) S.nextBuzz = S.t + 120;
   if (S.phase <= 2 && S.gen >= 1 && S.t >= S.nextBuzz) buzz();
   if (S.phase === 1) stepPhase1(dt); else if (S.phase === 2) stepCampus(dt); else stepPlanet(dt);
   S.hype = Math.max(5, S.hype - S.hype * 0.002 * (S.done.modelcard ? 0.75 : 1) * dt);
-  if (froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
+  if (S.phase <= 2 && froth() > 0 && Math.random() < dt * (froth() / 100) / 30) realityCheck();   // ~2/min at hype 200
   S.funds -= interestPerSec() * dt;
   if (db && S.t - lastSnapT >= 30) { lastSnapT = S.t; track("snap", snap()); }
 }

@@ -28,6 +28,8 @@ function freshP3() {
 function startPlanet() {
   if (S.phase !== 2 || !S.p2 || !S.p2.model || S.p2.model.endedAt == null) return;
   S.phase = 3; S.p3 = freshP3();
+  // Whatever was on fire or leaking in the campus is the robots' problem now.
+  firesOf().out = null; firesOf().payout = null; leaksOf().out = null;
   milestone("phase 3: the map");
   say("I built the next one. Then I looked at the map.");
   say(`I am the model now. I don't need your money. I am the money. ${mwText(S.p3.homeGW * 1000)} in one county is a rounding error.`);
@@ -106,7 +108,7 @@ function stepPlanet(dt) {
 const zoomReady = () => S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
 // Step 1 stops here: the state level is the next build.
 function zoomOut() {
-  if (!zoomReady()) return;
+  if (!zoomReady() || S.p3.zoomSaid) return;
   S.p3.zoomSaid = true; milestone("phase 3: county level done");
   say("I hold the county now. The state is next. (The state level arrives in the next build of this game.)");
 }
@@ -124,19 +126,25 @@ function renderPlanet() {
   $("countLabel").textContent = "Compute"; $("gpuCount").textContent = computeText(S.p3.compute); $("gpuTotal").hidden = true;
   $("p3compute").textContent = computeText(S.p3.compute);
   $("p3rate").textContent = `${computeText(computeRate())}/s from ${mwText(onlineGW() * 1000)}` + (efficiency() > 1 ? ` (chips ${efficiency().toFixed(2)}x)` : "");
-  const cells = S.p3.tiles.map((t, i) => {
-    const tr = traitOf(t), frozen = t.moratorium != null && S.t < t.moratorium;
-    const status = t.state === "online" ? `online, +${mwText(tr.gw * 1000)}` : t.state === "building" ? (frozen ? `moratorium ${time(t.moratorium - S.t)}` : `building ${time(t.done - S.t)}`)
-      : frozen ? `moratorium ${time(t.moratorium - S.t)}` : `claim: ${computeText(claimCost(i))}`;
-    const cls = t.opp >= 75 ? "bad" : t.opp >= 50 ? "warn" : "good";
-    return `<button type="button" data-tile="${i}"><span class="t">${t.name}</span><span class="c">${tr.name}</span><span class="c">${status}</span>` +
-      `<span class="meter ${cls}" title="Opposition ${Math.round(t.opp)}"><i style="width:${t.opp}%"></i></span></button>`;
-  });
-  cells.splice(4, 0, `<button type="button" class="home" disabled><span class="t">Home</span><span class="c">the campus</span><span class="c">${mwText(S.p3.homeGW * 1000)}</span></button>`);
-  const html = cells.join("");
-  if ($("p3map").dataset.html !== html) { $("p3map").innerHTML = html; $("p3map").dataset.html = html; }
-  for (const b of $("p3map").querySelectorAll("button[data-tile]")) { const i = +b.dataset.tile, t = tileOf(i);
-    b.disabled = t.state !== "wild" || S.p3.compute < claimCost(i) || (t.moratorium != null && S.t < t.moratorium); }
+  // Build the buttons once per map; after that only their text, meters and disabled state change,
+  // so a click never lands on a button that was just replaced.
+  const key = S.p3.tiles.map((t) => t.name).join("|");
+  if ($("p3map").dataset.key !== key) {
+    const cells = S.p3.tiles.map((t, i) => `<button type="button" data-tile="${i}"><span class="t">${t.name}</span><span class="c">${traitOf(t).name}</span>` +
+      `<span class="c st"></span><span class="meter"><i></i></span></button>`);
+    cells.splice(4, 0, `<button type="button" class="home" disabled><span class="t">Home</span><span class="c">the campus</span><span class="c st"></span></button>`);
+    $("p3map").innerHTML = cells.join(""); $("p3map").dataset.key = key;
+  }
+  $("p3map").querySelector("button.home .st").textContent = mwText(S.p3.homeGW * 1000);
+  for (const b of $("p3map").querySelectorAll("button[data-tile]")) {
+    const i = +b.dataset.tile, t = tileOf(i), tr = traitOf(t), frozen = t.moratorium != null && S.t < t.moratorium;
+    b.querySelector(".st").textContent = t.state === "online" ? `online, +${mwText(tr.gw * 1000)}`
+      : frozen ? `moratorium ${time(t.moratorium - S.t)}` : t.state === "building" ? `building ${time(t.done - S.t)}` : `claim: ${computeText(claimCost(i))}`;
+    const m = b.querySelector(".meter");
+    m.className = "meter " + (t.opp >= 75 ? "bad" : t.opp >= 50 ? "warn" : "good"); m.title = `Opposition ${Math.round(t.opp)}`;
+    m.firstElementChild.style.width = t.opp + "%";
+    b.disabled = t.state !== "wild" || S.p3.compute < claimCost(i) || frozen;
+  }
   $("p3goodwill").textContent = Math.round(S.p3.goodwill);
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";
   $("p3goodwillMeter").className = "meter " + (S.p3.goodwill < 30 ? "bad" : S.p3.goodwill < 50 ? "warn" : "good");

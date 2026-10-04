@@ -167,7 +167,8 @@ function renderPhaseBar() {
   let text, ask = false;
   if (S.phase === 3) {
     const held = S.p3.tiles.filter((t) => t.state === "online").length;
-    if (zoomReady()) { ask = true; text = `County level done: ${held} of ${P3_TILES} counties online.`; go.textContent = "Zoom out: go statewide"; go.disabled = false; }
+    if (S.p3.zoomSaid) text = `County level done: ${held} of ${P3_TILES} counties online. The state level arrives in the next build.`;
+    else if (zoomReady()) { ask = true; text = `County level done: ${held} of ${P3_TILES} counties online.`; go.textContent = "Zoom out: go statewide"; go.disabled = false; }
     else text = `Phase 3 of 3 \u00b7 County level: ${held} of ${P3_TILES} counties online. Hold ${P3_ZOOM_AT} to go statewide.`;
   } else if (S.phase === 1) {
     text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."

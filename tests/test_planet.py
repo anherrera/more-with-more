@@ -192,3 +192,37 @@ def test_six_counties_online_offers_the_zoom_out(game):
     assert pg.is_visible("#phaseGo") and "statewide" in pg.inner_text("#phaseGo").lower()
     pg.click("#phaseGo")
     assert "state" in pg.evaluate("() => S.log.at(-1)").lower()
+
+
+def test_map_buttons_survive_renders_so_clicks_land(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e9; render(); document.querySelector('#p3map button[data-tile=\"0\"]').__mark = 1; }")
+    for _ in range(3):
+        pg.evaluate("() => { step(1); render(); }")
+    assert pg.evaluate("() => document.querySelector('#p3map button[data-tile=\"0\"]').__mark") == 1
+
+
+def test_zoom_out_stub_fires_once(game):
+    pg = planet(game)
+    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.click("#phaseGo")
+    pg.evaluate("() => { zoomOut(); render(); }")
+    assert len([l for l in pg.evaluate("() => S.log") if "I hold the county" in l]) == 1
+    assert not pg.is_visible("#phaseGo")
+
+
+def test_phase2_news_stays_out_of_phase3(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.rival.next = S.t; S.nextChip = S.t; }")
+    run(pg, 2)
+    log = " ".join(pg.evaluate("() => S.log.slice(-6)"))
+    assert "PIVT" not in log and "legacy" not in log
+    assert "I " in pg.evaluate("() => S.log.at(-1)") or "Parallax shipped" in log
+
+
+def test_fires_from_phase2_dont_follow_you_to_the_map(game):
+    pg = ended_campus(game)
+    pg.evaluate("() => { S.fleet = {3: 1000}; S.gpus = 1000; firesOf().next = S.t; step(1); }")
+    pg.click("#phaseGo")
+    text = pg.inner_text("#alerts") if pg.is_visible("#alerts") else ""
+    assert "Fire" not in text
