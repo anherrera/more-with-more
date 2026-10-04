@@ -59,3 +59,59 @@ def test_reset_from_phase3(game):
     pg.click("#resetYes")
     assert pg.evaluate("() => S.phase") == 1
     assert pg.is_visible(".cols") and not pg.is_visible("#p3")
+
+
+def test_map_shows_home_and_eight_counties(game):
+    pg = planet(game)
+    assert len(pg.query_selector_all("#p3map button[data-tile]")) == 8
+    assert pg.is_visible("#p3map button.home")
+    names = pg.inner_text("#p3map")
+    assert "Cheap land" in names or "Strong grid" in names
+
+
+def test_compute_accrues_from_online_gigawatts(game):
+    pg = planet(game)
+    rate = pg.evaluate("() => computeRate()")
+    assert rate == pytest.approx(pg.evaluate("() => S.p3.homeGW * efficiency()"))
+    c0 = pg.evaluate("() => S.p3.compute")
+    run(pg, 10)
+    assert pg.evaluate("() => S.p3.compute") == pytest.approx(c0 + 10 * rate, rel=0.01)
+
+
+def test_claim_costs_about_a_minute_of_compute_and_builds(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e9; render(); }")
+    cost = pg.evaluate("() => claimCost(0)")
+    assert 30 * pg.evaluate("() => computeRate()") <= cost <= 120 * pg.evaluate("() => computeRate()")
+    pg.click("#p3map button[data-tile='0']")
+    assert pg.evaluate("() => S.p3.tiles[0].state") == "building"
+    secs = pg.evaluate("() => S.p3.tiles[0].done - S.t")
+    run(pg, secs + 1)
+    assert pg.evaluate("() => S.p3.tiles[0].state") == "online"
+    assert pg.evaluate("() => onlineGW()") > pg.evaluate("() => S.p3.homeGW")
+
+
+def test_claim_guards(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 0; claim(0); }")
+    assert pg.evaluate("() => S.p3.tiles[0].state") == "wild"
+    pg.evaluate("() => { S.p3.compute = 1e12; claim(0); }")
+    left = pg.evaluate("() => S.p3.compute")
+    pg.evaluate("() => claim(0)")                                  # twice: nothing
+    assert pg.evaluate("() => S.p3.compute") == left
+    pg.evaluate("() => { S.p3.tiles[1].moratorium = S.t + 60; claim(1); }")
+    assert pg.evaluate("() => S.p3.tiles[1].state") == "wild"
+
+
+def test_practice_speeds_later_counties(game):
+    pg = planet(game)
+    first = pg.evaluate("() => tileBuildSecs(0)")
+    pg.evaluate("() => { for (const i of [1, 2, 3, 4]) S.p3.tiles[i].state = 'online'; }")
+    assert pg.evaluate("() => tileBuildSecs(0)") < first
+
+
+def test_phase3_fits_a_laptop(game, page):
+    page.set_viewport_size({"width": 1440, "height": 900})
+    pg = planet(game)
+    bottom = pg.evaluate("() => Math.max(document.getElementById('p3map').getBoundingClientRect().bottom, document.getElementById('p3slider').getBoundingClientRect().bottom)")
+    assert bottom <= 900
