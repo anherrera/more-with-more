@@ -349,3 +349,12 @@ def test_headline_keeps_the_raw_gpu_count(game):
     n = pg.evaluate("() => p3GPUs()")
     assert f"{n:,} GPUs" in pg.inner_text(".count")
     assert n == pg.evaluate("() => Math.round(onlineGW() * 1e6 / newest().kw)")
+
+
+@pytest.mark.parametrize("level", [0, 1, 2])
+def test_names_match_their_traits(game, level):
+    pg = planet(game)
+    for _ in range(5):
+        ok = pg.evaluate(f"() => {{ const L = LEVELS[{level}], tiles = freshTiles({level});"
+                         " return tiles.every((t) => L.names[t.trait].includes(t.name)) && new Set(tiles.map((t) => t.name)).size === 8; }")
+        assert ok

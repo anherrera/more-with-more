@@ -10,8 +10,15 @@ const COUNTY_TRAITS = {
   nuclear:   { name: "Old nuclear plant",           gw: 3,   secs: 90, opp: 20 },
   retirees:  { name: "Retirement community",        gw: 1.5, secs: 60, opp: 30, townhall: true },
 };
-const COUNTY_NAMES = ["Loam County", "Big Wire County", "Meadowlark County", "Port Sorrow", "Lower Fiber Parish",
-  "Gravel Springs", "New Substation", "Cul-de-Sac County", "Turbine Falls", "Old Aquifer County"];
+// Names come in pools per trait, so a place sounds like what it is.
+const COUNTY_NAMES = {
+  cheap: ["Loam County", "Gravel Springs", "Cul-de-Sac County"],
+  grid: ["Big Wire County", "New Substation", "Old Aquifer County"],
+  organized: ["Port Sorrow", "Meadowlark County"],
+  college: ["Collegeville", "Lower Fiber Parish"],
+  nuclear: ["Reactor Bend", "Turbine Falls"],
+  retirees: ["Sunset Acres", "Shuffleboard Springs"],
+};
 // The state level: ten times the scale, and every state needs power before it counts.
 const STATE_TRAITS = {
   sunbelt:   { name: "Sunbelt: deserts, sun, no water",     gw: 15, secs: 60,  opp: 15, sunny: true },
@@ -21,8 +28,14 @@ const STATE_TRAITS = {
   plains:    { name: "Great Plains: wind and nothing else",  gw: 20, secs: 60,  opp: 10 },
   swing:     { name: "Swing state: every claim is a campaign issue", gw: 15, secs: 60, opp: 30, townhall: true },
 };
-const STATE_NAMES = ["Big Sky Grid", "New Mesa", "East Rust", "Hydro Valley", "The Plains", "Tech Coast", "Delaware (Spiritually)",
-  "Purple State", "Lake Effect", "Old Dominion Fiber"];
+const STATE_NAMES = {
+  sunbelt: ["New Mesa", "Sun Valley", "Cactus State"],
+  rust: ["East Rust", "Lake Effect"],
+  techcoast: ["Tech Coast", "Delaware (Spiritually)"],
+  hydro: ["Hydro Valley", "Dam Country"],
+  plains: ["The Plains", "Big Sky Grid", "Windward"],
+  swing: ["Purple State", "Old Dominion Fiber"],
+};
 // The country level: a hundred times the county, and the planet starts to warm.
 const COUNTRY_TRAITS = {
   nordic:    { name: "Cold country: free cooling",               gw: 100, secs: 80,  opp: 20, cold: true },
@@ -32,8 +45,14 @@ const COUNTRY_TRAITS = {
   island:    { name: "Island nation: sun and sea",               gw: 100, secs: 60,  opp: 15, sunny: true },
   mega:      { name: "Megacity state: huge grid, no land",       gw: 200, secs: 100, opp: 30 },
 };
-const COUNTRY_NAMES = ["Nordmark", "Petrolia", "Sovereignstan", "The Loud Republic", "Coralia", "Megalopolis",
-  "Grand Duchy of Fiber", "Kingdom of Tax", "Cold Coast", "Archipelago of Servers"];
+const COUNTRY_NAMES = {
+  nordic: ["Nordmark", "Cold Coast", "Fjordland"],
+  petro: ["Petrolia", "Grand Duchy of Fiber"],
+  sovereign: ["Sovereignstan", "Kingdom of Tax", "United Funds"],
+  democracy: ["The Loud Republic", "Republic of Debate"],
+  island: ["Coralia", "Archipelago of Servers"],
+  mega: ["Megalopolis", "Singular City"],
+};
 // The planet level: the continents and the oceans. The oceans are the heat sink.
 const PLANET_TRAITS = {
   continent: { name: "A continent",                                  gw: 1500, secs: 90,  opp: 25 },
@@ -82,8 +101,9 @@ function freshTiles(level) {
   }
   const kinds = L.kinds.slice();
   for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
-  const names = L.names.slice().sort(() => Math.random() - 0.5);
-  return kinds.map((k, i) => ({ name: names[i], trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null }));
+  const used = new Set();
+  const nameFor = (k) => { const n = L.names[k].filter((x) => !used.has(x)).sort(() => Math.random() - 0.5)[0]; used.add(n); return n; };
+  return kinds.map((k) => ({ name: nameFor(k), trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null }));
 }
 
 function freshP3() {
