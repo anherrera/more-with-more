@@ -33,7 +33,7 @@ const PROPOSALS = [
     pitch: "It was retired, not dead.",
     effect: (k) => `+${mwText(600 * k)} of grid in 4 minutes.`,
     when: () => energizedAt() >= 200 || hallMWAt() > powerAt(),
-    apply: (k) => { (S.p2.pendingGrid = S.p2.pendingGrid || []).push({ mw: 600 * k, at: S.t + 240, what: "The nuclear plant is back online. The model watched the whole restart. It did not blink." }); } },
+    apply: (k) => { (S.p2.pendingGrid = S.p2.pendingGrid || []).push({ mw: 600 * k, at: S.t + 240, what: "The nuclear plant is back online, with a new name. The old name tested poorly. The model watched the whole restart. It did not blink." }); } },
   { id: "eminent", title: "Use eminent domain", weight: 16, cost: 400e6,
     pitch: "The neighbors have been very understanding. They will be more understanding after this.",
     effect: (k) => `+${Math.round(5000 * k).toLocaleString("en-US")} acres.`,

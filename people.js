@@ -134,6 +134,7 @@ function stepTown(dt) {
     t.moratorium = S.t + MORATORIUM_SECS;
     ceoStrike("a moratorium");
     say(`The county passed a moratorium on new data center halls. ${time(MORATORIUM_SECS)}, or until the next election, whichever comes first.`);
+    say("Your board's statement: \u201cWe've signed the principles.\u201d Nobody asked which principles.");
   }
   if (!S.p2.builds.some((b) => b.kind === "hall")) return;
   if (t.nextHall == null) t.nextHall = S.t + 180 + Math.random() * 120;

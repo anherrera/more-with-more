@@ -243,8 +243,23 @@ const RIVAL_WEIRD = [
   ["PivotCloud was added to a major index. Index funds must buy it. Index funds must also, apparently, feel good about you.", +8, 0.35],
   ["A PivotCloud customer defaulted and returned 20,000 GPUs. \u201cSpot supply glut\u201d headlines. Your hype dips in sympathy.", -9, -0.45],
 ];
+// The rest of the neocloud neighborhood: [line, hype change for you]. Made up, like everyone else here.
+const NEOCLOUD_NEWS = [
+  ["Flarewell Compute burns the gas oil fields were going to flare anyway. It used to mine bitcoin with it. Now the gas thinks.", +4],
+  ["Flarewell Compute's pitch deck: \u201cWaste not.\u201d Slide two is a photo of a flare stack with a GPU drawn on it.", +3],
+  ["Flarewell Compute bought another gas field. Its sustainability report calls this \u201cpower diversity.\u201d", -3],
+  ["Elsewhere Cloud reminded investors, for the ninth time this week, that it is Dutch.", +2],
+  ["Elsewhere Cloud is the international leftovers of a large search engine you're not allowed to name. Its HQ is in Amsterdam. Very much in Amsterdam.", 0],
+  ["Elsewhere Cloud built a data center in Finland, where the cooling is free and the sun is optional. Investors asked why you aren't in Finland.", -4],
+];
 function rivalNews() {
   const R = S.rival;
+  if (Math.random() < 0.2) {
+    const [line, dh] = NEOCLOUD_NEWS[Math.floor(Math.random() * NEOCLOUD_NEWS.length)];
+    R.next = S.t + 80 + Math.random() * 60; S.hype = Math.max(5, S.hype + dh);
+    say(dh ? `${line} Your hype ${dh > 0 ? "+" : ""}${dh}.` : line);
+    return;
+  }
   if (Math.random() < 0.35) {
     const [line, dh, shock] = RIVAL_WEIRD[Math.floor(Math.random() * RIVAL_WEIRD.length)];
     R.prev = R.px; R.px = Math.max(3, R.px * Math.exp(shock)); R.n += 1; R.next = S.t + 80 + Math.random() * 60;
