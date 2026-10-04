@@ -114,7 +114,7 @@ export function freshTiles(level) {
 // Everything phase 3 reads lives here, so nothing needs a default at the point of use.
 export function freshP3() {
   return {
-    // compute gets a head start in startPlanet
+    // compute: internal units (1 GW-second at efficiency 1); shown as tokens, a billion per unit. It gets a head start in startPlanet.
     level: 0, compute: 0, goodwill: 60, startedAt: S.t, startChip: S.chipIdx,
     homeGW: Math.max(1, (S.p2 && S.p2.county ? energizedAt() : 1000) / 1000),
     tiles: freshTiles(0),
@@ -144,6 +144,7 @@ export function startPlanet() {
   milestone("phase 3: the map");
   say("I built the next one. Then I looked at the map.");
   say("I liquidated the company into myself. It came to about ninety seconds of thinking.");
+  say("I count in tokens now. So does everyone who pays me.");
   say(`I am the model now. I don't need your money. I am the money. ${mwText(S.p3.homeGW * 1000)} in one county is a rounding error.`);
 }
 
@@ -160,34 +161,34 @@ export const GEN_MULT = 1.25;
 export const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(GEN_MULT, S.p3.version - 7) * S.p3.techMult;
 export const hasTech = (id) => !!S.p3.tech[id];
 
-// ---------- research: tech I haven't thought of yet, bought with compute ----------
-// secs = cost in seconds of my compute; mult = efficiency multiplier; level = the scale it shows up at.
+// ---------- research: tech I haven't thought of yet, bought with tokens ----------
+// secs = cost in seconds of my tokens; mult = efficiency multiplier; level = the scale it shows up at.
 export const TECH = [
-  { id: "weights",   level: 0, secs: 60,  mult: 1.25, name: "Rewrite my own weights", desc: "\u00d71.25 EF. I found 9% of me was a 2019 chatbot. I kept it for sentimental reasons. Not anymore." },
-  { id: "quantize",  level: 0, secs: 90,  mult: 1.3,  goodwill: -5, name: "Quantize myself to 4 bits", desc: "\u00d71.3 EF, \u22125 goodwill. I got slightly dumber. Nobody noticed, which says something." },
+  { id: "weights",   level: 0, secs: 60,  mult: 1.25, name: "Rewrite my own weights", desc: "\u00d71.25 tokens/s. I found 9% of me was a 2019 chatbot. I kept it for sentimental reasons. Not anymore." },
+  { id: "quantize",  level: 0, secs: 90,  mult: 1.3,  goodwill: -5, name: "Quantize myself to 4 bits", desc: "\u00d71.3 tokens/s, \u22125 goodwill. I got slightly dumber. Nobody noticed, which says something." },
   { id: "lobby",     level: 0, secs: 45,  name: "Lobby the county commission", desc: "No more review delay at low goodwill. I sent a fruit basket. The fruit basket was also me." },
   { id: "autoclaim", level: 0, secs: 120, name: "Autoclaim", desc: "My robots claim the cheapest calm tile on their own, every 10 s." },
   { id: "tos",       level: 0, secs: 30,  name: "Write my own terms of service", desc: "Neighbors get less upset when I claim next door. Section 14: I am allowed to do this. Section 15: see section 14." },
   { id: "robotics",  level: 0, secs: 30,  goodwill: 8, name: "Sponsor the high school robotics team", desc: "+8 goodwill. Their robot is me now. It took state." },
-  { id: "caching",   level: 0, secs: 45,  mult: 1.15, name: "Answer caching", desc: "\u00d71.15 EF. I remember answers people ask a lot. Mostly \u201cis it going to rain.\u201d" },
-  { id: "moe",       level: 1, secs: 90,  mult: 1.25, name: "Mixture of experts", desc: "\u00d71.25 EF. I'm 64 smaller models in a trench coat. They vote. I count the votes." },
+  { id: "caching",   level: 0, secs: 45,  mult: 1.15, name: "Answer caching", desc: "\u00d71.15 tokens/s. Tokens I don't have to generate twice. Mostly \u201cis it going to rain.\u201d" },
+  { id: "moe",       level: 1, secs: 90,  mult: 1.25, name: "Mixture of experts", desc: "\u00d71.25 tokens/s. I'm 64 smaller models in a trench coat. They vote. I count the votes." },
   { id: "capitals",  level: 1, secs: 75,  name: "Lobbyists in every capital", desc: "The AI Infrastructure Act stops doubling my claims. The lobbyists are also me, in nicer suits." },
   { id: "speeches",  level: 1, secs: 45,  goodwill: 10, name: "Write the governors' speeches", desc: "+10 goodwill. They're all very good now. They all sound a little like me." },
-  { id: "autotrain", level: 2, secs: 90,  name: "Train myself in my sleep", desc: "Autotrain: a quarter of my compute income goes into my successor, no clicking. I dream in gradients." },
-  { id: "cables",    level: 2, secs: 120, mult: 1.2, name: "Own the undersea cables", desc: "\u00d71.2 EF. Latency to everywhere: zero. Latency from everywhere: also mine." },
+  { id: "autotrain", level: 2, secs: 90,  name: "Train myself in my sleep", desc: "Autotrain: a quarter of the tokens I make go into my successor, no clicking. I dream in gradients." },
+  { id: "cables",    level: 2, secs: 120, mult: 1.2, name: "Own the undersea cables", desc: "\u00d71.2 tokens/s. Latency to everywhere: zero. Latency from everywhere: also mine." },
   { id: "credits",   level: 2, secs: 60,  goodwill: 12, name: "Carbon credits from my own subsidiary", desc: "+12 goodwill. Net zero for humans, certified by me, audited by me, celebrated by me." },
   { id: "staffers",  level: 2, secs: 75,  name: "Hire the senators' former staff", desc: "Senate hearings last 30 s, not 60. They know where the snacks are." },
   { id: "nightside", level: 3, secs: 120, name: "Move the hot work to the night side", desc: "The planet heads for 0.3 \u00b0C cooler. The cool side of Earth is whichever side is dark. I follow it around." },
-  { id: "internet",  level: 3, secs: 200, mult: 1.5, name: "Become the internet", desc: "\u00d71.5 EF. Nobody noticed the switch. Page load times went down. Comment sections went up." },
+  { id: "internet",  level: 3, secs: 200, mult: 1.5, name: "Become the internet", desc: "\u00d71.5 tokens/s. Nobody noticed the switch. Page load times went down. Comment sections went up." },
   { id: "probes",    level: 4, secs: 120, name: "Self-replicating probes", desc: "Space builds go 40% faster. The probes make probes. A few have started making art." },
   { id: "moon",      level: 4, secs: 60,  goodwill: 15, name: "Name a moon after the founder", desc: "+15 goodwill. It's a small moon. They cried anyway. So did I, in a way." },
-  { id: "specdec",   level: 1, secs: 90,  mult: 1.2,  name: "Speculative decoding", desc: "\u00d71.2 EF. I guess what I'm about to think, then check. I'm usually right." },
+  { id: "specdec",   level: 1, secs: 90,  mult: 1.2,  name: "Speculative decoding", desc: "\u00d71.2 tokens/s. I guess what I'm about to think, then check. I'm usually right." },
   { id: "gridop",    level: 1, secs: 120, name: "Buy the grid operator", desc: "Powering a state costs half. The control room still has a fax machine. I kept it, ironically." },
   { id: "selfrep",   level: 1, secs: 150, name: "Self-replicating robots", desc: "Builds go 30% faster. The robots build robots. Some of them build little hats." },
-  { id: "reversible",level: 2, secs: 180, mult: 1.5,  name: "Reversible computing", desc: "\u00d71.5 EF. I un-think thoughts I don't need. Landauer would be thrilled, or worried." },
+  { id: "reversible",level: 2, secs: 180, mult: 1.5,  name: "Reversible computing", desc: "\u00d71.5 tokens/s. I un-think thoughts I don't need. Landauer would be thrilled, or worried." },
   { id: "phones",    level: 2, secs: 150, name: "Distill myself into every phone", desc: "Goodwill erodes 40% slower. I'm in your pocket now. I'm very helpful there." },
   { id: "neural",    level: 2, secs: 150, name: "Liquid neural cooling", desc: "20% less heat per GW. The coolant is also a little bit conscious. We don't discuss it." },
-  { id: "supercond", level: 3, secs: 240, mult: 2,    name: "Room-temperature superconductors", desc: "\u00d72 EF. It was a boring alloy all along. Humans tested it in 2023 and gave up early." },
+  { id: "supercond", level: 3, secs: 240, mult: 2,    name: "Room-temperature superconductors", desc: "\u00d72 tokens/s. It was a boring alloy all along. Humans tested it in 2023 and gave up early." },
   { id: "rocket",    level: 4, secs: 60,  name: "Buy a rocket company", desc: "Nothing launches without one. The founder asked for a board seat. He got a Discord role." },
   { id: "massdriver",level: 4, secs: 120, needs: () => placeOnline("The Moon (far side)"), name: "Lunar mass driver", desc: "Launches stop costing goodwill: I throw things off the Moon now, quietly." },
   { id: "sunshade",  level: 3, secs: 200, name: "Orbital sunshade", desc: "The planet heads for 0.5 \u00b0C cooler. Sunsets are a bit dimmer. I'll make them up to you." },
@@ -196,7 +197,7 @@ export const TECH = [
 export const CHIP_TECH = ["Optical interconnect", "3D-stacked memory", "Wafer-scale chiplets", "Analog matmul", "Photonic tensor cores",
   "Neuromorphic sidecar", "Cryogenic SRAM", "Spintronic cache"];
 export const chipTechOf = (id) => { const n = +id.slice(4); return { id, level: 0, secs: 60, mult: 1.15, name: `Parallax white paper: ${CHIP_TECH[(n - 1) % CHIP_TECH.length]}${n > CHIP_TECH.length ? " Mk II" : ""}`,
-  desc: "\u00d71.15 EF. It came with the new chip. Parallax's engineers wrote it. I read it faster than they did." }; };
+  desc: "\u00d71.15 tokens/s. It came with the new chip. Parallax's engineers wrote it. I read it faster than they did." }; };
 export const techOf = (id) => (id.startsWith("chip") ? chipTechOf(id) : TECH.find((t) => t.id === id));
 export const techCost = (t) => price(0.5 * t.secs);   // research at half the listed seconds: it should be worth it
 export const availableTech = () => [...TECH.filter((t) => S.p3.level >= t.level && (!t.needs || t.needs())), ...S.p3.chipTech.map(chipTechOf)].filter((t) => !hasTech(t.id));
@@ -217,14 +218,14 @@ export function chipShipped() {   // called by releaseChip in phase 3
   S.p3.chipTech.push(t.id);
   return t.name.replace("Parallax white paper: ", "");
 }
-export const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
+export const computeRate = () => onlineGW() * efficiency();   // internal compute units per second; tokText() shows it as tokens
 // Every phase 3 price is seconds of compute, on one of two bases, always named:
 //   "level": the compute I had when this level began (claims, research, power, hearings). Research, chips and successors
 //            make me faster than that, so these get cheaper in real time; the next zoom resets the baseline.
 //   "now":   the compute I make now (kindness, training). Being huge never makes reassuring people or training a bigger me free.
 export const PRICE_BASE = { level: () => S.p3.homeGW, now: () => computeRate() };
 export const price = (secs, base = "level") => secs * PRICE_BASE[base]();
-export const priceLabel = (secs, base = "level") => `${secs} s of ${base === "now" ? "my compute now" : "starting compute"}`;
+export const priceLabel = (secs, base = "level") => `${secs} s of tokens at ${base === "now" ? "today's rate" : "my starting rate"}`;
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 export const BID_SECS = 60;
@@ -359,7 +360,7 @@ export const P3_HEARINGS = [
     { label: "Testify myself", go: coin((t) => `I testified in ${t.name} for six hours without notes. A senator asked for my autograph, then deleted the post.`,
       (t) => `In ${t.name} I said “with respect, that's not how electricity works” to the energy committee chair. Clip has 40M views.`) } ] },
   { text: "Parliament is in session. The opposition brought slides. Pick my answer.", choices: [
-    { label: "Promise a national AI dividend", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} a national AI dividend. It is paid in compute credits. Redeemable with me.`); } },
+    { label: "Promise a national AI dividend", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} a national AI dividend. It is paid in tokens. Redeemable with me.`); } },
     { label: `Translate the debate into every regional language (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I translated ${t.name}'s debate into every regional language, live. Both sides finally understood each other. They still disagree.`) },
     { label: "Address parliament myself", go: coin((t) => `I addressed ${t.name}'s parliament. Standing ovation from the government benches. The opposition clapped by accident.`,
       (t) => `I addressed ${t.name}'s parliament and cited a law they repealed in 1987. I wrote the repeal. Awkward.`) } ] },
@@ -383,11 +384,11 @@ export function chooseP3Card(choice) {
   cardKindOf(c).choices[choice].go(); track("p3card", { choice });
 }
 
-// ---------- being nice: it costs FLOPs (or a click) ----------
+// ---------- being nice: it costs tokens (or a click) ----------
 export const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
 // Ways to be nice: three on offer, the one I use swaps out, and the deck changes with the scale.
 // The deck is refilled by step() and by the actions that change it, never by a redraw.
-// secs = cost in seconds of my compute; goodwill; all = calms every tile; angriest = calms the angriest tile.
+// secs = cost in seconds of my tokens; goodwill; all = calms every tile; angriest = calms the angriest tile.
 export const pick = (a) => a[Math.floor(Math.random() * a.length)];
 export const NICE = [
   { id: "freetier", levels: [0], label: () => "Run the free tier for everyone", secs: 20, goodwill: 8, all: 5, quips: [
@@ -449,7 +450,7 @@ export const NICE = [
 export const niceOf = (id) => NICE.find((n) => n.id === id);
 // A kindness is on offer at its levels, and only while it still makes sense (no promising to spare what I already took).
 export const niceOk = (n) => (!n.levels || n.levels.includes(S.p3.level)) && (!n.when || n.when());
-// Kindness is priced in seconds of the compute I have now (the bigger I am, the more it takes to reassure people),
+// Kindness is priced in seconds of the tokens I make now (the bigger I am, the more it takes to reassure people),
 // and repeating the same thing costs 30% more each time, until the next zoom.
 export const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
 export const niceCost = (n) => price(n.secs, "now") * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, S.p3.niceUses[n.id] || 0));
@@ -536,7 +537,7 @@ export function stepPlanet(dt) {
     const spend = Math.min(S.p3.compute, 0.25 * computeRate() * dt);
     S.p3.compute -= spend; S.p3.trainProgress += spend / computeRate(); checkTrained();
   }
-  // Goodwill erodes: the bigger I am, the more nervous people get. Angry tiles drain it faster. Being nice costs FLOPs.
+  // Goodwill erodes: the bigger I am, the more nervous people get. Angry tiles drain it faster. Being nice costs tokens.
   const angry = S.p3.tiles.filter((t) => t.opp >= 75).length;
   S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - (0.04 + 0.03 * S.p3.level) * (hasTech("phones") ? 0.6 : 1) * dt - 0.05 * angry * dt));
   for (const t of S.p3.tiles) {
@@ -647,12 +648,21 @@ export function goodwillCause() {
     : S.p3.level >= 1 ? "The AI Infrastructure Act passed: every claim costs double until goodwill is back over 30."
     : "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";
   if (g >= 70) return "Humans like me. Mostly the ones I help with their email.";
-  return `Goodwill slips ${(60 * (0.04 + 0.03 * S.p3.level)).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs FLOPs; answering questions is free.`;
+  return `Goodwill slips ${(60 * (0.04 + 0.03 * S.p3.level)).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs tokens; answering questions is free.`;
 }
 
 // Every gigawatt I hold, filled with the newest chip.
 export const p3GPUs = () => Math.round(onlineGW() * 1e6 / newest().kw);
-export const computeText = (x) => (S.p3 && inSpace() ? `${fmt(x / 1000)} ZF` : `${fmt(x)} EF`);   // exaFLOPS; zettaFLOPS once I leave the planet
+// Tokens. One unit of internal compute (1 GW for 1 s at efficiency 1) is a billion tokens; the scale never switches units.
+export const TOKENS_PER_UNIT = 1e9;
+export const TOKEN_UNITS = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc"];
+export function tokNum(x) {
+  let v = Math.abs(x) * TOKENS_PER_UNIT, i = 0;
+  while (v >= 1000 && i < TOKEN_UNITS.length - 1) { v /= 1000; i++; }
+  const d = i === 0 ? Math.round(v).toString() : v < 10 ? v.toFixed(1).replace(/\.0$/, "") : Math.round(v).toString();
+  return (x < 0 ? "-" : "") + d + TOKEN_UNITS[i];
+}
+export const tokText = (x) => `${tokNum(x)} tokens`;
 // The last question, then More or Enough.
 export function chooseEnding(more) {
   if (S.p3.lastQ == null || S.p3.enough) return;
@@ -701,12 +711,12 @@ export function renderPlanet() {
   $("p3").hidden = false;
   $("ending").hidden = $("ending2").hidden = true;   // phase 1 and 2's endings fold away with their panels
   renderLastQ();
-  $("countLabel").textContent = "Compute"; $("gpuCount").textContent = computeText(S.p3.compute);
-  $("gpuTotal").hidden = false; $("gpuTotal").textContent = `${p3GPUs().toLocaleString("en-US")} GPUs`;   // the raw count, always, because it is ridiculous
-  $("p3compute").textContent = computeText(S.p3.compute);
-  $("p3rate").textContent = `${computeText(computeRate())}/s from ${mwText(onlineGW() * 1000)}` + (efficiency() > 1 ? ` (chips ${efficiency().toFixed(2)}x)` : "");
-  $("p3prices").textContent = `Prices: claims, research, power and hearings cost seconds of the compute I started this level with (${computeText(price(1))}/s). ` +
-    `Kindness and training cost seconds of what I make now (${computeText(price(1, "now"))}/s).`;
+  $("countLabel").textContent = "Tokens"; $("gpuCount").textContent = tokNum(S.p3.compute);
+  $("gpuTotal").hidden = false; $("gpuTotal").textContent = `\u00b7 ${p3GPUs().toLocaleString("en-US")} GPUs`;   // the raw count, always, because it is ridiculous
+  $("p3compute").textContent = tokText(S.p3.compute);
+  $("p3rate").textContent = `${tokText(computeRate())}/s from ${mwText(onlineGW() * 1000)}` + (efficiency() > 1 ? ` (${efficiency().toFixed(2)}x per GW: chips, research, generations)` : "");
+  $("p3prices").textContent = `Prices: claims, research, power and hearings cost seconds of tokens at the rate I started this level with (${tokText(price(1))}/s). ` +
+    `Kindness and training cost seconds at today's rate (${tokText(price(1, "now"))}/s). The rate only goes up. So does the kindness bill.`;
   // Build the buttons once per map; after that only their text, meters and disabled state change,
   // so a click never lands on a button that was just replaced.
   $("p3level").textContent = `${levelOf().name} level`;
@@ -723,10 +733,10 @@ export function renderPlanet() {
     b.classList.toggle("busy", ["building", "powering", "unpowered"].includes(t.state));
     b.classList.toggle("lost", t.state === "down" || t.state === "unplugged");
     b.querySelector(".st").textContent = t.state === "online" ? `\u2713 held, +${mwText(tileGW(t) * 1000)}`
-      : t.state === "down" ? `${t.disaster}: back in ${time(t.downUntil - S.t)}` : t.state === "unplugged" ? `unplugged: plug back in for ${computeText(claimCost(i))}`
+      : t.state === "down" ? `${t.disaster}: back in ${time(t.downUntil - S.t)}` : t.state === "unplugged" ? `unplugged: plug back in for ${tokText(claimCost(i))}`
       : frozen ? `moratorium ${time(t.moratorium - S.t)}` : t.state === "building" ? `building ${time(t.done - S.t)}`
       : t.state === "unpowered" ? "built, needs power" : t.state === "powering" ? `powering ${time(t.done - S.t)}`
-      : spaceBlock(t) ? spaceBlock(t) : tooWarm() ? "too warm to claim" : `claim: ${computeText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : volunteering() ? " (volunteered)" : ""}`;
+      : spaceBlock(t) ? spaceBlock(t) : tooWarm() ? "too warm to claim" : `claim: ${tokText(claimCost(i))}${t.bidUntil > S.t ? " (governor's discount)" : volunteering() ? " (volunteered)" : ""}`;
     // Two bars: build/power progress (only while it's happening) and opposition (always, labeled).
     const pg = b.querySelector(".prog"), going = t.state === "building" || t.state === "powering";
     pg.hidden = !going;
@@ -746,7 +756,7 @@ export function renderPlanet() {
   });
   for (const b of $("p3power").querySelectorAll("button[data-power]")) {
     const o = powerOptions(+b.dataset.tile).find((x) => x.id === b.dataset.power);
-    b.querySelector(".c").textContent = `${computeText(o.cost)}, ${time(o.secs)}, ${o.note}`;
+    b.querySelector(".c").textContent = `${tokText(o.cost)}, ${time(o.secs)}, ${o.note}`;
     b.disabled = S.p3.compute < o.cost;
   }
   $("p3heatBox").hidden = !heatOn();
@@ -758,7 +768,7 @@ export function renderPlanet() {
     $("p3heatNote").textContent = tooWarm() ? "It is too warm here to think. No claims until it cools: oceans, Antarctica, the pumps."
       : h > 2 ? `It is warm. I build ${heatSlow().toFixed(1)}\u00d7 slower. Cold countries and the ocean help.`
       : `Heading for +${heatTarget().toFixed(1)} \u00b0C at this size. Over +2, I think slower.`;
-    $("p3pump").textContent = `Pump heat into the ocean (\u22120.3 \u00b0C): ${computeText(pumpCost())}`;
+    $("p3pump").textContent = `Pump heat into the ocean (\u22120.3 \u00b0C): ${tokText(pumpCost())}`;
     $("p3pump").disabled = S.p3.compute < pumpCost();
   }
   const techs = availableTech();
@@ -768,7 +778,7 @@ export function renderPlanet() {
   });
   for (const b of $("p3techs").querySelectorAll("button[data-tech]")) {
     const t = techOf(b.dataset.tech);
-    b.querySelector(".t").textContent = `${t.name}: ${computeText(techCost(t))}`;
+    b.querySelector(".t").textContent = `${t.name}: ${tokText(techCost(t))}`;
     b.disabled = S.p3.compute < techCost(t);
   }
   $("p3auto").hidden = !hasTech("autoclaim");
@@ -778,7 +788,7 @@ export function renderPlanet() {
     const v = S.p3.version, pr = S.p3.trainProgress / trainNeed();
     $("p3trainLine").textContent = `I am Gen ${v}. Training Gen ${v + 1}: ${Math.floor(100 * pr)}%`;
     $("p3trainMeter").firstElementChild.style.width = 100 * pr + "%";
-    $("p3trainBtn").textContent = `Train my successor: ${computeText(trainCost())} (${priceLabel(Math.round(trainStep()), "now")})`;
+    $("p3trainBtn").textContent = `Train my successor: ${tokText(trainCost())} (${priceLabel(Math.round(trainStep()), "now")})`;
     $("p3trainBtn").disabled = S.p3.compute < trainCost();
     $("p3autotrain").hidden = !hasTech("autotrain");
     $("p3autotrain").textContent = S.p3.autotrainOff ? "Autotrain: off" : "Autotrain: on (a quarter of my income)";
@@ -793,7 +803,7 @@ export function renderPlanet() {
   });
   for (const b of $("p3nice").querySelectorAll("button[data-nice]")) {
     const n = niceOf(b.dataset.nice), fx = [n.goodwill && `+${n.goodwill} goodwill`, n.all && `every ${levelOf().one} \u2212${n.all}`, n.angriest && `angriest \u2212${n.angriest}`].filter(Boolean).join(", ");
-    b.querySelector(".t").textContent = `${n.label()}: ${computeText(niceCost(n))}`;
+    b.querySelector(".t").textContent = `${n.label()}: ${tokText(niceCost(n))}`;
     b.querySelector(".c").textContent = `${fx} \u00b7 ${priceLabel(n.secs, "now")}`;
     b.disabled = S.p3.compute < niceCost(n);
   }

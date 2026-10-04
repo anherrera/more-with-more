@@ -11,6 +11,6 @@ caffeinate -dimsu uv run --with pytest --with playwright --with pytest-rerunfail
 git add -A
 git commit -q -m "$1
 
-Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 git -C ../more-with-more-play checkout -q --detach main
 echo "shipped locally: $(git log --oneline -1)  (not pushed; run tools/publish.sh when ready for GitHub + the public site)"

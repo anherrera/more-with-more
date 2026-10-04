@@ -1,5 +1,5 @@
-"""Phase 3 prices are seconds of compute, on one of two explicit bases: the compute I had when the level began
-("level": claims, research, power, hearings) or the compute I make now ("now": kindness, training)."""
+"""Phase 3 prices are seconds of tokens, on one of two explicit bases: the rate I had when the level began
+("level": claims, research, power, hearings) or the rate I make now ("now": kindness, training)."""
 import pytest
 
 from conftest import run, planet, nationwide
@@ -19,20 +19,20 @@ def test_one_helper_prices_everything_and_names_its_base(game):
     assert r["nice"] == pytest.approx(now) and r["train"] == pytest.approx(now)
 
 
-def test_hearing_choices_say_which_compute_they_cost(game):
+def test_hearing_choices_say_which_rate_they_cost(game):
     pg = planet(game)
     labels = pg.evaluate("() => P3_HEARINGS.flatMap((h) => h.choices.map((c) => c.label)).filter((l) => /\\d+ s/.test(l))")
     assert len(labels) == 4
-    assert all("FLOPs" not in l and "starting compute" in l for l in labels)
+    assert all("FLOPs" not in l and "compute" not in l and "starting rate" in l for l in labels)
 
 
 def test_buttons_and_the_me_panel_name_the_pricing_base(game):
     pg = nationwide(game)
     pg.evaluate("() => render()")
-    assert "compute now" in pg.inner_text("#p3trainBtn")
-    assert "compute now" in pg.inner_text("#p3nice")
+    assert "today's rate" in pg.inner_text("#p3trainBtn")
+    assert "today's rate" in pg.inner_text("#p3nice")
     prices = pg.inner_text("#p3prices")
-    assert "started this level with" in prices and "now" in prices and prices.startswith("Prices")
+    assert "started this level with" in prices and "today's rate" in prices and prices.startswith("Prices")
 
 
 def test_phase3_opens_with_ninety_seconds_of_thinking(game):
