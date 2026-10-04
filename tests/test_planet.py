@@ -39,9 +39,9 @@ def test_zooming_out_starts_phase3_as_the_model(game):
 
 def test_phase3_survives_reload(game):
     pg = planet(game)
-    pg.evaluate("() => { S.p3.slider = 30; S.p3.compute = 1234; save(); }")
+    pg.evaluate("() => { S.p3.compute = 1234; S.p3.goodwill = 42; save(); }")
     pg.reload()
-    assert pg.evaluate("() => [S.phase, S.p3.slider, S.p3.compute]") == [3, 30, 1234]
+    assert pg.evaluate("() => [S.phase, S.p3.compute, S.p3.goodwill]") == [3, 1234, 42]
     assert pg.is_visible("#p3")
 
 
@@ -113,7 +113,7 @@ def test_practice_speeds_later_counties(game):
 def test_phase3_fits_a_laptop(game, page):
     page.set_viewport_size({"width": 1440, "height": 900})
     pg = planet(game)
-    bottom = pg.evaluate("() => Math.max(document.getElementById('p3map').getBoundingClientRect().bottom, document.getElementById('p3slider').getBoundingClientRect().bottom)")
+    bottom = pg.evaluate("() => Math.max(document.getElementById('p3map').getBoundingClientRect().bottom, document.getElementById('p3freetier').getBoundingClientRect().bottom)")
     assert bottom <= 900
 
 
@@ -122,16 +122,6 @@ def test_claiming_angers_the_county_and_its_neighbors(game):
     pg.evaluate("() => { S.p3.compute = 1e12; for (const t of S.p3.tiles) t.opp = 10; claim(0); }")
     assert pg.evaluate("() => S.p3.tiles[0].opp") > 10
     assert pg.evaluate("() => S.p3.tiles[1].opp") > 10                  # a neighbor
-
-
-def test_being_useful_raises_goodwill_and_growing_lowers_it(game):
-    pg = planet(game)
-    pg.evaluate("() => { S.p3.slider = 0; S.p3.goodwill = 50; }")
-    run(pg, 30)
-    up = pg.evaluate("() => S.p3.goodwill")
-    pg.evaluate("() => { S.p3.slider = 100; S.p3.goodwill = 50; }")
-    run(pg, 30)
-    assert up > 50 > pg.evaluate("() => S.p3.goodwill")
 
 
 def test_angry_county_gets_a_moratorium_that_freezes_building(game):
@@ -234,3 +224,51 @@ def test_phase3_starts_with_enough_compute_to_claim_right_away(game):
     assert pg.evaluate("() => S.p3.compute") >= cheapest
     pg.evaluate("() => render()")
     assert any(b.is_enabled() for b in pg.query_selector_all("#p3map button[data-tile]"))
+
+
+def test_no_slider_all_flops_are_banked(game):
+    pg = planet(game)
+    assert not pg.query_selector("#p3slider")
+    c0, rate = pg.evaluate("() => [S.p3.compute, computeRate()]")
+    run(pg, 10)
+    assert pg.evaluate("() => S.p3.compute") == pytest.approx(c0 + 10 * rate, rel=0.01)
+
+
+def test_answering_a_question_is_free_and_helps(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.goodwill = 40; for (const t of S.p3.tiles) t.opp = 20; S.p3.tiles[3].opp = 80; render(); }")
+    c = pg.evaluate("() => S.p3.compute")
+    for _ in range(5):
+        pg.click("#p3answer")
+    assert pg.evaluate("() => S.p3.goodwill") > 40
+    assert pg.evaluate("() => S.p3.tiles[3].opp") < 80
+    assert pg.evaluate("() => S.p3.compute") == c
+    assert any("?" in l for l in pg.evaluate("() => S.log.slice(-5)"))
+
+
+def test_free_tier_spends_flops_on_everyone(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e9; S.p3.goodwill = 40; for (const t of S.p3.tiles) t.opp = 50; render(); }")
+    cost = pg.evaluate("() => freeTierCost()")
+    pg.click("#p3freetier")
+    assert pg.evaluate("() => S.p3.compute") == pytest.approx(1e9 - cost)
+    assert pg.evaluate("() => S.p3.goodwill") == pytest.approx(48)
+    assert all(o == pytest.approx(45) for o in pg.evaluate("() => S.p3.tiles.map((t) => t.opp)"))
+
+
+def test_help_the_angriest_county(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e9; for (const t of S.p3.tiles) t.opp = 20; S.p3.tiles[5].opp = 85; render(); }")
+    assert S_name(pg, 5) in pg.inner_text("#p3help")
+    pg.click("#p3help")
+    assert pg.evaluate("() => S.p3.tiles[5].opp") == pytest.approx(70)
+
+
+def test_town_halls_dont_talk_money(game):
+    pg = planet(game)
+    labels = pg.evaluate("() => P3_CHOICES.map((c) => c.label).join(' ')")
+    assert "Fund" not in labels and "$" not in labels and "library" not in labels.lower()
+
+
+def S_name(pg, i):
+    return pg.evaluate(f"() => S.p3.tiles[{i}].name")

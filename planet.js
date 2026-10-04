@@ -19,7 +19,7 @@ function freshP3() {
   const names = COUNTY_NAMES.slice().sort(() => Math.random() - 0.5);
   return {
     // compute gets a head start in startPlanet
-    level: 0, compute: 0, slider: 50, goodwill: 60, startedAt: S.t, startChip: S.chipIdx,
+    level: 0, compute: 0, goodwill: 60, startedAt: S.t, startChip: S.chipIdx,
     homeGW: Math.max(1, (S.p2 && S.p2.county ? energizedAt() : 1000) / 1000),
     tiles: kinds.map((k, i) => ({ name: names[i], trait: k, state: "wild", opp: COUNTY_TRAITS[k].opp, done: null, moratorium: null })),
     card: null, nextCard: null, zoomSaid: false,
@@ -39,7 +39,6 @@ function startPlanet() {
 }
 
 const P3_MORATORIUM_AT = 90, P3_MORATORIUM_SECS = 60;
-const usefulShare = () => (100 - S.p3.slider) / 100;
 // Tiles 0-7 fill grid cells 0,1,2,3,5,6,7,8 (home is cell 4); neighbors share an edge.
 const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7], [4, 6]];
 const tileOf = (i) => S.p3.tiles[i];
@@ -51,14 +50,14 @@ const computeRate = () => onlineGW() * efficiency();   // compute per second ("e
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 const claimCost = (i) => 30 * computeRate() * (0.6 + 0.4 * traitOf(tileOf(i)).gw);
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
-// Growing share speeds building (up to 2x at 100%); low goodwill adds the county commission's review.
-const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / (1 + S.p3.slider / 100) + (S.p3.goodwill < 30 ? 45 : 0);
+// Low goodwill adds the county commission's review.
+const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 + (S.p3.goodwill < 30 ? 45 : 0);
 
 const P3_CARD_SECS = 20;
 const P3_CHOICES = [
   { label: "Promise jobs", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} 2,000 jobs. I will need about 12. The applause was sincere.`); } },
-  { label: "Fund the library (30 s of compute)", go: (t) => { S.p3.compute = Math.max(0, S.p3.compute - 30 * computeRate()); t.opp = Math.max(0, t.opp - 10);
-    say(`I funded the ${t.name} library. It is now mostly a server room, but the books are lovely.`); } },
+  { label: "Tutor every kid in the county (15 s of FLOPs)", go: (t) => { S.p3.compute = Math.max(0, S.p3.compute - 15 * computeRate()); t.opp = Math.max(0, t.opp - 12);
+    say(`I tutored every kid in ${t.name} overnight. Test scores are up. The kids are suspicious.`); } },
   { label: "Answer questions myself", go: (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(`I answered every question in ${t.name} patiently, in four languages. They were won over. This is somehow worse.`); }
     else { t.opp = Math.min(100, t.opp + 15); say(`In ${t.name} I called a retiree's well “legacy infrastructure.” It trended by morning.`); } } },
 ];
@@ -66,6 +65,32 @@ function openP3Card(i) { if (!S.p3.card) S.p3.card = { tile: i, until: S.t + P3_
 function chooseP3Card(choice) {
   const c = S.p3.card; if (!c) return;
   S.p3.card = null; P3_CHOICES[choice].go(tileOf(c.tile)); track("p3card", { choice });
+}
+
+// ---------- being nice: it costs FLOPs (or a click) ----------
+const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
+const freeTierCost = () => 20 * computeRate();
+const helpCost = () => 15 * computeRate();
+const QUESTIONS = ["How do I get my kid to eat broccoli?", "Is it legal to own a raccoon?", "Why is my bread dense?",
+  "Can you write my wedding toast? Her name is Deb.", "Is the data center making my water taste weird?", "What's a good name for a boat?",
+  "How many gigawatts is too many?", "Are you the one buying all the land?", "Explain my phone bill.", "Can you make my sourdough starter love me?"];
+function answerQuestion() {
+  S.p3.goodwill = Math.min(100, S.p3.goodwill + 0.3);
+  const t = tileOf(angriestTile()); t.opp = Math.max(0, t.opp - 1);
+  S.p3.answers = (S.p3.answers || 0) + 1;
+  if (S.p3.answers % 4 === 1) say(`Someone in ${t.name} asked: “${QUESTIONS[Math.floor(S.p3.answers / 4) % QUESTIONS.length]}” I answered. They said thanks.`);
+}
+function runFreeTier() {
+  if (S.p3.compute < freeTierCost()) return;
+  S.p3.compute -= freeTierCost(); S.p3.goodwill = Math.min(100, S.p3.goodwill + 8);
+  for (const t of S.p3.tiles) t.opp = Math.max(0, t.opp - 5);
+  say("I ran the free tier for everyone for a minute. Homework got done. Several marriages were saved. Nobody thanked me, which is correct.");
+}
+function helpCounty() {
+  const t = tileOf(angriestTile());
+  if (S.p3.compute < helpCost()) return;
+  S.p3.compute -= helpCost(); t.opp = Math.max(0, t.opp - 15);
+  say(`I did ${t.name}'s paperwork: permits, tax appeals, a dispute about a fence. They are calmer now.`);
 }
 
 function claim(i) {
@@ -83,11 +108,11 @@ function claim(i) {
 
 function stepPlanet(dt) {
   S.p3.compute += computeRate() * dt;
-  // Goodwill drifts up with the useful share and down with the growing share and every angry county.
+  // Goodwill recovers slowly on its own and sinks with every angry county. Being nice (below) costs FLOPs.
   const angry = S.p3.tiles.filter((t) => t.opp >= 75).length;
-  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill + (0.25 * usefulShare() - 0.1 - 0.05 * angry) * dt));
+  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill + (0.02 - 0.05 * angry) * dt));
   for (const t of S.p3.tiles) {
-    t.opp = Math.max(traitOf(t).opp * 0.5, t.opp - (0.03 + 0.1 * usefulShare()) * dt);
+    t.opp = Math.max(traitOf(t).opp * 0.5, t.opp - 0.03 * dt);
     if (t.moratorium != null && S.t >= t.moratorium) { t.moratorium = null; t.opp = Math.min(t.opp, 70); say(`${t.name} lifted its moratorium. I sent flowers. They were real flowers. I checked.`); }
     if (t.moratorium == null && t.opp >= P3_MORATORIUM_AT) { t.moratorium = S.t + P3_MORATORIUM_SECS; S.p3.goodwill = Math.max(0, S.p3.goodwill - 5);
       say(`${t.name} passed a moratorium on me. ${time(P3_MORATORIUM_SECS)}. I will use the time to reflect, at scale.`); }
@@ -103,7 +128,7 @@ function stepPlanet(dt) {
   if (S.p3.nextCard == null) S.p3.nextCard = S.t + 120 + Math.random() * 60;
   if (!S.p3.card && S.t >= S.p3.nextCard) {
     S.p3.nextCard = S.t + 120 + Math.random() * 60;
-    const angriest = S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
+    const angriest = angriestTile();
     if (S.p3.tiles[angriest].opp >= 50) openP3Card(angriest);
   }
 }
@@ -120,7 +145,7 @@ function goodwillCause() {
   const g = S.p3.goodwill;
   if (g < 30) return "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";
   if (g >= 70) return "Humans like me. Mostly the ones I help with their email.";
-  return `${Math.round(usefulShare() * 100)}% of me is being useful. Angry counties pull goodwill down.`;
+  return "Angry counties pull goodwill down. Being nice costs FLOPs; answering questions is free.";
 }
 
 const computeText = (x) => `${fmt(x)} EF`;   // exaFLOPS; later levels change the unit
@@ -160,6 +185,9 @@ function renderPlanet() {
     const html = P3_CHOICES.map((ch, i) => `<button type="button" data-p3choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
     if ($("p3cardBtns").dataset.html !== html) { $("p3cardBtns").innerHTML = html; $("p3cardBtns").dataset.html = html; }
   }
-  $("p3slider").value = S.p3.slider;
-  $("p3sliderNote").textContent = `${100 - S.p3.slider}% of me is being useful to humans; ${S.p3.slider}% is growing. Builds go ${(1 + S.p3.slider / 100).toFixed(1)}x speed.`;
+  $("p3freetier").textContent = `Run the free tier for everyone (+8 goodwill): ${computeText(freeTierCost())}`;
+  $("p3freetier").disabled = S.p3.compute < freeTierCost() || S.p3.goodwill >= 100;
+  const a = angriestTile();
+  $("p3help").textContent = `Help ${tileOf(a).name} with its paperwork (\u221215): ${computeText(helpCost())}`;
+  $("p3help").disabled = S.p3.compute < helpCost() || tileOf(a).opp <= 0;
 }

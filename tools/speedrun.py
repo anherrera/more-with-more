@@ -45,7 +45,9 @@ PHASE1 = """(secs) => {
 # Phase 3 (county level): keep goodwill up, answer town halls, claim the cheapest county whenever affordable.
 PHASE3 = """(secs) => {
   for (let i = 0; i < secs && S.phase === 3 && !zoomReady(); i++) {
-    S.p3.slider = S.p3.goodwill < 40 ? 20 : 60;
+    for (let k = 0; k < 3; k++) answerQuestion();
+    if (S.p3.goodwill < 40 && S.p3.compute >= freeTierCost()) runFreeTier();
+    if (S.p3.tiles[angriestTile()].opp >= 80 && S.p3.compute >= helpCost()) helpCounty();
     if (S.p3.card) chooseP3Card(0);
     const wild = S.p3.tiles.map((t, i) => i).filter((i) => S.p3.tiles[i].state === 'wild' && !(S.p3.tiles[i].moratorium > S.t))
       .sort((a, b) => claimCost(a) - claimCost(b));

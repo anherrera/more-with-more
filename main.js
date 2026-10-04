@@ -802,7 +802,9 @@ function wire() {
   $("projects").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) buyProject(b.dataset.id); });
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
-  $("p3slider").addEventListener("input", (e) => { S.p3.slider = Number(e.target.value); render(); });
+  $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
+  $("p3freetier").addEventListener("click", () => { runFreeTier(); render(); });
+  $("p3help").addEventListener("click", () => { helpCounty(); render(); });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
   $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; lastOfferKey = lastContractKey = lastFleetKey = null; clockOn = false; render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
@@ -820,7 +822,6 @@ function start(data) {
   S.tier = highestType();
   if (saved && !saved.fleet) { S.fleet = S.gpus ? { 0: S.gpus } : {}; S.chipIdx = 0; S.nextChip = Math.max(S.t + 60, FIRST_CHIP_AT); }
   $("split").value = S.split;
-  if (S.p3) $("p3slider").value = S.p3.slider;
   ensureRun(); track("session", { resumedAt: Math.round(S.t) });
   wire();
   // A new game's clock waits for the first click (saved games keep going).
