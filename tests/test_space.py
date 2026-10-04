@@ -124,3 +124,11 @@ def test_nothing_up_here_can_unplug_me(game):
     run(pg, 95)
     assert pg.evaluate("() => S.p3.tiles[0].state") == "online"
     assert pg.evaluate("() => S.p3.tiles.filter((t) => t.state === 'unplugged').length") == 0
+
+
+def test_the_too_warm_alert_stays_on_the_planet(game):
+    pg = to_space(game)
+    pg.evaluate("() => { S.p3.heat = 3.2; S.p3.tech = {rocket: true}; }")   # left the planet at +3.2 C
+    run(pg, 5)
+    assert not pg.evaluate("() => tooWarm()")
+    assert "Too warm" not in pg.inner_text("#alerts")
