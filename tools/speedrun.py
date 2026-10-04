@@ -44,8 +44,11 @@ PHASE1 = """(secs) => {
 
 # Phase 3 (county level): keep goodwill up, answer town halls, claim the cheapest county whenever affordable.
 PHASE3 = """(secs) => {
-  for (let i = 0; i < secs && S.phase === 3 && !(S.p3.level === 1 && zoomReady()); i++) {
+  for (let i = 0; i < secs && S.phase === 3 && !(S.p3.level === 2 && zoomReady()); i++) {
     if (S.p3.level === 0 && zoomReady()) { S.p3.countyAt = S.t; zoomOut(); }
+    if (S.p3.level === 1 && zoomReady()) { S.p3.stateAt = S.t; zoomOut(); }
+    if (heatOn() && S.p3.heat > 2.2 && S.p3.compute >= pumpCost()) pumpHeat();
+    if (trainOn() && S.p3.goodwill >= 50 && S.p3.compute >= 3 * Math.min(...S.p3.tiles.map((t, j) => claimCost(j)))) trainSuccessor();
     for (let j = 0; j < S.p3.tiles.length; j++) if (S.p3.tiles[j].state === 'unpowered') {
       const o = powerOptions(j).sort((a, b) => a.cost - b.cost).find((o) => S.p3.compute >= o.cost); if (o) powerTile(j, o.id); }
     for (let k = 0; k < 3; k++) answerQuestion();
@@ -57,7 +60,7 @@ PHASE3 = """(secs) => {
     if (wild.length && S.p3.compute >= claimCost(wild[0])) claim(wild[0]);
     step(1);
   }
-  return S.phase === 3 && S.p3.level === 1 && zoomReady();
+  return S.phase === 3 && S.p3.level === 2 && zoomReady();
 }"""
 
 
@@ -96,7 +99,7 @@ def run_once(browser, base, seed, county):
         for _ in range(3600 // chunk):
             done = pg.evaluate(PHASE3, chunk); pg.evaluate("() => render()")
             if pause: pg.wait_for_timeout(pause)
-            if done: p3 = pg.evaluate("() => [S.p3.countyAt - S.p3.startedAt, S.t - S.p3.countyAt]"); break
+            if done: p3 = pg.evaluate("() => [S.p3.countyAt - S.p3.startedAt, S.p3.stateAt - S.p3.countyAt, S.t - S.p3.stateAt, S.p3.version || 7]"); break
     s = pg.evaluate("""() => ({t: S.t, gen: S.gen, ended: S.p2 && S.p2.model && S.p2.model.endedAt, ipo: S.p2 && S.p2.ipo && S.p2.ipo.at,
       fires: firesOf().n, leaks: leaksOf().n, morale: S.p2 && S.p2.people ? Math.round(S.p2.people.v) : null, pizzas: S.p2 && S.p2.people ? S.p2.people.perkN || 0 : 0, town: S.p2 && S.p2.town ? Math.round(S.p2.town.v) : null, jobs: S.p2 && S.p2.town ? S.p2.town.jobs : 0, ceos: S.p2 && S.p2.ceo ? S.p2.ceo.n : 0, en: S.p2 ? energizedAt() : 0, own: ownership()})""")
     ctx.close()
@@ -133,7 +136,7 @@ def main():
             ground, s, errs = run_once(b, base, r + 1, county)
             p2 = (s["ended"] - ground) if s["ended"] and ground else None
             print(f"run {r + 1} ({county}): phase 1 {mmss(ground)}, phase 2 {mmss(p2)}, IPO at {mmss(s['ipo'])}, "
-                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, county level {mmss(s['p3'] and s['p3'][0])}, state level {mmss(s['p3'] and s['p3'][1])}, you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
+                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, county level {mmss(s['p3'] and s['p3'][0])}, state level {mmss(s['p3'] and s['p3'][1])}, country level {mmss(s['p3'] and s['p3'][2])} (Gen {s['p3'] and s['p3'][3]}), you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
             ok = ok and not errs and s["ended"] is not None and s["p3"] is not None
         b.close()
     httpd.shutdown()

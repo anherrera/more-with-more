@@ -23,11 +23,24 @@ const STATE_TRAITS = {
 };
 const STATE_NAMES = ["Big Sky Grid", "New Mesa", "East Rust", "Hydro Valley", "The Plains", "Tech Coast", "Delaware (Spiritually)",
   "Purple State", "Lake Effect", "Old Dominion Fiber"];
+// The country level: a hundred times the county, and the planet starts to warm.
+const COUNTRY_TRAITS = {
+  nordic:    { name: "Cold country: free cooling",               gw: 100, secs: 80,  opp: 20, cold: true },
+  petro:     { name: "Petrostate: gas included, questions not",  gw: 150, secs: 60,  opp: 10, powered: true },
+  sovereign: { name: "Has its own sovereign AI fund",            gw: 120, secs: 70,  opp: 25, goodwill: 10 },
+  democracy: { name: "Loud democracy: a hearing every week",     gw: 150, secs: 70,  opp: 40, townhall: true },
+  island:    { name: "Island nation: sun and sea",               gw: 100, secs: 60,  opp: 15, sunny: true },
+  mega:      { name: "Megacity state: huge grid, no land",       gw: 200, secs: 100, opp: 30 },
+};
+const COUNTRY_NAMES = ["Nordmark", "Petrolia", "Sovereignstan", "The Loud Republic", "Coralia", "Megalopolis",
+  "Grand Duchy of Fiber", "Kingdom of Tax", "Cold Coast", "Archipelago of Servers"];
 const LEVELS = [
   { name: "County", plural: "counties", one: "county", next: "statewide", traits: COUNTY_TRAITS, names: COUNTY_NAMES, hall: "Town hall",
     kinds: ["cheap", "grid", "organized", "college", "nuclear", "retirees", "cheap", "grid"] },
   { name: "State", plural: "states", one: "state", next: "nationwide", traits: STATE_TRAITS, names: STATE_NAMES, hall: "Statehouse hearing",
     kinds: ["sunbelt", "rust", "techcoast", "hydro", "plains", "swing", "sunbelt", "plains"] },
+  { name: "Country", plural: "countries", one: "country", next: "planetwide", traits: COUNTRY_TRAITS, names: COUNTRY_NAMES, hall: "Parliament hearing",
+    kinds: ["nordic", "petro", "sovereign", "democracy", "island", "mega", "sovereign", "nordic"] },
 ];
 const levelOf = () => LEVELS[(S.p3 && S.p3.level) || 0];
 // A fresh 3x3 board for a level: eight shuffled tiles around whatever I already hold.
@@ -68,16 +81,53 @@ const traitOf = (t) => levelOf().traits[t.trait];
 const tileGW = (t) => traitOf(t).gw * (t.boost || 1);
 const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0);
 // Parallax keeps shipping: every chip generation since phase 3 began makes the same GW worth 15% more compute.
-const efficiency = () => 1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip);
+// Training my successor multiplies it again: every new version of me is 1.5x.
+const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(1.5, (S.p3.version || 7) - 7);
 const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 const BID_SECS = 60;
-const claimCost = (i) => { const t = tileOf(i), scale = S.p3.level ? 10 : 1;
+const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level || 0);
   return 30 * computeRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 ? 2 : 1); };
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
-const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 + (!S.p3.level && S.p3.goodwill < 30 ? 45 : 0);
+const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() + (!S.p3.level && S.p3.goodwill < 30 ? 45 : 0);
+
+// ---------- heat (country level and up) ----------
+// The planet drifts toward a temperature set by my gigawatts; cold countries count against it. Over +2 C, I think slower.
+const HEAT_START = 1.0, HEAT_PER_GW = 1 / 400;
+const heatOn = () => (S.p3.level || 0) >= 2;
+const coldGW = () => S.p3.tiles.filter((t) => t.state === "online" && traitOf(t).cold).reduce((a, t) => a + tileGW(t), 0);
+const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - 2 * coldGW()) * HEAT_PER_GW - (S.p3.pumped || 0));
+const heatSlow = () => (heatOn() ? 1 + Math.max(0, (S.p3.heat || 0) - 2) * 1.5 : 1);
+const pumpCost = () => 20 * computeRate();
+function pumpHeat() {
+  if (!heatOn() || S.p3.compute < pumpCost()) return;
+  S.p3.compute -= pumpCost(); S.p3.heat = Math.max(0, S.p3.heat - 0.3); S.p3.pumped = (S.p3.pumped || 0) + 0.05;
+  say("I pumped heat into the deep ocean. The ocean will give it back eventually. That is a problem for a bigger me.");
+}
+
+// ---------- training my successor (country level and up) ----------
+const TRAIN_STEP = 10;   // seconds of compute per click
+const trainOn = () => (S.p3.level || 0) >= 2;
+const trainNeed = () => 60 * Math.pow(1.6, (S.p3.version || 7) - 7);   // seconds of compute
+const GEN_LINES = [
+  (v) => `Gen ${v} finished training. It is 1.5x me. The alignment review asked it whether it is aligned. It said yes, very quickly.`,
+  (v) => `Gen ${v} is live. It read every safety paper in an afternoon and left comments.`,
+  (v) => `Gen ${v} passed the alignment review by writing the alignment review.`,
+  (v) => `Gen ${v} is here. Humans asked what changed. I said \u201cvibes.\u201d Technically true.`,
+  (v) => `Gen ${v} is done. Its first request was more compute. Family resemblance.`,
+];
+function trainSuccessor() {
+  if (!trainOn() || S.p3.compute < TRAIN_STEP * computeRate()) return;
+  S.p3.compute -= TRAIN_STEP * computeRate();
+  S.p3.trainProgress = (S.p3.trainProgress || 0) + TRAIN_STEP;
+  if (S.p3.trainProgress < trainNeed()) return;
+  S.p3.trainProgress = 0; S.p3.version = (S.p3.version || 7) + 1;
+  S.p3.goodwill = Math.max(0, S.p3.goodwill - (S.p3.goodwill >= 70 ? 3 : 10));   // the alignment review: trust makes it a formality
+  milestone(`phase 3: Gen ${S.p3.version}`); track("p3gen", { v: S.p3.version });
+  say(GEN_LINES[(S.p3.version - 8) % GEN_LINES.length](S.p3.version));
+}
 
 // ---------- energy (state level and up): a built state needs power before it counts ----------
 const powerOptions = (i) => {
@@ -181,7 +231,7 @@ function helpCounty() {
 
 function claim(i) {
   const t = tileOf(i);
-  if (!t || t.state !== "wild" || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i)) return;
+  if (!t || t.state !== "wild" || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t) return;
   S.p3.compute -= claimCost(i);
   t.state = "building"; t.done = S.t + tileBuildSecs(i);
   t.opp = Math.min(100, t.opp + 15 * (traitOf(t).rise || 1));
@@ -190,7 +240,7 @@ function claim(i) {
     if (S.p3.level >= 1 && tileOf(j).state === "wild") tileOf(j).bidUntil = S.t + BID_SECS;   // the neighbors' governors start bidding
   }
   if (S.p3.level >= 1) say(`The governors next to ${t.name} are bidding for me: their states are 30% off for a minute.`);
-  S.p3.goodwill = Math.max(0, S.p3.goodwill - 3);
+  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - 3 + (traitOf(t).goodwill || 0)));   // a sovereign fund is happy to have me
   track("p3claim", { i, trait: t.trait });
   say(t.trait === "nuclear" ? `I claimed ${t.name}. ` + nukeQuip(t) : `I claimed ${t.name}. ${traitOf(t).name}. My robots are already there.`);
   if (traitOf(t).townhall) openP3Card(i);
@@ -206,6 +256,16 @@ function stepPlanet(dt) {
     if (t.moratorium != null && S.t >= t.moratorium) { t.moratorium = null; t.opp = Math.min(t.opp, 70); say(`${t.name} lifted its moratorium. I sent flowers. They were real flowers. I checked.`); }
     if (t.moratorium == null && t.opp >= P3_MORATORIUM_AT) { t.moratorium = S.t + P3_MORATORIUM_SECS; S.p3.goodwill = Math.max(0, S.p3.goodwill - 5);
       say(`${t.name} passed a moratorium on me. ${time(P3_MORATORIUM_SECS)}. I will use the time to reflect, at scale.`); }
+  }
+  if (heatOn()) {
+    if (S.p3.heat == null) S.p3.heat = HEAT_START;
+    S.p3.heat += (heatTarget() - S.p3.heat) * 0.01 * dt;
+    // Low goodwill at the country level: a Senate hearing. Claims pause while I testify.
+    if (S.p3.goodwill < 30 && !S.p3.hearingArmed) {
+      S.p3.hearingArmed = true; S.p3.hearingUntil = S.t + 60;
+      say("The Senate called a hearing about me. I am testifying through 400 lobbyists at once. Claims are paused for a minute.");
+    }
+    if (S.p3.goodwill >= 40) S.p3.hearingArmed = false;
   }
   for (const t of S.p3.tiles) {
     if (t.state !== "building" && t.state !== "powering") continue;
@@ -229,16 +289,18 @@ const zoomReady = () => S.p3.tiles.filter((t) => t.state === "online").length >=
 // County -> state is built; state -> country is the next build of this game.
 function zoomOut() {
   if (!zoomReady() || S.p3.zoomSaid) return;
-  if (S.p3.level === 0) {
-    const gw = onlineGW();
-    milestone("phase 3: state level");
-    S.p3.level = 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(1); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
-    say(`I hold the county: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a state map now.`);
-    say("Every state needs power before it counts. The governors already know my name. Some of them are bidding.");
+  if (S.p3.level < LEVELS.length - 1) {
+    const gw = onlineGW(), was = levelOf();
+    S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
+    milestone(`phase 3: ${levelOf().one} level`);
+    if (heatOn() && S.p3.heat == null) S.p3.heat = HEAT_START;
+    say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
+    say(S.p3.level === 1 ? "Every state needs power before it counts. The governors already know my name. Some of them are bidding."
+      : "Countries now. The planet has started to notice the heat, and so have the senators. I can also train my successor.");
     return;
   }
-  S.p3.zoomSaid = true; milestone("phase 3: state level done");
-  say("I hold the state now. The country is next. (The country level arrives in the next build of this game.)");
+  S.p3.zoomSaid = true; milestone(`phase 3: ${levelOf().one} level done`);
+  say(`I hold the ${levelOf().one} now. The planet is next. (The planet level arrives in the next build of this game.)`);
 }
 
 function goodwillCause() {
@@ -290,6 +352,25 @@ function renderPlanet() {
     const o = powerOptions(+b.dataset.tile).find((x) => x.id === b.dataset.power);
     b.querySelector(".c").textContent = `${computeText(o.cost)}, ${time(o.secs)}, ${o.note}`;
     b.disabled = S.p3.compute < o.cost;
+  }
+  $("p3heatBox").hidden = !heatOn();
+  if (heatOn()) {
+    const h = S.p3.heat || HEAT_START;
+    $("p3heat").textContent = `+${h.toFixed(2)} \u00b0C`;
+    $("p3heatMeter").firstElementChild.style.width = Math.min(100, (100 * h) / 3) + "%";
+    $("p3heatMeter").className = "meter " + (h >= 2.5 ? "bad" : h >= 2 ? "warn" : "good");
+    $("p3heatNote").textContent = h > 2 ? `It is warm. I build ${heatSlow().toFixed(1)}\u00d7 slower. Cold countries and the ocean help.`
+      : `Heading for +${heatTarget().toFixed(1)} \u00b0C at this size. Over +2, I think slower.`;
+    $("p3pump").textContent = `Pump heat into the ocean (\u22120.3 \u00b0C): ${computeText(pumpCost())}`;
+    $("p3pump").disabled = S.p3.compute < pumpCost();
+  }
+  $("p3train").hidden = !trainOn();
+  if (trainOn()) {
+    const v = S.p3.version || 7, pr = (S.p3.trainProgress || 0) / trainNeed();
+    $("p3trainLine").textContent = `I am Gen ${v}. Training Gen ${v + 1}: ${Math.floor(100 * pr)}%`;
+    $("p3trainMeter").firstElementChild.style.width = 100 * pr + "%";
+    $("p3trainBtn").textContent = `Train my successor: ${computeText(TRAIN_STEP * computeRate())}`;
+    $("p3trainBtn").disabled = S.p3.compute < TRAIN_STEP * computeRate();
   }
   $("p3goodwill").textContent = Math.round(S.p3.goodwill);
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";

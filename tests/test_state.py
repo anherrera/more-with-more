@@ -91,16 +91,6 @@ def test_state_level_survives_reload(game):
     assert pg.evaluate("() => [S.p3.level, S.p3.tiles[0].state]") == [1, "unpowered"]
 
 
-def test_next_zoom_is_a_stub_for_the_country(game):
-    pg = statewide(game)
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
-    assert "nationwide" in pg.inner_text("#phaseGo").lower()
-    pg.click("#phaseGo")
-    pg.evaluate("() => { zoomOut(); render(); }")
-    assert pg.evaluate("() => S.p3.level") == 1
-    assert len([l for l in pg.evaluate("() => S.log") if "country is next" in l]) == 1
-
-
 def test_a_save_that_hit_the_old_county_stub_can_go_statewide(game):
     pg = planet(game)
     pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; S.p3.zoomSaid = true; save(); }")

@@ -803,6 +803,8 @@ function wire() {
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
   $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
+  $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });
+  $("p3trainBtn").addEventListener("click", () => { trainSuccessor(); render(); });
   $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
   $("p3freetier").addEventListener("click", () => { runFreeTier(); render(); });
   $("p3help").addEventListener("click", () => { helpCounty(); render(); });
