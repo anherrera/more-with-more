@@ -113,3 +113,12 @@ def test_late_game_high_school(game):
     assert pg.query_selector("button[data-id='highschool']")
     pg.evaluate("() => buyProject('highschool')")
     assert pg.evaluate("() => townOf().v") == 50
+
+
+def test_solar_does_not_anger_the_town_but_turbines_do(game):
+    pg = campus(game, funds=1e10)
+    v = pg.evaluate("() => townOf().v")
+    pg.evaluate("() => build('solar')")
+    assert pg.evaluate("() => townOf().v") == v
+    pg.evaluate("() => build('turbine')")
+    assert pg.evaluate("() => townOf().v") > v

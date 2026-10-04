@@ -70,7 +70,7 @@ function chooseCard(i) {
 }
 
 // ---------- the town ----------
-const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 1, reclaimed: 0 }, TOWN_EASE = 0.02, MORATORIUM_SECS = 120;
+const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.02, MORATORIUM_SECS = 120;
 const townOf = () => S.p2.town || (S.p2.town = { v: countyOf() ? countyOf().town : 20, jobs: 0, promises: 0, nextHall: null, moratorium: null });
 const moratoriumOn = () => !!(S.p2.town && S.p2.town.moratorium != null && S.t < S.p2.town.moratorium);
 // Builds started above 50 opposition take longer: permits, lawsuits, a guy with a sign.
