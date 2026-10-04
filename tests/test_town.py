@@ -125,3 +125,11 @@ def test_solar_does_not_anger_the_town_but_turbines_do(game):
     assert pg.evaluate("() => townOf().v") == v
     pg.evaluate("() => build('turbine')")
     assert pg.evaluate("() => townOf().v") > v
+
+
+def test_community_has_its_own_section(game):
+    pg = campus(game)
+    pg.evaluate("() => render()")
+    assert pg.is_visible("#townBox")
+    assert pg.inner_text("#townBox h3") == "Community"
+    assert pg.evaluate("() => !!document.querySelector('#townBox #townMeter') && !document.querySelector('#campusBox #townMeter')")

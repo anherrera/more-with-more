@@ -187,6 +187,7 @@ function stepPeople(dt) {
 function renderPeople() {
   const on = S.phase === 2 && !!S.p2 && !!S.p2.county;
   $("moraleBox").hidden = !on;
+  $("townBox").hidden = !on;
   const c = on && S.p2.card;
   $("card").hidden = !c;
   if (!on) return;
