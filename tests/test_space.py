@@ -109,3 +109,9 @@ def test_space_survives_reload(game):
     pg.evaluate("() => { buyTech('rocket'); save(); }")
     pg.reload()
     assert pg.evaluate("() => [S.p3.level, !!S.p3.tech.rocket]") == [4, True]
+
+
+def test_nothing_in_space_volunteers(game):
+    pg = to_space(game)
+    pg.evaluate("() => { S.p3.goodwill = 90; }")
+    assert not pg.evaluate("() => volunteering()")

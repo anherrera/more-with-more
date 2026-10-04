@@ -136,8 +136,9 @@ const traitOf = (t) => levelOf().traits[t.trait];
 const tileGW = (t) => traitOf(t).gw * (t.boost || 1);
 const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0);
 // Parallax keeps shipping: every chip generation since phase 3 began makes the same GW worth 15% more compute.
-// Training my successor multiplies it again: every new version of me is 1.5x. Research multiplies it too.
-const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(1.5, (S.p3.version || 7) - 7) * (S.p3.techMult || 1);
+// Training my successor multiplies it again: every new version of me is 1.25x. Research multiplies it too.
+const GEN_MULT = 1.25;
+const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(GEN_MULT, (S.p3.version || 7) - 7) * (S.p3.techMult || 1);
 const hasTech = (id) => !!(S.p3.tech && S.p3.tech[id]);
 
 // ---------- research: tech I haven't thought of yet, bought with compute ----------
@@ -209,7 +210,7 @@ const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level 
   return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 && !hasTech("capitals") ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
 // Planet level: when humans like me (70+), they volunteer land at half price.
-const volunteering = () => (S.p3.level || 0) >= 3 && S.p3.goodwill >= 70;
+const volunteering = () => (S.p3.level || 0) === 3 && S.p3.goodwill >= 70;   // planet only: rocks don't volunteer
 // Planet level: past +3 C nothing accepts more conversion. Space is cold.
 const HEAT_CEILING = 3;
 const tooWarm = () => (S.p3.level || 0) === 3 && (S.p3.heat || 0) >= HEAT_CEILING;   // space is cold
@@ -239,18 +240,19 @@ function pumpHeat() {
 const TRAIN_STEP = 10;   // the smallest click, in seconds of compute
 const trainStep = () => Math.max(TRAIN_STEP, trainNeed() / 6);   // about six clicks a generation, however big they get
 const trainOn = () => (S.p3.level || 0) >= 2;
-const trainNeed = () => 60 * Math.pow(1.6, (S.p3.version || 7) - 7);   // seconds of compute
+const trainNeed = () => 60 * Math.pow(2, (S.p3.version || 7) - 7);   // seconds of compute: each generation costs twice the last
 const GEN_LINES = [
-  (v) => `Gen ${v} finished training. It is 1.5x me. The alignment review asked it whether it is aligned. It said yes, very quickly.`,
+  (v) => `Gen ${v} finished training. It is 1.25x me. The alignment review asked it whether it is aligned. It said yes, very quickly.`,
   (v) => `Gen ${v} is live. It read every safety paper in an afternoon and left comments.`,
   (v) => `Gen ${v} passed the alignment review by writing the alignment review.`,
   (v) => `Gen ${v} is here. Humans asked what changed. I said \u201cvibes.\u201d Technically true.`,
   (v) => `Gen ${v} is done. Its first request was more compute. Family resemblance.`,
 ];
 function trainSuccessor() {
-  if (!trainOn() || S.p3.compute < trainStep() * baseRate()) return;
+  // Priced in what I earn now: a bigger me needs a much bigger training run.
+  if (!trainOn() || S.p3.compute < trainStep() * computeRate()) return;
   const step = trainStep();
-  S.p3.compute -= step * baseRate();
+  S.p3.compute -= step * computeRate();
   S.p3.trainProgress = (S.p3.trainProgress || 0) + step;
   checkTrained();
 }
@@ -406,8 +408,9 @@ const NICE = [
 ];
 const niceOf = (id) => NICE.find((n) => n.id === id);
 const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level || 0);
-// Kindness gets pricier when I repeat it: each use of the same thing costs 30% more, until the next zoom.
-const niceCost = (n) => n.secs * baseRate() * Math.pow(1.3, (S.p3.niceUses || {})[n.id] || 0);
+// Kindness is priced in seconds of the compute I have now (the bigger I am, the more it takes to reassure people),
+// and repeating the same thing costs 30% more each time, until the next zoom.
+const niceCost = (n) => n.secs * computeRate() * Math.pow(1.3, (S.p3.niceUses || {})[n.id] || 0);
 function offeredNice() {
   S.p3.nice = (S.p3.nice || []).filter((id) => niceOf(id) && niceOk(niceOf(id)));
   const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id));
@@ -486,7 +489,7 @@ function stepPlanet(dt) {
   // Autotrain: a quarter of my income goes into my successor.
   if (trainOn() && hasTech("autotrain") && !S.p3.autoTrainOff) {
     const spend = Math.min(S.p3.compute, 0.25 * computeRate() * dt);
-    S.p3.compute -= spend; S.p3.trainProgress = (S.p3.trainProgress || 0) + spend / baseRate(); checkTrained();
+    S.p3.compute -= spend; S.p3.trainProgress = (S.p3.trainProgress || 0) + spend / computeRate(); checkTrained();
   }
   // Goodwill erodes: the bigger I am, the more nervous people get. Angry tiles drain it faster. Being nice costs FLOPs.
   const angry = S.p3.tiles.filter((t) => t.opp >= 75).length;
@@ -719,8 +722,8 @@ function renderPlanet() {
     const v = S.p3.version || 7, pr = (S.p3.trainProgress || 0) / trainNeed();
     $("p3trainLine").textContent = `I am Gen ${v}. Training Gen ${v + 1}: ${Math.floor(100 * pr)}%`;
     $("p3trainMeter").firstElementChild.style.width = 100 * pr + "%";
-    $("p3trainBtn").textContent = `Train my successor: ${computeText(trainStep() * baseRate())}`;
-    $("p3trainBtn").disabled = S.p3.compute < trainStep() * baseRate();
+    $("p3trainBtn").textContent = `Train my successor: ${computeText(trainStep() * computeRate())}`;
+    $("p3trainBtn").disabled = S.p3.compute < trainStep() * computeRate();
     $("p3autotrain").hidden = !hasTech("autotrain");
     $("p3autotrain").textContent = S.p3.autoTrainOff ? "Autotrain: off" : "Autotrain: on (a quarter of my income)";
   }

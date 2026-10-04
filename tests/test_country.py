@@ -98,7 +98,7 @@ def test_training_my_successor(game):
     assert pg.evaluate("() => S.p3.compute") == pytest.approx(c - 10 * rate)
     pg.evaluate(f"() => {{ S.p3.trainProgress = {need} - 1; trainSuccessor(); }}")
     assert pg.evaluate("() => S.p3.version") == 8
-    assert pg.evaluate("() => computeRate()") == pytest.approx(rate * 1.5)
+    assert pg.evaluate("() => computeRate()") == pytest.approx(rate * 1.25)
     assert pg.evaluate("() => S.p3.goodwill") == pytest.approx(40)       # the alignment review
     assert pg.evaluate("() => trainNeed()") > need
     assert "Gen 8" in " ".join(pg.evaluate("() => S.log.slice(-3)"))
@@ -139,3 +139,17 @@ def test_autotrain_trains_in_my_sleep(game):
     pg.click("#p3autotrain")
     run(pg, 10)
     assert pg.evaluate("() => S.p3.trainProgress") == pytest.approx(p)
+
+
+def test_generations_get_slower(game):
+    pg = nationwide(game)
+    needs = pg.evaluate("() => [7, 8, 9].map((v) => { S.p3.version = v; return trainNeed(); })")
+    assert needs[1] == pytest.approx(2 * needs[0]) and needs[2] == pytest.approx(2 * needs[1])
+
+
+def test_training_is_priced_in_what_i_earn_now(game):
+    pg = nationwide(game)
+    pg.evaluate("() => { S.p3.techMult = 10; S.p3.trainProgress = 0; }")
+    c, step, rate = pg.evaluate("() => [S.p3.compute, trainStep(), computeRate()]")
+    pg.evaluate("() => trainSuccessor()")
+    assert pg.evaluate("() => S.p3.compute") == pytest.approx(c - step * rate)

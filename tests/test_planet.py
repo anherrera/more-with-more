@@ -383,3 +383,10 @@ def test_repeating_a_kindness_costs_more_until_the_next_zoom(game):
     assert pg.evaluate("() => niceCost(niceOf('freetier'))") == pytest.approx(first * 1.3)
     pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; zoomOut(); }")
     assert pg.evaluate("() => S.p3.niceUses || {}") == {}
+
+
+def test_kindness_scales_with_how_big_i_am(game):
+    pg = planet(game)
+    small = pg.evaluate("() => niceCost(niceOf('freetier'))")
+    pg.evaluate("() => { S.p3.techMult = 10; }")
+    assert pg.evaluate("() => niceCost(niceOf('freetier'))") == pytest.approx(small * 10)
