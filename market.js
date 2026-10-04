@@ -4,7 +4,14 @@
 const DILUTION = { "Pre-seed": 0.10, Seed: 0.15, "Series A": 0.20, "Series B": 0.15, "Series C": 0.12, "Series D": 0.10, "Series E": 0.08 };
 const REV_MULTIPLE = 20000, IPO_FLOAT = 0.10, IPO_DISCOUNT = 0.85, LOCKUP = 120;
 const IPO_BACKLOG = 400, IPO_CAMPUS = 600;
-const FOLLOW_ON_MAX = 3, FOLLOW_ON_CAP = 600e6;   // the market has limits, eventually
+const FOLLOW_ON_MAX = 3, FOLLOW_ON_MIN = 300e6, FOLLOW_ON_CAP = 3e9;   // the market has limits, eventually
+// 8% of the company, scaled by the mood: froth buys more, a cold market less.
+const followOnAmt = () => Math.max(FOLLOW_ON_MIN, Math.min(FOLLOW_ON_CAP, FOLLOW_ON * marketCap() * (0.5 + S.hype / 100)));
+const FOLLOW_ON_LINES = [
+  (m) => `Follow-on offering: ${m}. The stock dipped 5%. The analyst notes say \u201caccretive,\u201d which nobody can define.`,
+  (m) => `Second follow-on: ${m}. The roadshow was one Zoom call and a drone video of the campus. Oversubscribed anyway.`,
+  (m) => `Third follow-on: ${m}. An analyst asked when you'd stop selling stock. You said \u201cwhen the GPUs stop getting better.\u201d Everyone laughed. You didn't.`,
+];
 const FOLLOW_ON = 0.08, FOLLOW_ON_EVERY = 300, SECONDARY = 0.01, SECONDARY_EVERY = 60;
 
 // Saves from before the cap table: rebuild it from the rounds already raised.
@@ -64,12 +71,12 @@ function ringTheBell() {
 function followOn() {
   const ipo = S.p2.ipo;
   if (!isPublic() || (ipo.followOns || 0) >= FOLLOW_ON_MAX || S.t < ipo.lastFollowOn + FOLLOW_ON_EVERY || S.hype < HYPE_TO_RAISE) return;
-  const amt = Math.min(FOLLOW_ON_CAP, FOLLOW_ON * marketCap());
+  const amt = followOnAmt();
   ipo.followOns = (ipo.followOns || 0) + 1;
   dilute(FOLLOW_ON, amt, null); capOf().lastVal = 0;
   S.funds += amt; ipo.lastFollowOn = S.t; ipo.shock *= 0.95; S.hype = Math.max(10, S.hype - 10);
   track("followon", { amt: Math.round(amt) });
-  say(`Follow-on offering: ${money(amt)}. The stock dipped 5%. The analyst notes say “accretive,” which nobody can define.`);
+  say(FOLLOW_ON_LINES[(ipo.followOns - 1) % FOLLOW_ON_LINES.length](money(amt)));
 }
 
 function sellSecondary() {
@@ -120,7 +127,7 @@ function renderPublicRaise() {
   const ipo = S.p2.ipo, wait = ipo.lastFollowOn + FOLLOW_ON_EVERY - S.t;
   if ((ipo.followOns || 0) >= FOLLOW_ON_MAX) { b.textContent = "No more follow-ons. The market has had enough of you, for now."; b.disabled = true; return; }
   b.textContent = wait > 0 ? `Follow-on offering again in ${time(wait)}` : S.hype < HYPE_TO_RAISE ? `Follow-on needs hype ${HYPE_TO_RAISE}+`
-    : `Follow-on offering: ${money(Math.min(FOLLOW_ON_CAP, FOLLOW_ON * marketCap()))} (dilutes you ${FOLLOW_ON * 100}%)`;
+    : `Follow-on offering: ${money(followOnAmt())} (dilutes you ${FOLLOW_ON * 100}%, more when hype is high)`;
   b.disabled = wait > 0 || S.hype < HYPE_TO_RAISE;
 }
 const publicRaise = () => (isPublic() ? followOn() : ringTheBell());

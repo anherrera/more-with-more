@@ -70,13 +70,18 @@ def test_lockup_opens_secondaries(game):
     assert pg.evaluate("() => ownership()") == pytest.approx(own * 0.99)
 
 
+def money_in(text):
+    return "$" in text
+
+
 def test_follow_on_offering(game):
     pg = public_ready(game)
     ipo(pg)
     assert "Follow-on offering" in pg.inner_text("#raise")
-    cap, funds, own = pg.evaluate("() => [marketCap(), S.funds, ownership()]")
+    amt, funds, own = pg.evaluate("() => [followOnAmt(), S.funds, ownership()]")
+    assert money_in(pg.inner_text("#raise"))
     pg.click("#raise")
-    assert pg.evaluate("() => S.funds") == pytest.approx(funds + 0.08 * cap, rel=1e-6)
+    assert pg.evaluate("() => S.funds") == pytest.approx(funds + amt, rel=1e-6)
     assert pg.evaluate("() => ownership()") == pytest.approx(own * 0.92)
     assert pg.is_disabled("#raise")
 

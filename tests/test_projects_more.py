@@ -86,7 +86,10 @@ def test_follow_ons_are_capped(game):
     pg.evaluate("""() => { S.p2.round = 1; S.p2.ipo = {at: S.t - 1e4, px0: 1, walk: 1, shock: 1, lastFollowOn: -1e9, lastSecondary: -1e9, lockupSaid: true};
       S.cap = S.cap || capOf(); S.cap.lastVal = 1e12; }""")
     got = []
-    for _ in range(4):
-        f = pg.evaluate("() => S.funds"); pg.evaluate("() => { followOn(); S.p2.ipo.lastFollowOn = -1e9; }")
+    for hype in (45, 90, 150, 150):
+        f = pg.evaluate("() => S.funds"); pg.evaluate(f"() => {{ S.cap.lastVal = 2e10; S.hype = {hype}; followOn(); S.p2.ipo.lastFollowOn = -1e9; }}")
         got.append(pg.evaluate("() => S.funds") - f)
-    assert [g <= 600e6 + 1 for g in got[:3]] == [True] * 3 and got[3] == 0
+    assert all(300e6 - 1 <= g <= 3e9 + 1 for g in got[:3]) and got[3] == 0
+    assert got[0] < got[1] < got[2]                                     # a frothier market buys more
+    lines = [l for l in pg.evaluate("() => S.log") if "follow-on" in l.lower().split(":")[0]]
+    assert len(set(lines)) == 3
