@@ -82,7 +82,7 @@ def test_claim_costs_about_a_minute_of_compute_and_builds(game):
     pg = planet(game)
     pg.evaluate("() => { S.p3.compute = 1e9; render(); }")
     cost = pg.evaluate("() => claimCost(0)")
-    assert 30 * pg.evaluate("() => computeRate()") <= cost <= 120 * pg.evaluate("() => computeRate()")
+    assert 25 * pg.evaluate("() => computeRate()") <= cost <= 60 * pg.evaluate("() => computeRate()")
     pg.click("#p3map button[data-tile='0']")
     assert pg.evaluate("() => S.p3.tiles[0].state") == "building"
     secs = pg.evaluate("() => S.p3.tiles[0].done - S.t")
@@ -226,3 +226,11 @@ def test_fires_from_phase2_dont_follow_you_to_the_map(game):
     pg.click("#phaseGo")
     text = pg.inner_text("#alerts") if pg.is_visible("#alerts") else ""
     assert "Fire" not in text
+
+
+def test_phase3_starts_with_enough_compute_to_claim_right_away(game):
+    pg = planet(game)
+    cheapest = pg.evaluate("() => Math.min(...S.p3.tiles.map((t, i) => claimCost(i)))")
+    assert pg.evaluate("() => S.p3.compute") >= cheapest
+    pg.evaluate("() => render()")
+    assert any(b.is_enabled() for b in pg.query_selector_all("#p3map button[data-tile]"))

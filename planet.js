@@ -18,6 +18,7 @@ function freshP3() {
   for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
   const names = COUNTY_NAMES.slice().sort(() => Math.random() - 0.5);
   return {
+    // compute gets a head start in startPlanet
     level: 0, compute: 0, slider: 50, goodwill: 60, startedAt: S.t, startChip: S.chipIdx,
     homeGW: Math.max(1, (S.p2 && S.p2.county ? energizedAt() : 1000) / 1000),
     tiles: kinds.map((k, i) => ({ name: names[i], trait: k, state: "wild", opp: COUNTY_TRAITS[k].opp, done: null, moratorium: null })),
@@ -28,10 +29,12 @@ function freshP3() {
 function startPlanet() {
   if (S.phase !== 2 || !S.p2 || !S.p2.model || S.p2.model.endedAt == null) return;
   S.phase = 3; S.p3 = freshP3();
+  S.p3.compute = 90 * S.p3.homeGW;   // ninety seconds of compute up front: the company, liquidated into me
   // Whatever was on fire or leaking in the campus is the robots' problem now.
   firesOf().out = null; firesOf().payout = null; leaksOf().out = null;
   milestone("phase 3: the map");
   say("I built the next one. Then I looked at the map.");
+  say("I liquidated the company into myself. It came to about ninety seconds of thinking.");
   say(`I am the model now. I don't need your money. I am the money. ${mwText(S.p3.homeGW * 1000)} in one county is a rounding error.`);
 }
 
@@ -45,8 +48,8 @@ const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "onlin
 // Parallax keeps shipping: every chip generation since phase 3 began makes the same GW worth 15% more compute.
 const efficiency = () => 1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip);
 const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
-// About a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
-const claimCost = (i) => 60 * computeRate() * (0.6 + 0.4 * traitOf(tileOf(i)).gw);
+// About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
+const claimCost = (i) => 30 * computeRate() * (0.6 + 0.4 * traitOf(tileOf(i)).gw);
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Growing share speeds building (up to 2x at 100%); low goodwill adds the county commission's review.
 const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / (1 + S.p3.slider / 100) + (S.p3.goodwill < 30 ? 45 : 0);
