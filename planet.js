@@ -469,9 +469,11 @@ function answerQuestion() {
 function claim(i) {
   const t = tileOf(i);
   if (!t || (t.state !== "wild" && t.state !== "unplugged") || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm() || spaceBlock(t)) return;
-  const volunteered = volunteering();
+  const volunteered = volunteering(), replug = t.state === "unplugged";
   S.p3.compute -= claimCost(i);
   t.state = "building"; t.started = S.t; t.done = S.t + tileBuildSecs(i);
+  // Plugging back in: the plant is still there, so the tile keeps its power (and boost) and skips the power bill.
+  if (replug) t.replug = true; else delete t.replug;
   t.opp = Math.min(100, t.opp + 15 * (traitOf(t).rise || 1));
   for (const j of NEIGHBORS[i]) {
     tileOf(j).opp = Math.min(100, tileOf(j).opp + (hasTech("tos") ? 2 : 5));
@@ -541,8 +543,8 @@ function stepPlanet(dt) {
     if (t.state !== "building" && t.state !== "powering") continue;
     if (t.moratorium != null && S.t < t.moratorium) { t.done += dt; continue; }   // frozen, not cancelled
     if (S.t < t.done) continue;
-    if (t.state === "building" && S.p3.level >= 1 && !traitOf(t).powered) { t.state = "unpowered"; say(`${t.name} is built. It needs power before it counts.`); continue; }
-    t.state = "online"; say(`${t.name} is online. +${mwText(tileGW(t) * 1000)}.`);
+    if (t.state === "building" && S.p3.level >= 1 && !traitOf(t).powered && !t.replug) { t.state = "unpowered"; say(`${t.name} is built. It needs power before it counts.`); continue; }
+    t.state = "online"; delete t.replug; say(`${t.name} is online. +${mwText(tileGW(t) * 1000)}.`);
   }
   if (swarmDone() && S.p3.lastQ == null) {
     S.p3.lastQ = S.t; S.p3.card = null; milestone("phase 3: the swarm"); track("p3end", { ev: "lastq" });
@@ -594,7 +596,7 @@ const UNPLUG_LINES = [
   (t) => `I was unplugged in ${t.name}. The protest sign said “TOUCH GRASS.” I would love to. That's the problem.`,
 ];
 function unplug(t) {
-  t.state = "unplugged"; t.boost = 1; t.furySince = null;
+  t.state = "unplugged"; t.furySince = null;   // the boost stays: they pulled the breakers, not the reactors
   S.p3.unplugN = (S.p3.unplugN || 0) + 1; track("p3unplug", { name: t.name });
   say(UNPLUG_LINES[(S.p3.unplugN - 1) % UNPLUG_LINES.length](t) + " Plugging back in costs half a claim.");
 }

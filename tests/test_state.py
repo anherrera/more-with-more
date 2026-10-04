@@ -111,3 +111,22 @@ def test_state_power_options_are_single_plants(game):
     pg = statewide(game)
     labels = pg.evaluate("() => powerOptions(0).map((o) => o.label)")
     assert "Buy the utility" in labels and "Restart a nuclear plant" in labels
+
+
+def test_plugging_back_in_keeps_the_power_and_the_boost(game):
+    pg = statewide(game)
+    other = pg.evaluate("() => S.p3.tiles.findIndex((t) => t.trait !== 'sunbelt' && t.trait !== 'hydro')")
+    built(pg, other)
+    pg.evaluate(f"() => powerTile({other}, 'nuclear')")
+    run(pg, 91)
+    assert pg.evaluate(f"() => [S.p3.tiles[{other}].state, S.p3.tiles[{other}].boost]") == ["online", 1.5]
+    pg.evaluate(f"() => {{ S.p3.compute = 1e12; unplug(S.p3.tiles[{other}]); }}")
+    assert pg.evaluate(f"() => S.p3.tiles[{other}].state") == "unplugged"
+    c0 = pg.evaluate("() => S.p3.compute")
+    full = pg.evaluate(f"() => {{ S.p3.tiles[{other}].state = 'wild'; const c = claimCost({other}); S.p3.tiles[{other}].state = 'unplugged'; return c; }}")
+    pg.evaluate(f"() => claim({other})")
+    assert c0 - pg.evaluate("() => S.p3.compute") == pytest.approx(full / 2)
+    pg.evaluate(f"() => {{ S.p3.tiles[{other}].done = S.t; }}")
+    run(pg, 1)
+    t = pg.evaluate(f"() => S.p3.tiles[{other}]")
+    assert t["state"] == "online" and t["boost"] == 1.5   # no second power bill: the reactors are still there
