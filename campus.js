@@ -419,7 +419,6 @@ function chooseCounty(id) {
 const campusRevenue = () => (S.p2 ? S.p2.contracts.filter((c) => c.status === "active").reduce((a, c) => a + c.fee, 0) + onDemandRevenue() : 0);
 
 function stepCampus(dt) {
-  if (S.p2.market == null) S.p2.market = MARKET_START_MW;   // Plan 1 saves
   S.funds += onDemandRevenue() * dt;
   if (!S.p2.county) return;
   const q = S.p2.queue;

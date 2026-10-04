@@ -95,7 +95,7 @@ def test_render_is_read_only_in_space(game):
 def test_a_loaded_save_has_every_field_before_the_first_render(game):
     from test_phasebar import campus
     pg = campus(game)
-    pg.evaluate("() => { delete S.fires; delete S.leaks; delete S.cap; delete S.p2.people; delete S.p2.town; delete S.p2.ceo; delete S.p2.model; save(); }")
+    pg.evaluate("() => { delete S.v; delete S.fires; delete S.leaks; delete S.cap; delete S.p2.people; delete S.p2.town; delete S.p2.ceo; delete S.p2.model; save(); }")
     pg.reload()
     have = pg.evaluate("() => [S.fires, S.leaks, S.cap, S.p2.people, S.p2.town, S.p2.ceo, S.p2.model].map((x) => !!x)")
     assert have == [True] * 7

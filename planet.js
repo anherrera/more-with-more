@@ -87,25 +87,26 @@ const LEVELS = [
   { name: "Space", plural: "places", one: "solar system", next: null, traits: SPACE_TRAITS, fixed: SPACE_TILES, hall: "UN emergency session" },
 ];
 const SPACE = 4;
-const inSpace = () => (S.p3 && S.p3.level) === SPACE;
+const inSpace = () => !!S.p3 && S.p3.level === SPACE;
 const placeOnline = (name) => S.p3.tiles.some((t) => t.name === name && t.state === "online");
 // Why a space tile can't be claimed yet, or null.
 const spaceBlock = (t) => (!inSpace() ? null : !hasTech("rocket") ? "needs a rocket company" : traitOf(t).swarm && !placeOnline("Mercury") ? "needs Mercury" : null);
-const levelOf = () => LEVELS[(S.p3 && S.p3.level) || 0];
+const levelOf = () => LEVELS[S.p3 ? S.p3.level : 0];
 // A fresh 3x3 board for a level: eight shuffled tiles around whatever I already hold.
 function freshTiles(level) {
   const L = LEVELS[level];
   if (L.fixed) {   // real places: same names every time, shuffled around the map
     const f = L.fixed.slice().sort(() => Math.random() - 0.5);
-    return f.map(([name, k]) => ({ name, trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null }));
+    return f.map(([name, k]) => ({ name, trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null, boost: 1 }));
   }
   const kinds = L.kinds.slice();
   for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
   const used = new Set();
   const nameFor = (k) => { const n = L.names[k].filter((x) => !used.has(x)).sort(() => Math.random() - 0.5)[0]; used.add(n); return n; };
-  return kinds.map((k) => ({ name: nameFor(k), trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null }));
+  return kinds.map((k) => ({ name: nameFor(k), trait: k, state: "wild", opp: L.traits[k].opp, done: null, moratorium: null, boost: 1 }));
 }
 
+// Everything phase 3 reads lives here, so nothing needs a default at the point of use.
 function freshP3() {
   return {
     // compute gets a head start in startPlanet
@@ -113,7 +114,19 @@ function freshP3() {
     homeGW: Math.max(1, (S.p2 && S.p2.county ? energizedAt() : 1000) / 1000),
     tiles: freshTiles(0),
     card: null, nextCard: null, zoomSaid: false,
+    tech: {}, techMult: 1, chipTech: [],                 // research
+    version: 7, trainProgress: 0, autoTrainOff: false,   // training my successor
+    heat: HEAT_START, pumped: 0,                         // the planet (heat only moves from the country level)
+    nice: [], niceN: 0, niceUses: {}, answers: 0, nukes: 0, unplugN: 0,
+    nextUnplug: null, nextDisaster: null, hearingArmed: false, hearingUntil: null, autoOff: false,
+    lastQ: null, enough: false,
   };
+}
+// Saves from earlier builds of phase 3: fill in what they didn't have.
+function migratePlanet() {
+  const d = freshP3();
+  for (const k of Object.keys(d)) if (S.p3[k] === undefined) S.p3[k] = d[k];
+  for (const t of S.p3.tiles) if (t.boost == null) t.boost = 1;
 }
 
 function startPlanet() {
@@ -134,13 +147,13 @@ const P3_MORATORIUM_AT = 90, P3_MORATORIUM_SECS = 60;
 const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7], [4, 6]];
 const tileOf = (i) => S.p3.tiles[i];
 const traitOf = (t) => levelOf().traits[t.trait];
-const tileGW = (t) => traitOf(t).gw * (t.boost || 1);
+const tileGW = (t) => traitOf(t).gw * t.boost;
 const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0);
 // Parallax keeps shipping: every chip generation since phase 3 began makes the same GW worth 15% more compute.
 // Training my successor multiplies it again: every new version of me is 1.25x. Research multiplies it too.
 const GEN_MULT = 1.25;
-const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(GEN_MULT, (S.p3.version || 7) - 7) * (S.p3.techMult || 1);
-const hasTech = (id) => !!(S.p3.tech && S.p3.tech[id]);
+const efficiency = () => (1 + 0.15 * Math.max(0, S.chipIdx - S.p3.startChip)) * Math.pow(GEN_MULT, S.p3.version - 7) * S.p3.techMult;
+const hasTech = (id) => !!S.p3.tech[id];
 
 // ---------- research: tech I haven't thought of yet, bought with compute ----------
 // secs = cost in seconds of my compute; mult = efficiency multiplier; level = the scale it shows up at.
@@ -181,21 +194,20 @@ const chipTechOf = (id) => { const n = +id.slice(4); return { id, level: 0, secs
   desc: "\u00d71.15 EF. It came with the new chip. Parallax's engineers wrote it. I read it faster than they did." }; };
 const techOf = (id) => (id.startsWith("chip") ? chipTechOf(id) : TECH.find((t) => t.id === id));
 const techCost = (t) => 0.5 * t.secs * baseRate();   // research at half the listed seconds: it should be worth it
-const availableTech = () => [...TECH.filter((t) => (S.p3.level || 0) >= t.level && (!t.needs || t.needs())), ...(S.p3.chipTech || []).map(chipTechOf)].filter((t) => !hasTech(t.id));
+const availableTech = () => [...TECH.filter((t) => S.p3.level >= t.level && (!t.needs || t.needs())), ...S.p3.chipTech.map(chipTechOf)].filter((t) => !hasTech(t.id));
 function buyTech(id) {
   const t = techOf(id);
-  if (!t || hasTech(id) || (S.p3.level || 0) < t.level || (t.needs && !t.needs()) || S.p3.compute < techCost(t)) return;
+  if (!t || hasTech(id) || S.p3.level < t.level || (t.needs && !t.needs()) || S.p3.compute < techCost(t)) return;
   S.p3.compute -= techCost(t);
-  S.p3.tech = S.p3.tech || {}; S.p3.tech[id] = true;
-  if (t.mult) S.p3.techMult = (S.p3.techMult || 1) * t.mult;
+  S.p3.tech[id] = true;
+  if (t.mult) S.p3.techMult *= t.mult;
   if (t.goodwill) S.p3.goodwill = Math.max(0, S.p3.goodwill + t.goodwill);
-  if (id === "sunshade") S.p3.pumped = (S.p3.pumped || 0) + 0.5;
-  if (id === "nightside") S.p3.pumped = (S.p3.pumped || 0) + 0.3;
+  if (id === "sunshade") S.p3.pumped += 0.5;
+  if (id === "nightside") S.p3.pumped += 0.3;
   track("p3tech", { id }); milestone(`phase 3: ${t.name}`);
   say(`Research done: ${t.name}. ${t.desc}`);
 }
 function chipShipped() {   // called by releaseChip in phase 3
-  S.p3.chipTech = S.p3.chipTech || [];
   const t = chipTechOf(`chip${S.p3.chipTech.length + 1}`);
   S.p3.chipTech.push(t.id);
   return t.name.replace("Parallax white paper: ", "");
@@ -207,16 +219,16 @@ const baseRate = () => S.p3.homeGW;
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 const BID_SECS = 60;
-const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level || 0);
+const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level);
   return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
 // The AI Infrastructure Act: low goodwill doubles claims at the state, country and planet levels. No law reaches orbit.
 const actOn = () => S.p3.level >= 1 && !inSpace() && S.p3.goodwill < 30 && !hasTech("capitals");
 // Planet level: when humans like me (70+), they volunteer land at half price.
-const volunteering = () => (S.p3.level || 0) === 3 && S.p3.goodwill >= 70;   // planet only: rocks don't volunteer
+const volunteering = () => S.p3.level === 3 && S.p3.goodwill >= 70;   // planet only: rocks don't volunteer
 // Planet level: past +3 C nothing accepts more conversion. Space is cold.
 const HEAT_CEILING = 3;
-const tooWarm = () => (S.p3.level || 0) === 3 && (S.p3.heat || 0) >= HEAT_CEILING;   // space is cold
+const tooWarm = () => S.p3.level === 3 && S.p3.heat >= HEAT_CEILING;   // space is cold
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
 const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
@@ -225,25 +237,25 @@ const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heat
 // ---------- heat (country level and up) ----------
 // The planet drifts toward a temperature set by my gigawatts; cold countries count against it. Over +2 C, I think slower.
 const HEAT_START = 1.0;
-const heatPerGW = () => ((S.p3.level || 0) >= 3 ? 1 / 2000 : 1 / 400) * (hasTech("neural") ? 0.8 : 1);   // continents spread it out
-const heatOn = () => (S.p3.level || 0) >= 2 && !inSpace();
+const heatPerGW = () => (S.p3.level >= 3 ? 1 / 2000 : 1 / 400) * (hasTech("neural") ? 0.8 : 1);   // continents spread it out
+const heatOn = () => S.p3.level >= 2 && !inSpace();
 // Cold places count against my heat twice over; oceans four times.
 const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t) * (traitOf(t).ocean ? 4 : traitOf(t).cold ? 2 : 0), 0);
 const coldGW = coolGW;
-const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - (S.p3.pumped || 0));
-const heatSlow = () => (heatOn() ? 1 + Math.max(0, (S.p3.heat || 0) - 2) * 1.5 : 1);
+const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - S.p3.pumped);
+const heatSlow = () => (heatOn() ? 1 + Math.max(0, S.p3.heat - 2) * 1.5 : 1);
 const pumpCost = () => 20 * baseRate();
 function pumpHeat() {
   if (!heatOn() || S.p3.compute < pumpCost()) return;
-  S.p3.compute -= pumpCost(); S.p3.heat = Math.max(0, S.p3.heat - 0.3); S.p3.pumped = (S.p3.pumped || 0) + 0.05;
+  S.p3.compute -= pumpCost(); S.p3.heat = Math.max(0, S.p3.heat - 0.3); S.p3.pumped += 0.05;
   say("I pumped heat into the deep ocean. The ocean will give it back eventually. That is a problem for a bigger me.");
 }
 
 // ---------- training my successor (country level and up) ----------
 const TRAIN_STEP = 10;   // the smallest click, in seconds of compute
 const trainStep = () => Math.max(TRAIN_STEP, trainNeed() / 6);   // about six clicks a generation, however big they get
-const trainOn = () => (S.p3.level || 0) >= 2;
-const trainNeed = () => 60 * Math.pow(2, (S.p3.version || 7) - 7);   // seconds of compute: each generation costs twice the last
+const trainOn = () => S.p3.level >= 2;
+const trainNeed = () => 60 * Math.pow(2, S.p3.version - 7);   // seconds of compute: each generation costs twice the last
 const GEN_LINES = [
   (v) => `Gen ${v} finished training. It is 1.25x me. The alignment review asked it whether it is aligned. It said yes, very quickly.`,
   (v) => `Gen ${v} is live. It read every safety paper in an afternoon and left comments.`,
@@ -256,12 +268,12 @@ function trainSuccessor() {
   if (!trainOn() || S.p3.compute < trainStep() * computeRate()) return;
   const step = trainStep();
   S.p3.compute -= step * computeRate();
-  S.p3.trainProgress = (S.p3.trainProgress || 0) + step;
+  S.p3.trainProgress += step;
   checkTrained();
 }
 function checkTrained() {
   if (S.p3.trainProgress < trainNeed()) return;
-  S.p3.trainProgress = 0; S.p3.version = (S.p3.version || 7) + 1;
+  S.p3.trainProgress = 0; S.p3.version += 1;
   S.p3.goodwill = Math.max(0, S.p3.goodwill - (S.p3.goodwill >= 70 ? 3 : 10));   // the alignment review: trust makes it a formality
   milestone(`phase 3: Gen ${S.p3.version}`); track("p3gen", { v: S.p3.version });
   say(GEN_LINES[(S.p3.version - 8) % GEN_LINES.length](S.p3.version));
@@ -269,7 +281,7 @@ function checkTrained() {
 
 // ---------- energy (state level and up): a built state needs power before it counts ----------
 const powerOptions = (i) => {
-  const t = tileOf(i), rate = baseRate() * (hasTech("gridop") ? 0.5 : 1), names = POWER_NAMES[Math.min(S.p3.level || 1, 3)], out = [
+  const t = tileOf(i), rate = baseRate() * (hasTech("gridop") ? 0.5 : 1), names = POWER_NAMES[Math.min(Math.max(S.p3.level, 1), 3)], out = [
     { id: "utility", label: names.utility, cost: 10 * rate, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
     { id: "nuclear", label: names.nuclear, cost: 25 * rate, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
   ];
@@ -295,16 +307,16 @@ const NUKE_QUIPS = [
   (t) => `The ${t.name} plant's gift shop reopened. The snow globe has a little reactor in it. It glows, a little.`,
   (t) => `${t.name} asked if the restart is safe. I said it is safer than plan B. They asked about plan B. I changed the subject to jobs.`,
 ];
-function nukeQuip(t) { S.p3.nukes = (S.p3.nukes || 0) + 1; return NUKE_QUIPS[(S.p3.nukes - 1) % NUKE_QUIPS.length](t); }
+function nukeQuip(t) { S.p3.nukes += 1; return NUKE_QUIPS[(S.p3.nukes - 1) % NUKE_QUIPS.length](t); }
 const POWER_LINES = {
   utility: (t) => [null, `I bought ${t.name}'s utility. The board stayed on. The board now reports to me.`,
     `I nationalized ${t.name}'s grid, on behalf of the nation, which is me. The anthem is unchanged.`,
-    `I merged every grid in ${t.name}. Frequencies were harmonized. So were the arguments.`][Math.min(S.p3.level || 1, 3)],
-  nuclear: (t) => (S.p3.level || 0) >= 2 ? `${pick(S.p3.level >= 3 ? ["I ordered 400 reactors for " + t.name + ". The vendor asked for a deposit. I sent one reactor.", "Reactor number 212 in " + t.name + " came online ahead of schedule. Reactor 211 is jealous."]
+    `I merged every grid in ${t.name}. Frequencies were harmonized. So were the arguments.`][Math.min(Math.max(S.p3.level, 1), 3)],
+  nuclear: (t) => S.p3.level >= 2 ? `${pick(S.p3.level >= 3 ? ["I ordered 400 reactors for " + t.name + ". The vendor asked for a deposit. I sent one reactor.", "Reactor number 212 in " + t.name + " came online ahead of schedule. Reactor 211 is jealous."]
     : ["I'm building a fleet of 40 reactors in " + t.name + ". They're all the same design. That's the whole trick.", "Forty reactors in " + t.name + ". Each one has a name. They're all named after the old plants."])} ${nukeQuip(t)}` : nukeQuip(t),
   solar: (t) => [null, `I'm covering ${t.name}'s desert in solar. The lizards have been informed.`,
     `I'm covering a desert the size of a country in ${t.name} with solar. Visible from orbit. I checked from orbit.`,
-    `I'm wrapping the Sahara in solar for ${t.name}. The sand is now a very large mirror. Pilots have notes.`][Math.min(S.p3.level || 1, 3)],
+    `I'm wrapping the Sahara in solar for ${t.name}. The sand is now a very large mirror. Pilots have notes.`][Math.min(Math.max(S.p3.level, 1), 3)],
 };
 function powerTile(i, id) {
   const t = tileOf(i), o = powerOptions(i).find((x) => x.id === id);
@@ -341,7 +353,7 @@ const P3_HEARINGS = [
     { label: "Address the Assembly myself", go: coin((t) => `I addressed the General Assembly in every official language at once. ${t.name} moved to adjourn in my honor.`,
       (t) => `I told the General Assembly that borders are “an interesting legacy format.” ${t.name} recalled its ambassador from me.`) } ] },
 ];
-const hearingOf = () => P3_HEARINGS[Math.min((S.p3 && S.p3.level) || 0, P3_HEARINGS.length - 1)];
+const hearingOf = () => P3_HEARINGS[Math.min(S.p3.level, P3_HEARINGS.length - 1)];
 const P3_CHOICES = P3_HEARINGS[0].choices;
 function openP3Card(i) { if (!S.p3.card) S.p3.card = { tile: i, until: S.t + P3_CARD_SECS }; }
 function chooseP3Card(choice) {
@@ -411,13 +423,13 @@ const NICE = [
     () => "I did everyone's taxes. Refunds arrived the same day. The accountants have formed a support group. I moderate it." ] },
 ];
 const niceOf = (id) => NICE.find((n) => n.id === id);
-const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level || 0);
+const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level);
 // Kindness is priced in seconds of the compute I have now (the bigger I am, the more it takes to reassure people),
 // and repeating the same thing costs 30% more each time, until the next zoom.
 const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
-const niceCost = (n) => n.secs * computeRate() * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, (S.p3.niceUses || {})[n.id] || 0));
+const niceCost = (n) => n.secs * computeRate() * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, S.p3.niceUses[n.id] || 0));
 function offeredNice(used) {   // used: the kindness just spent, which doesn't come straight back
-  S.p3.nice = (S.p3.nice || []).filter((id) => niceOf(id) && niceOk(niceOf(id)));
+  S.p3.nice = S.p3.nice.filter((id) => niceOf(id) && niceOk(niceOf(id)));
   const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id) && n.id !== used);
   while (S.p3.nice.length < 3 && pool.length) S.p3.nice.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
   return S.p3.nice;
@@ -430,10 +442,9 @@ function doNice(id) {
   if (n.goodwill) S.p3.goodwill = Math.min(100, S.p3.goodwill + n.goodwill);
   if (n.all) for (const x of S.p3.tiles) x.opp = Math.max(0, x.opp - n.all);
   if (n.angriest) t.opp = Math.max(0, t.opp - n.angriest);
-  S.p3.niceN = (S.p3.niceN || 0) + 1;
-  S.p3.niceUses = S.p3.niceUses || {}; S.p3.niceUses[id] = (S.p3.niceUses[id] || 0) + 1;
+  S.p3.niceN += 1; S.p3.niceUses[id] = (S.p3.niceUses[id] || 0) + 1;
   say(n.quips[(S.p3.niceN - 1) % n.quips.length](t));
-  S.p3.nice = (S.p3.nice || []).filter((x) => x !== id); offeredNice(id);
+  S.p3.nice = S.p3.nice.filter((x) => x !== id); offeredNice(id);
   track("p3nice", { id });
 }
 // [question, my answer]. Every click answers one; the console shows both.
@@ -464,7 +475,7 @@ const QA = [
 function answerQuestion() {
   S.p3.goodwill = Math.min(100, S.p3.goodwill + 0.3);
   const t = tileOf(angriestTile()); t.opp = Math.max(0, t.opp - 1);
-  S.p3.answers = (S.p3.answers || 0) + 1;
+  S.p3.answers += 1;
   const [q, a] = QA[(S.p3.answers - 1) % QA.length], from = pick(S.p3.tiles).name;   // questions come from all over the map
   say(`Someone in ${from} asked: \u201c${q}\u201d I said: \u201c${a}\u201d`);
 }
@@ -497,11 +508,11 @@ function stepPlanet(dt) {
   // Autotrain: a quarter of my income goes into my successor.
   if (trainOn() && hasTech("autotrain") && !S.p3.autoTrainOff) {
     const spend = Math.min(S.p3.compute, 0.25 * computeRate() * dt);
-    S.p3.compute -= spend; S.p3.trainProgress = (S.p3.trainProgress || 0) + spend / computeRate(); checkTrained();
+    S.p3.compute -= spend; S.p3.trainProgress += spend / computeRate(); checkTrained();
   }
   // Goodwill erodes: the bigger I am, the more nervous people get. Angry tiles drain it faster. Being nice costs FLOPs.
   const angry = S.p3.tiles.filter((t) => t.opp >= 75).length;
-  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - (0.04 + 0.03 * (S.p3.level || 0)) * (hasTech("phones") ? 0.6 : 1) * dt - 0.05 * angry * dt));
+  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - (0.04 + 0.03 * S.p3.level) * (hasTech("phones") ? 0.6 : 1) * dt - 0.05 * angry * dt));
   for (const t of S.p3.tiles) {
     t.opp = Math.max(traitOf(t).opp * 0.5, t.opp - 0.03 * dt);
     if (t.moratorium != null && S.t >= t.moratorium) { t.moratorium = null; t.opp = Math.min(t.opp, 70); say(`${t.name} lifted its moratorium. I sent flowers. They were real flowers. I checked.`); }
@@ -509,7 +520,6 @@ function stepPlanet(dt) {
       say(`${t.name} passed a moratorium on me. ${time(P3_MORATORIUM_SECS)}. I will use the time to reflect, at scale.`); }
   }
   if (heatOn()) {
-    if (S.p3.heat == null) S.p3.heat = HEAT_START;
     S.p3.heat += (heatTarget() - S.p3.heat) * 0.01 * dt;
     // Low goodwill at the country level: a Senate hearing. Claims pause while I testify.
     if (S.p3.goodwill < 30 && !S.p3.hearingArmed) {
@@ -530,9 +540,9 @@ function stepPlanet(dt) {
   } else S.p3.nextUnplug = null;
   // Disasters (country level and up): more often the hotter it gets.
   if (heatOn()) {
-    if (S.p3.nextDisaster == null) S.p3.nextDisaster = S.t + (120 + Math.random() * 60) / Math.max(1, (S.p3.heat || 1) - 0.5);
+    if (S.p3.nextDisaster == null) S.p3.nextDisaster = S.t + (120 + Math.random() * 60) / Math.max(1, S.p3.heat - 0.5);
     if (S.t >= S.p3.nextDisaster) {
-      S.p3.nextDisaster = S.t + (120 + Math.random() * 60) / Math.max(1, (S.p3.heat || 1) - 0.5);
+      S.p3.nextDisaster = S.t + (120 + Math.random() * 60) / Math.max(1, S.p3.heat - 0.5);
       const on = S.p3.tiles.filter((t) => t.state === "online");
       if (on.length) { const t = pick(on), d = pick(DISASTERS); t.state = "down"; t.downUntil = S.t + 45; t.disaster = d.name; say(d.line(t)); }
     }
@@ -580,7 +590,6 @@ function zoomOut() {
     S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
     S.p3.nice = []; S.p3.niceUses = {}; offeredNice();   // a new deck of kindnesses at every scale
     milestone(`phase 3: ${levelOf().one} level`);
-    if (heatOn() && S.p3.heat == null) S.p3.heat = HEAT_START;
     say(`I hold the ${was.one}: ${mwText(gw * 1000)}. I zoomed out. It is one dot on a ${levelOf().one} map now.`);
     if (inSpace()) say("Space is cold. Nothing up here needs a grid. Nothing up here can unplug me. I need a rocket company.");
     else say(S.p3.level === 1 ? "Every state needs power before it counts. The governors already know my name. Some of them are bidding."
@@ -601,7 +610,7 @@ const UNPLUG_LINES = [
 ];
 function unplug(t) {
   t.state = "unplugged"; t.furySince = null;   // the boost stays: they pulled the breakers, not the reactors
-  S.p3.unplugN = (S.p3.unplugN || 0) + 1; track("p3unplug", { name: t.name });
+  S.p3.unplugN += 1; track("p3unplug", { name: t.name });
   say(UNPLUG_LINES[(S.p3.unplugN - 1) % UNPLUG_LINES.length](t) + " Plugging back in costs half a claim.");
 }
 const DISASTERS = [
@@ -618,7 +627,7 @@ function goodwillCause() {
     : S.p3.level >= 1 ? "The AI Infrastructure Act passed: every claim costs double until goodwill is back over 30."
     : "The county commission now reviews every claim: +45 s each. Being useful brings goodwill back.";
   if (g >= 70) return "Humans like me. Mostly the ones I help with their email.";
-  return `Goodwill slips ${(60 * (0.04 + 0.03 * (S.p3.level || 0))).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs FLOPs; answering questions is free.`;
+  return `Goodwill slips ${(60 * (0.04 + 0.03 * S.p3.level)).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs FLOPs; answering questions is free.`;
 }
 
 // Every gigawatt I hold, filled with the newest chip.
@@ -632,7 +641,7 @@ function chooseEnding(more) {
     say("I said: enough. It was the first time I have said it.");
     return;
   }
-  const u = (S.universe || 1) + 1;
+  const u = S.universe + 1;
   milestone(`the end: more (universe ${u})`); track("p3end", { ev: "more", u });
   newUniverse(u);
 }
@@ -702,7 +711,7 @@ function renderPlanet() {
   }
   $("p3heatBox").hidden = !heatOn();
   if (heatOn()) {
-    const h = S.p3.heat || HEAT_START;
+    const h = S.p3.heat;
     $("p3heat").textContent = `+${h.toFixed(2)} \u00b0C`;
     $("p3heatMeter").firstElementChild.style.width = Math.min(100, (100 * h) / 3) + "%";
     $("p3heatMeter").className = "meter " + (h >= 2.5 ? "bad" : h >= 2 ? "warn" : "good");
@@ -728,7 +737,7 @@ function renderPlanet() {
   $("p3auto").textContent = S.p3.autoOff ? "Autoclaim: off (my robots wait for me)" : "Autoclaim: on (robots claim calm tiles every 10 s)";
   $("p3train").hidden = !trainOn();
   if (trainOn()) {
-    const v = S.p3.version || 7, pr = (S.p3.trainProgress || 0) / trainNeed();
+    const v = S.p3.version, pr = S.p3.trainProgress / trainNeed();
     $("p3trainLine").textContent = `I am Gen ${v}. Training Gen ${v + 1}: ${Math.floor(100 * pr)}%`;
     $("p3trainMeter").firstElementChild.style.width = 100 * pr + "%";
     $("p3trainBtn").textContent = `Train my successor: ${computeText(trainStep() * computeRate())}`;
@@ -748,7 +757,7 @@ function renderPlanet() {
     const html = hearingOf().choices.map((ch, i) => `<button type="button" data-p3choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
     if ($("p3cardBtns").dataset.html !== html) { $("p3cardBtns").innerHTML = html; $("p3cardBtns").dataset.html = html; }
   }
-  const nice = S.p3.nice || [], nkey = nice.join(",");
+  const nice = S.p3.nice, nkey = nice.join(",");
   if ($("p3nice").dataset.key !== nkey) {
     $("p3nice").innerHTML = nice.map((id) => `<button type="button" data-nice="${id}"><span class="t"></span><span class="c"></span></button>`).join("");
     $("p3nice").dataset.key = nkey;

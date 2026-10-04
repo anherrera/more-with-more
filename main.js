@@ -198,7 +198,7 @@ function realityCheck() {
   const leverage = S.debt / (rev * 600 + S.debt + 1e-9);
   const severity = (0.3 + 0.5 * leverage) * (S.done.hallucinate ? 0.5 : 1);   // admitting it in the docs takes the sting out
   const loss = Math.round(froth() * severity);
-  S.hype -= loss; S.checks = (S.checks || 0) + 1;
+  S.hype -= loss; S.checks += 1;
   const pool = S.done.depr6 ? [...REALITY, "A short-seller read your depreciation footnote."] : REALITY;
   let line = `${pool[S.checks % pool.length]} Hype -${loss}.`, seized = 0;
   if (S.debt > 0 && severity > 0.5 && S.phase === 1) {
@@ -465,7 +465,7 @@ function hints() {
     "Revenue will not build a data center. Move the Training share slider and train a model.");
   hint("raise", S.gen >= 1, "Investors like a new model. Raise while hype is above 40.");
   hint("full", S.gpus > 0 && roomNewest() < 1 && S.tier === 0, "The rack is full. Upgrade the cooling or lease more space.");
-  if (roomNewest() < 1 && S.credits + S.funds > gpuPrice() * 200 && S.t - (S.lastStranded || -1e9) > 300) {
+  if (roomNewest() < 1 && S.credits + S.funds > gpuPrice() * 200 && S.t - (S.lastStranded ?? -1e9) > 300) {
     S.lastStranded = S.t;
     say(`${money(S.credits + S.funds)} to spend and nowhere to put GPUs. Lease more space or upgrade the cooling.`);
   }
@@ -850,18 +850,31 @@ function newUniverse(u) {
   clearCaches();
 }
 
+// ---------- save versions ----------
+// A save without S.v is version 0. Each migration runs once, in order, on a save older than its version; every step
+// checks the field it fills, so a save from any point in the game's history lands in the same place.
+const MIGRATIONS = [
+  { v: 1, up: (saved) => {   // phase 1 grew: the log flipped direction, leases stacked, the cooling list grew, chips got generations
+    if (!saved.logV2) { S.log = S.log.slice().reverse(); S.logV2 = true; }
+    if (!saved.leases) S.leases = { [TYPES[saved.tier || 0].id]: 1 };
+    if (!saved.coolingV2) { S.cooling = [0, 2, 3, 4][saved.cooling || 0] ?? 0; S.coolingV2 = true; }
+    if (!saved.leaseCool) { S.leaseCool = {}; TYPES.forEach((t, i) => { if (owned(i)) S.leaseCool[t.id] = { [S.cooling]: owned(i) }; }); }
+    if (!saved.fleet) { S.fleet = S.gpus ? { 0: S.gpus } : {}; S.chipIdx = 0; S.nextChip = Math.max(S.t + 60, FIRST_CHIP_AT); }
+  } },
+  { v: 2, up: (saved) => { if (!saved.cap) S.cap = deriveCap(); } },   // the cap table: rebuilt from the rounds raised
+  { v: 3, up: () => { if (S.p2) migrateCampus(); } },                  // phase 2: the model, people, the town, the CEO, chip generations
+  { v: 4, up: () => { if (S.p3) migratePlanet(); } },                  // phase 3: research, training, heat, kindness, space
+];
+function migrate(saved) {
+  for (const m of MIGRATIONS) if ((saved.v || 0) < m.v) m.up(saved);
+  S.v = SAVE_VERSION;
+}
+
 function start(data) {
   const saved = (data && data.state) || load();
-  if (saved) { S = Object.assign(fresh(), saved); if (!saved.logV2) { S.log = S.log.slice().reverse(); } S.log = S.log.map(unMojibake); }
-  S.logV2 = true;
-  if (saved && !saved.cap) S.cap = deriveCap();   // saves from before the cap table
-  if (S.p2) migrateCampus();
-  if (S.p3 && S.p3.zoomSaid && (S.p3.level || 0) < LEVELS.length - 1) S.p3.zoomSaid = false;   // a save that hit a placeholder: that level exists now
-  if (saved && !saved.leases) { S.leases = { [TYPES[saved.tier || 0].id]: 1 }; }          // old saves: one of the tier they had
-  if (saved && !saved.coolingV2) { S.cooling = [0, 2, 3, 4][saved.cooling || 0] ?? 0; S.coolingV2 = true; } // cooling list grew
-  if (saved && !saved.leaseCool) { S.leaseCool = {}; TYPES.forEach((t, i) => { if (owned(i)) S.leaseCool[t.id] = { [S.cooling]: owned(i) }; }); }
+  if (saved) { S = Object.assign(fresh(), saved); migrate(saved); S.log = S.log.map(unMojibake); }
+  if (S.p3 && S.p3.zoomSaid && S.p3.level < LEVELS.length - 1) S.p3.zoomSaid = false;   // a save that hit a placeholder level: the next one exists now
   S.tier = highestType();
-  if (saved && !saved.fleet) { S.fleet = S.gpus ? { 0: S.gpus } : {}; S.chipIdx = 0; S.nextChip = Math.max(S.t + 60, FIRST_CHIP_AT); }
   $("split").value = S.split;
   ensureRun(); track("session", { resumedAt: Math.round(S.t) });
   wire();
