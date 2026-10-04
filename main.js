@@ -488,6 +488,7 @@ function renderConsole() {
 function render() {
   $("p3").hidden = S.phase !== 3;
   document.querySelector(".cols").hidden = S.phase === 3;
+  renderPause();
   if (S.phase === 3) {   // phase 3 has its own screen; phases 1-2 panels are folded away
     $("ticker").innerHTML = `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> \u00b7 it reports to me now`;
     renderConsole(); renderPhaseBar(); renderAlerts(); renderPlanet();
@@ -805,6 +806,8 @@ function wire() {
   $("p3map").addEventListener("click", (e) => { const b = e.target.closest("button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
   $("p3cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
   $("p3power").addEventListener("click", (e) => { const b = e.target.closest("button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
+  $("pause").addEventListener("click", () => togglePause());
+  document.addEventListener("keydown", (e) => { if ((e.key === "p" || e.key === "P") && !e.metaKey && !e.ctrlKey && !/input|textarea/i.test(e.target.tagName)) togglePause(); });
   $("p3autotrain").addEventListener("click", () => { S.p3.autoTrainOff = !S.p3.autoTrainOff; render(); });
   $("p3auto").addEventListener("click", () => { S.p3.autoOff = !S.p3.autoOff; render(); });
   $("p3techs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tech]"); if (b) { buyTech(b.dataset.tech); render(); } });
@@ -818,6 +821,20 @@ function wire() {
   $("lastEnough").addEventListener("click", () => { chooseEnding(false); render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });
   wireCampus();
+}
+
+// Paused: the clock stops completely. No income, no timers, no humans getting angrier.
+const running = () => clockOn && !S.paused;
+function togglePause() {
+  S.paused = !S.paused; track("pause", { on: S.paused });
+  if (!S.paused) clockOn = true;   // resuming starts the clock even on a fresh game
+  save(); render();
+}
+function renderPause() {
+  $("pause").textContent = S.paused ? "\u25b6 Resume" : "\u23f8 Pause";
+  $("pause").classList.toggle("on", !!S.paused);
+  $("pausedBanner").hidden = !S.paused;
+  document.body.classList.toggle("paused", !!S.paused);
 }
 
 // Anything rendered from cached keys has to forget them when the game starts over.
@@ -856,7 +873,7 @@ function start(data) {
     let last = performance.now();
     setInterval(() => {
       const now = performance.now(), dt = Math.min((now - last) / 1000, 1); last = now;
-      if (clockOn) for (let left = dt * SPEED; left > 1e-9; left -= 1) step(Math.min(1, left));   // sub-steps of at most 1 s
+      if (running()) for (let left = dt * SPEED; left > 1e-9; left -= 1) step(Math.min(1, left));   // sub-steps of at most 1 s
       render();
     }, 100);
     setInterval(save, 5000);
