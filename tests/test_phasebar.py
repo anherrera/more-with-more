@@ -52,3 +52,10 @@ def test_phase2_posts_like_an_infra_company(game):
     pg.click("#post")
     last = pg.evaluate("() => S.log.at(-1)")
     assert last.startswith("Posted:") and pg.evaluate("() => CAMPUS_POSTS.some((p) => S.log.at(-1).includes(p))")
+
+
+def test_headline_shows_delivered_and_gpu_count_in_phase2(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.fleet = {3: 12345}; S.gpus = 12345; render(); }")
+    head = pg.inner_text(".count")
+    assert "Delivered" in head and "12,345 GPUs" in head

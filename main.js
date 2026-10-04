@@ -598,6 +598,7 @@ function render() {
 function renderPhase1() {
   $("countLabel").textContent = "GPUs";
   $("gpuCount").textContent = S.gpus.toLocaleString("en-US");
+  $("gpuTotal").hidden = !(S.phase === 2 && S.p2 && S.p2.county);   // phase 2 headline is MW delivered; keep the GPU count beside it
   $("price").textContent = "$" + (S.price < 0.01 ? S.price.toFixed(4) : S.price.toFixed(3)) + (S.done.dynprice ? " (auto)" : "");
   const d = demand(), sv = Math.min(servingGPUs(), d);
   $("demand").textContent = fmt(d) + " /s";

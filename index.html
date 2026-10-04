@@ -32,6 +32,7 @@
   body { background: var(--bg); color: var(--ink); font: 12.5px/1.35 var(--serif); padding-inline: 16px; padding-block: 10px 24px; }
   .wrap { max-width: 1800px; margin: 0 auto; }
   .count { font-size: 22px; margin: 0; font-variant-numeric: tabular-nums; }
+  #gpuTotal { font-size: 15px; margin-left: 14px; }
   .ticker { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-variant-numeric: tabular-nums; }
   .ticker b { color: var(--accent); }
   #console {
@@ -110,7 +111,7 @@
 </style>
 
 <div class="wrap">
-  <div class="count"><span id="countLabel">GPUs</span>: <span id="gpuCount">0</span></div>
+  <div class="count"><span id="countLabel">GPUs</span>: <span id="gpuCount">0</span><span id="gpuTotal" class="sub" hidden></span></div>
   <div class="ticker" id="ticker"></div>
   <div id="hud">
   <div class="phasebar" id="phaseBar"><span id="phaseText"></span> <button id="phaseGo" type="button" class="primary" hidden></button></div>

@@ -628,6 +628,7 @@ function renderContracts() {
   $("nextMove").textContent = `Next: ${nextMove()}`;
   $("countLabel").textContent = "Delivered";
   $("gpuCount").textContent = `${mwText(deliveredMW())}`;
+  $("gpuTotal").textContent = `${S.gpus.toLocaleString("en-US")} GPUs`;
   $("backlog").textContent = `${mwText(backlogMW())}`;
   $("delivered").textContent = `${mwText(deliveredMW())} of ${mwText(usedKW() / 1000)} of GPUs`;
   $("p2rev").textContent = `${money(campusRevenue())}/s (${money(onDemandRevenue())}/s of it on-demand)`;
