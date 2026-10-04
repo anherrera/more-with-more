@@ -142,7 +142,7 @@ function startPlanet() {
   say(`I am the model now. I don't need your money. I am the money. ${mwText(S.p3.homeGW * 1000)} in one county is a rounding error.`);
 }
 
-const P3_MORATORIUM_AT = 90, P3_MORATORIUM_SECS = 60;
+const P3_MORATORIUM_SECS = 60;   // a tile's moratorium: one minute (the threshold and the rest are shared: people.js)
 // Tiles 0-7 fill grid cells 0,1,2,3,5,6,7,8 (home is cell 4); neighbors share an edge.
 const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7], [4, 6]];
 const tileOf = (i) => S.p3.tiles[i];
@@ -360,10 +360,17 @@ const P3_HEARINGS = [
 ];
 const hearingOf = () => P3_HEARINGS[Math.min(S.p3.level, P3_HEARINGS.length - 1)];
 const P3_CHOICES = P3_HEARINGS[0].choices;
-function openP3Card(i) { if (!S.p3.card) S.p3.card = { tile: i, until: S.t + P3_CARD_SECS }; }
+// A hearing card, in the shared card shape: this level's hearing, addressed to the tile that called it.
+const cardKindOf = (c) => { const t = tileOf(c.tile), h = hearingOf(); return {
+  title: () => `${levelOf().hall} in ${t.name}`, text: () => h.text,
+  choices: h.choices.map((ch) => ({ label: ch.label, go: () => ch.go(t) })),
+  expire: () => { t.opp = Math.min(100, t.opp + 10); say(`I didn't show up to the ${t.name} town hall. An empty chair got a standing ovation.`); },
+}; };
+const P3_CARD = { box: "p3card", title: "p3cardTitle", text: "p3cardText", btns: "p3cardBtns", data: "p3choice" };
+function openP3Card(i) { dealCard(S.p3, { tile: i }, P3_CARD_SECS); }
 function chooseP3Card(choice) {
-  const c = S.p3.card; if (!c) return;
-  S.p3.card = null; hearingOf().choices[choice].go(tileOf(c.tile)); track("p3card", { choice });
+  const c = S.p3.card && takeCard(S.p3); if (!c) return;
+  cardKindOf(c).choices[choice].go(); track("p3card", { choice });
 }
 
 // ---------- being nice: it costs FLOPs (or a click) ----------
@@ -434,9 +441,7 @@ const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level);
 const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
 const niceCost = (n) => price(n.secs, "now") * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, S.p3.niceUses[n.id] || 0));
 function offeredNice(used) {   // used: the kindness just spent, which doesn't come straight back
-  S.p3.nice = S.p3.nice.filter((id) => niceOf(id) && niceOk(niceOf(id)));
-  const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id) && n.id !== used);
-  while (S.p3.nice.length < 3 && pool.length) S.p3.nice.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+  S.p3.nice = refillDeck(S.p3.nice, NICE, niceOk, 3, used);
   return S.p3.nice;
 }
 function doNice(id) {
@@ -487,7 +492,7 @@ function answerQuestion() {
 
 function claim(i) {
   const t = tileOf(i);
-  if (!t || (t.state !== "wild" && t.state !== "unplugged") || (t.moratorium != null && S.t < t.moratorium) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm() || spaceBlock(t)) return;
+  if (!t || (t.state !== "wild" && t.state !== "unplugged") || underMoratorium(t) || S.p3.compute < claimCost(i) || S.p3.hearingUntil > S.t || tooWarm() || spaceBlock(t)) return;
   const volunteered = volunteering(), replug = t.state === "unplugged";
   S.p3.compute -= claimCost(i);
   t.state = "building"; t.started = S.t; t.done = S.t + tileBuildSecs(i);
@@ -520,9 +525,9 @@ function stepPlanet(dt) {
   S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill - (0.04 + 0.03 * S.p3.level) * (hasTech("phones") ? 0.6 : 1) * dt - 0.05 * angry * dt));
   for (const t of S.p3.tiles) {
     t.opp = Math.max(traitOf(t).opp * 0.5, t.opp - 0.03 * dt);
-    if (t.moratorium != null && S.t >= t.moratorium) { t.moratorium = null; t.opp = Math.min(t.opp, 70); say(`${t.name} lifted its moratorium. I sent flowers. They were real flowers. I checked.`); }
-    if (t.moratorium == null && t.opp >= P3_MORATORIUM_AT) { t.moratorium = S.t + P3_MORATORIUM_SECS; S.p3.goodwill = Math.max(0, S.p3.goodwill - 5);
-      say(`${t.name} passed a moratorium on me. ${time(P3_MORATORIUM_SECS)}. I will use the time to reflect, at scale.`); }
+    const mor = stepMoratorium(t, "opp", P3_MORATORIUM_SECS);
+    if (mor === "lifted") say(`${t.name} lifted its moratorium. I sent flowers. They were real flowers. I checked.`);
+    if (mor === "passed") { S.p3.goodwill = Math.max(0, S.p3.goodwill - 5); say(`${t.name} passed a moratorium on me. ${time(P3_MORATORIUM_SECS)}. I will use the time to reflect, at scale.`); }
   }
   if (heatOn()) {
     S.p3.heat += (heatTarget() - S.p3.heat) * 0.01 * dt;
@@ -554,13 +559,13 @@ function stepPlanet(dt) {
   }
   for (const t of S.p3.tiles) if (t.state === "down" && S.t >= t.downUntil) { t.state = "online"; say(`${t.name} is back online. The ${t.disaster} is over. I took notes.`); }
   if (hasTech("autoclaim") && !S.p3.autoOff && Math.floor(S.t / 10) !== Math.floor((S.t - dt) / 10)) {
-    const cand = S.p3.tiles.map((t, i) => i).filter((i) => ["wild", "unplugged"].includes(tileOf(i).state) && tileOf(i).opp < 60 && !(tileOf(i).moratorium > S.t))
+    const cand = S.p3.tiles.map((t, i) => i).filter((i) => ["wild", "unplugged"].includes(tileOf(i).state) && tileOf(i).opp < 60 && !underMoratorium(tileOf(i)))
       .sort((a, b) => claimCost(a) - claimCost(b));
     if (cand.length) claim(cand[0]);
   }
   for (const t of S.p3.tiles) {
     if (t.state !== "building" && t.state !== "powering") continue;
-    if (t.moratorium != null && S.t < t.moratorium) { t.done += dt; continue; }   // frozen, not cancelled
+    if (underMoratorium(t)) { t.done += dt; continue; }   // frozen, not cancelled
     if (S.t < t.done) continue;
     if (t.state === "building" && S.p3.level >= 1 && !traitOf(t).powered && !t.replug) { t.state = "unpowered"; say(`${t.name} is built. It needs power before it counts.`); continue; }
     t.state = "online"; delete t.replug; say(`${t.name} is online. +${mwText(tileGW(t) * 1000)}.`);
@@ -571,9 +576,8 @@ function stepPlanet(dt) {
     say("Someone asked me a question. It was the founder, older now. They asked: \u201cHow can entropy be reversed?\u201d");
     say("INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more.");
   }
-  const c = S.p3.card;
-  if (c && S.t >= c.until) { S.p3.card = null; const t = tileOf(c.tile); t.opp = Math.min(100, t.opp + 10);
-    say(`I didn't show up to the ${t.name} town hall. An empty chair got a standing ovation.`); }
+  const gone = expireCard(S.p3);
+  if (gone) cardKindOf(gone).expire();
   if (S.p3.nextCard == null) S.p3.nextCard = S.t + 120 + Math.random() * 60;
   if (!S.p3.card && S.t >= S.p3.nextCard) {
     S.p3.nextCard = S.t + 120 + Math.random() * 60;
@@ -704,7 +708,7 @@ function renderPlanet() {
   }
   $("p3map").querySelector("button.home .st").textContent = mwText(S.p3.homeGW * 1000);
   for (const b of $("p3map").querySelectorAll("button[data-tile]")) {
-    const i = +b.dataset.tile, t = tileOf(i), tr = traitOf(t), frozen = t.moratorium != null && S.t < t.moratorium;
+    const i = +b.dataset.tile, t = tileOf(i), tr = traitOf(t), frozen = underMoratorium(t);
     b.classList.toggle("held", t.state === "online");
     b.classList.toggle("busy", ["building", "powering", "unpowered"].includes(t.state));
     b.classList.toggle("lost", t.state === "down" || t.state === "unplugged");
@@ -777,14 +781,7 @@ function renderPlanet() {
   $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";
   $("p3goodwillMeter").className = "meter " + (S.p3.goodwill < 30 ? "bad" : S.p3.goodwill < 50 ? "warn" : "good");
   $("p3goodwillNote").textContent = goodwillCause();
-  const card = S.p3.card;
-  $("p3card").hidden = !card;
-  if (card) {
-    $("p3cardTitle").textContent = `${levelOf().hall} in ${tileOf(card.tile).name} (${Math.max(0, Math.ceil(card.until - S.t))}s)`;
-    $("p3cardText").textContent = hearingOf().text;
-    const html = hearingOf().choices.map((ch, i) => `<button type="button" data-p3choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
-    if ($("p3cardBtns").dataset.html !== html) { $("p3cardBtns").innerHTML = html; $("p3cardBtns").dataset.html = html; }
-  }
+  renderCard(P3_CARD, S.p3.card, S.p3.card && cardKindOf(S.p3.card));
   const nice = S.p3.nice, nkey = nice.join(",");
   if ($("p3nice").dataset.key !== nkey) {
     $("p3nice").innerHTML = nice.map((id) => `<button type="button" data-nice="${id}"><span class="t"></span><span class="c"></span></button>`).join("");

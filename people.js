@@ -1,6 +1,41 @@
-// people.js: the humans of phase 2. Morale (crunch drains it, calm restores it, perks help, less each time) and
-// temporary cards: decisions that show up, wait a few seconds, and go away (the tender offer, town halls). Also the
-// town: community opposition rises with every build, slows construction, prices land up, and can stop halls cold.
+// people.js: the humans. Shared by both phases: rotating decks (perks, kindnesses), cards (decisions that show up, wait
+// a few seconds, and go away: the tender offer, town halls, hearings) and opposition with moratoriums (the town, the
+// tiles). Phase 2's own: morale (crunch drains it, calm restores it, perks help, less each time), the town (opposition
+// rises with every build, slows construction, prices land up, and can stop halls cold) and the CEO.
+
+// ---------- shared: decks, cards, moratoriums ----------
+// A rotating deck: `n` cards from `pool` on offer, in the order they were dealt, dropping any the `ok` filter no longer
+// allows; the card just `used` doesn't come straight back. Returns the new hand (ids).
+function refillDeck(hand, pool, ok, n, used) {
+  const kept = hand.filter((id) => pool.some((c) => c.id === id && ok(c)));
+  const rest = pool.filter((c) => ok(c) && !kept.includes(c.id) && c.id !== used);
+  while (kept.length < n && rest.length) kept.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0].id);
+  return kept;
+}
+// A card lives on its phase's state (`holder.card`) with a deadline. Its kind: { title(), text(), choices: [{ label, go }], expire() }.
+function dealCard(holder, card, secs) { if (!holder.card) holder.card = { ...card, until: S.t + secs }; }
+function takeCard(holder) { const c = holder.card; holder.card = null; return c; }
+function expireCard(holder) { const c = holder.card; if (c && S.t >= c.until) { holder.card = null; return c; } return null; }
+// ids: { box, title, text, btns, data }: the card's panel and the data attribute its buttons answer with.
+function renderCard(ids, card, kind) {
+  $(ids.box).hidden = !card;
+  if (!card) return;
+  $(ids.title).textContent = `${kind.title()} (${Math.max(0, Math.ceil(card.until - S.t))}s)`;
+  $(ids.text).textContent = kind.text();
+  const html = kind.choices.map((ch, i) => `<button type="button" data-${ids.data}="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
+  if ($(ids.btns).dataset.html !== html) { $(ids.btns).innerHTML = html; $(ids.btns).dataset.html = html; }
+}
+// Opposition (0-100) passes a moratorium at 90; when it lifts after `secs`, the meter settles at 70.
+// Returns "passed" or "lifted" so the caller can say its line and take its own hit, or null.
+const MORATORIUM_AT = 90, MORATORIUM_REST = 70;
+const underMoratorium = (o) => !!(o && o.moratorium != null && S.t < o.moratorium);
+function stepMoratorium(o, key, secs) {
+  if (o.moratorium != null && S.t >= o.moratorium) { o.moratorium = null; o[key] = Math.min(o[key], MORATORIUM_REST); return "lifted"; }
+  if (o.moratorium == null && o[key] >= MORATORIUM_AT) { o.moratorium = S.t + secs; return "passed"; }
+  return null;
+}
+
+// ---------- phase 2: morale ----------
 
 const MORALE_START = 80, MORALE_REST = 0.08;
 const QUIT_LINES = [
@@ -41,9 +76,7 @@ const perkWait = () => Math.max(0, (moraleOf().perkAt ?? -1e9) + PERK_COOLDOWN -
 const perkGain = (p) => p.gain * Math.pow(PERK_FADE, (moraleOf().perkUses || {})[p.id] || 0);
 function offeredPerks(used) {   // used: the perk just spent, which doesn't come straight back
   const m = moraleOf();
-  m.perks = (m.perks || []).filter((id) => perkOf(id) && (!perkOf(id).when || perkOf(id).when()));
-  const pool = PERKS.filter((p) => !m.perks.includes(p.id) && p.id !== used && (!p.when || p.when()));
-  while (m.perks.length < 3 && pool.length) m.perks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+  m.perks = refillDeck(m.perks || [], PERKS, (p) => !p.when || p.when(), 3, used);
   return m.perks;
 }
 function usePerk(id) {
@@ -86,22 +119,19 @@ function tenderNo() {
   moraleOf().v = Math.max(0, moraleOf().v - 5);
   say("The tender offer quietly died. Everyone saw the email anyway.");
 }
-function openCard(kind) {
-  S.p2.card = { kind, until: S.t + CARDS[kind].secs };
-}
+function openCard(kind) { dealCard(S.p2, { kind }, CARDS[kind].secs); }
 function chooseCard(i) {
-  const c = S.p2 && S.p2.card;
+  const c = S.p2 && S.p2.card && takeCard(S.p2);
   if (!c) return;
-  S.p2.card = null;
   CARDS[c.kind].choices[i].go();
   track("card", { kind: c.kind, choice: i });
 }
 
 // ---------- the town ----------
-const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.04, MORATORIUM_SECS = 120;
+const TOWN_RISE = { hall: 4, turbine: 2, well: 3, solar: 0, reclaimed: 0 }, TOWN_EASE = 0.04, MORATORIUM_SECS = 120;   // the county's: two minutes
 const freshTown = () => ({ v: countyOf() ? countyOf().town : 20, jobs: 0, promises: 0, nextHall: null, moratorium: null });
 const townOf = () => S.p2.town;   // created when the county is picked (chooseCounty) or on load (migrateCampus)
-const moratoriumOn = () => !!(S.p2.town && S.p2.town.moratorium != null && S.t < S.p2.town.moratorium);
+const moratoriumOn = () => underMoratorium(S.p2.town);
 // Builds started above 50 opposition take longer: permits, lawsuits, a guy with a sign.
 const townSlow = () => 1 + Math.max(0, (S.p2 && S.p2.town ? S.p2.town.v : 0) - 50) / 50;
 function townBuilt(kind) {
@@ -156,12 +186,9 @@ CARDS.townhall = {
 function stepTown(dt) {
   const t = townOf(), base = countyOf().town;
   if (t.v > base) t.v = Math.max(base, t.v - TOWN_EASE * dt);
-  if (t.moratorium != null && S.t >= t.moratorium) {
-    t.moratorium = null; t.v = Math.min(t.v, 70);
-    say("The moratorium expired. The county board voted 3–2 to “revisit it,” which means no.");
-  }
-  if (t.moratorium == null && t.v >= 90) {
-    t.moratorium = S.t + MORATORIUM_SECS;
+  const mor = stepMoratorium(t, "v", MORATORIUM_SECS);
+  if (mor === "lifted") say("The moratorium expired. The county board voted 3–2 to “revisit it,” which means no.");
+  if (mor === "passed") {
     ceoStrike("a moratorium");
     say(`The county passed a moratorium on new data center halls. ${time(MORATORIUM_SECS)}, or until the next election, whichever comes first.`);
     say("Your board's statement: \u201cWe've signed the principles.\u201d Nobody asked which principles.");
@@ -183,8 +210,8 @@ function stepPeople(dt) {
       say(QUIT_LINES[Math.floor(Math.random() * QUIT_LINES.length)] + " Everything under construction slipped 30 s.");
     }
   } else m.nextQuit = null;
-  const c = S.p2.card;
-  if (c && S.t >= c.until) { S.p2.card = null; (CARDS[c.kind].expire || (() => {}))(); }
+  const gone = expireCard(S.p2);
+  if (gone) (CARDS[gone.kind].expire || (() => {}))();
   stepTown(dt);
   if (!S.p2.card && m.v < 45 && !isPublic() && S.t - m.lastTender > 600) { m.lastTender = S.t; openCard("tender"); }
 }
@@ -194,7 +221,6 @@ function renderPeople() {
   $("moraleBox").hidden = !on;
   $("townBox").hidden = !on;
   const c = on && S.p2.card;
-  $("card").hidden = !c;
   // Town halls show up in Community; everything else in the deals column.
   if (c && c.kind === "townhall") { if ($("card").parentElement !== $("townBox")) $("townBox").appendChild($("card")); }
   else if ($("card").parentElement !== $("colDeals")) $("colDeals").prepend($("card"));
@@ -218,14 +244,9 @@ function renderPeople() {
   $("sponsor").textContent = sponsorWait() > 0 ? `Sponsor something: again in ${Math.ceil(sponsorWait())}s`
     : `Sponsor ${sponsorNext()[0]} (\u2212${sponsorGain()} opposition): ${money(sponsorCost())}`;
   $("sponsor").disabled = S.funds < sponsorCost() || t.v <= 0 || sponsorWait() > 0;
-  if (c) {
-    const k = CARDS[c.kind];
-    $("cardTitle").textContent = `${k.title()} (${Math.max(0, Math.ceil(c.until - S.t))}s)`;
-    $("cardText").textContent = k.text();
-    const html = k.choices.map((ch, i) => `<button type="button" data-choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
-    if ($("cardBtns").dataset.html !== html) { $("cardBtns").innerHTML = html; $("cardBtns").dataset.html = html; }
-  }
+  renderCard(P2_CARD, c, c && CARDS[c.kind]);
 }
+const P2_CARD = { box: "card", title: "cardTitle", text: "cardText", btns: "cardBtns", data: "choice" };
 
 // ---------- CEO churn: three crises and the board brings in someone new. New CEO, who dis? ----------
 const CEO_STRIKES = 3, CEO_COOLDOWN = 480;
