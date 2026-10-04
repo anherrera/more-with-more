@@ -113,3 +113,10 @@ def test_trusted_models_get_an_easy_alignment_review(game):
 def test_no_training_before_the_country_level(game):
     pg = statewide(game)
     assert not pg.is_visible("#p3train")
+
+
+def test_a_save_that_hit_the_old_state_stub_can_go_nationwide(game):
+    pg = statewide(game)
+    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; S.p3.zoomSaid = true; save(); }")
+    pg.reload()
+    assert pg.is_visible("#phaseGo") and "nationwide" in pg.inner_text("#phaseGo").lower()

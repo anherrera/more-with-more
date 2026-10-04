@@ -818,7 +818,7 @@ function start(data) {
   if (saved) { S = Object.assign(fresh(), saved); if (!saved.logV2) { S.log = S.log.slice().reverse(); } S.log = S.log.map(unMojibake); }
   S.logV2 = true;
   if (S.p2) migrateCampus();
-  if (S.p3 && !S.p3.level && S.p3.zoomSaid) S.p3.zoomSaid = false;   // saves from the county-only build: the state level exists now
+  if (S.p3 && S.p3.zoomSaid && (S.p3.level || 0) < LEVELS.length - 1) S.p3.zoomSaid = false;   // a save that hit a placeholder: that level exists now
   if (saved && !saved.leases) { S.leases = { [TYPES[saved.tier || 0].id]: 1 }; }          // old saves: one of the tier they had
   if (saved && !saved.coolingV2) { S.cooling = [0, 2, 3, 4][saved.cooling || 0] ?? 0; S.coolingV2 = true; } // cooling list grew
   if (saved && !saved.leaseCool) { S.leaseCool = {}; TYPES.forEach((t, i) => { if (owned(i)) S.leaseCool[t.id] = { [S.cooling]: owned(i) }; }); }
