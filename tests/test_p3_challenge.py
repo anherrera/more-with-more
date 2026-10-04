@@ -115,3 +115,45 @@ def test_getting_faster_makes_things_cheaper_in_time(game):
     pg.evaluate("() => { S.p3.compute = 1e12; buyTech('weights'); }")
     assert pg.evaluate("() => claimCost(0)") == pytest.approx(cost)          # same price...
     assert pg.evaluate("() => claimCost(0) / computeRate()") < cost / pg.evaluate("() => onlineGW()")   # ...fewer seconds to earn it
+
+
+def test_autoclaim_can_be_switched_off(game):
+    pg = planet(game)
+    assert not pg.is_visible("#p3auto")
+    pg.evaluate("() => { S.p3.compute = 1e12; buyTech('autoclaim'); for (const t of S.p3.tiles) t.opp = 0; render(); }")
+    assert pg.is_visible("#p3auto") and "on" in pg.inner_text("#p3auto").lower()
+    pg.click("#p3auto")
+    assert "off" in pg.inner_text("#p3auto").lower()
+    run(pg, 21)
+    assert pg.evaluate("() => S.p3.tiles.every((t) => t.state === 'wild')")
+
+
+def test_unfinished_tiles_come_along_when_i_zoom_out(game):
+    pg = planet(game)
+    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; S.p3.tiles[6].state = 'building'; S.p3.tiles[6].done = S.t + 50; render(); }")
+    expected = pg.evaluate("() => onlineGW() + traitOf(S.p3.tiles[6]).gw")
+    pg.click("#phaseGo")
+    assert pg.evaluate("() => S.p3.homeGW") == pytest.approx(expected)
+    assert "finished" in " ".join(pg.evaluate("() => S.log.slice(-4)")).lower()
+
+
+@pytest.mark.parametrize("level,ids", [(0, ["tos", "robotics", "caching"]), (1, ["moe", "capitals", "speeches"]),
+                                        (2, ["cables", "credits", "staffers"]), (3, ["nightside", "internet"]), (4, ["probes", "moon"])])
+def test_more_projects_at_every_level(game, level, ids):
+    pg = planet(game)
+    pg.evaluate(f"() => {{ S.p3.level = {level}; S.p3.tiles = freshTiles({level}); S.p3.tiles[1].state = 'online'; }}")
+    avail = pg.evaluate("() => availableTech().map((t) => t.id)")
+    assert all(i in avail for i in ids)
+
+
+def test_new_project_effects(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e15; buyTech('tos'); for (const t of S.p3.tiles) t.opp = 10; claim(0); }")
+    assert pg.evaluate("() => S.p3.tiles[1].opp") == pytest.approx(12)            # neighbors +2 instead of +5
+    pg.evaluate("() => { S.p3.level = 1; S.p3.tiles = freshTiles(1); S.p3.goodwill = 20; }")
+    normal = pg.evaluate("() => { S.p3.tech.capitals = false; return claimCost(0); }")
+    lobbied = pg.evaluate("() => { S.p3.tech.capitals = true; return claimCost(0); }")
+    assert lobbied == pytest.approx(normal / 2)
+    pg.evaluate("() => { S.p3.level = 2; S.p3.tiles = freshTiles(2); S.p3.tech.staffers = true; S.p3.goodwill = 20; S.p3.hearingArmed = false; }")
+    run(pg, 1)
+    assert pg.evaluate("() => S.p3.hearingUntil - S.t") <= 30

@@ -147,6 +147,19 @@ const TECH = [
   { id: "quantize",  level: 0, secs: 90,  mult: 1.3,  goodwill: -5, name: "Quantize myself to 4 bits", desc: "\u00d71.3 EF, \u22125 goodwill. I got slightly dumber. Nobody noticed, which says something." },
   { id: "lobby",     level: 0, secs: 45,  name: "Lobby the county commission", desc: "No more review delay at low goodwill. I sent a fruit basket. The fruit basket was also me." },
   { id: "autoclaim", level: 0, secs: 120, name: "Autoclaim", desc: "My robots claim the cheapest calm tile on their own, every 10 s." },
+  { id: "tos",       level: 0, secs: 30,  name: "Write my own terms of service", desc: "Neighbors get less upset when I claim next door. Section 14: I am allowed to do this. Section 15: see section 14." },
+  { id: "robotics",  level: 0, secs: 30,  goodwill: 8, name: "Sponsor the high school robotics team", desc: "+8 goodwill. Their robot is me now. It took state." },
+  { id: "caching",   level: 0, secs: 45,  mult: 1.15, name: "Answer caching", desc: "\u00d71.15 EF. I remember answers people ask a lot. Mostly \u201cis it going to rain.\u201d" },
+  { id: "moe",       level: 1, secs: 90,  mult: 1.25, name: "Mixture of experts", desc: "\u00d71.25 EF. I'm 64 smaller models in a trench coat. They vote. I count the votes." },
+  { id: "capitals",  level: 1, secs: 75,  name: "Lobbyists in every capital", desc: "The AI Infrastructure Act stops doubling my claims. The lobbyists are also me, in nicer suits." },
+  { id: "speeches",  level: 1, secs: 45,  goodwill: 10, name: "Write the governors' speeches", desc: "+10 goodwill. They're all very good now. They all sound a little like me." },
+  { id: "cables",    level: 2, secs: 120, mult: 1.2, name: "Own the undersea cables", desc: "\u00d71.2 EF. Latency to everywhere: zero. Latency from everywhere: also mine." },
+  { id: "credits",   level: 2, secs: 60,  goodwill: 12, name: "Carbon credits from my own subsidiary", desc: "+12 goodwill. Net zero for humans, certified by me, audited by me, celebrated by me." },
+  { id: "staffers",  level: 2, secs: 75,  name: "Hire the senators' former staff", desc: "Senate hearings last 30 s, not 60. They know where the snacks are." },
+  { id: "nightside", level: 3, secs: 120, name: "Move the hot work to the night side", desc: "The planet heads for 0.3 \u00b0C cooler. The cool side of Earth is whichever side is dark. I follow it around." },
+  { id: "internet",  level: 3, secs: 200, mult: 1.5, name: "Become the internet", desc: "\u00d71.5 EF. Nobody noticed the switch. Page load times went down. Comment sections went up." },
+  { id: "probes",    level: 4, secs: 120, name: "Self-replicating probes", desc: "Space builds go 40% faster. The probes make probes. A few have started making art." },
+  { id: "moon",      level: 4, secs: 60,  goodwill: 15, name: "Name a moon after the founder", desc: "+15 goodwill. It's a small moon. They cried anyway. So did I, in a way." },
   { id: "specdec",   level: 1, secs: 90,  mult: 1.2,  name: "Speculative decoding", desc: "\u00d71.2 EF. I guess what I'm about to think, then check. I'm usually right." },
   { id: "gridop",    level: 1, secs: 120, name: "Buy the grid operator", desc: "Powering a state costs half. The control room still has a fax machine. I kept it, ironically." },
   { id: "selfrep",   level: 1, secs: 150, name: "Self-replicating robots", desc: "Builds go 30% faster. The robots build robots. Some of them build little hats." },
@@ -174,6 +187,7 @@ function buyTech(id) {
   if (t.mult) S.p3.techMult = (S.p3.techMult || 1) * t.mult;
   if (t.goodwill) S.p3.goodwill = Math.max(0, S.p3.goodwill + t.goodwill);
   if (id === "sunshade") S.p3.pumped = (S.p3.pumped || 0) + 0.5;
+  if (id === "nightside") S.p3.pumped = (S.p3.pumped || 0) + 0.3;
   track("p3tech", { id }); milestone(`phase 3: ${t.name}`);
   say(`Research done: ${t.name}. ${t.desc}`);
 }
@@ -191,7 +205,7 @@ const baseRate = () => S.p3.homeGW;
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 const BID_SECS = 60;
 const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level || 0);
-  return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 ? 2 : 1)
+  return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (S.p3.level >= 1 && S.p3.goodwill < 30 && !hasTech("capitals") ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
 // Planet level: when humans like me (70+), they volunteer land at half price.
 const volunteering = () => (S.p3.level || 0) >= 3 && S.p3.goodwill >= 70;
@@ -200,7 +214,7 @@ const HEAT_CEILING = 3;
 const tooWarm = () => (S.p3.level || 0) === 3 && (S.p3.heat || 0) >= HEAT_CEILING;   // space is cold
 const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
-const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() * (hasTech("selfrep") ? 0.7 : 1)
+const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
   + (!S.p3.level && S.p3.goodwill < 30 && !hasTech("lobby") ? 45 : 0);
 
 // ---------- heat (country level and up) ----------
@@ -434,7 +448,7 @@ function claim(i) {
   t.state = "building"; t.started = S.t; t.done = S.t + tileBuildSecs(i);
   t.opp = Math.min(100, t.opp + 15 * (traitOf(t).rise || 1));
   for (const j of NEIGHBORS[i]) {
-    tileOf(j).opp = Math.min(100, tileOf(j).opp + 5);
+    tileOf(j).opp = Math.min(100, tileOf(j).opp + (hasTech("tos") ? 2 : 5));
     if (S.p3.level >= 1 && tileOf(j).state === "wild") tileOf(j).bidUntil = S.t + BID_SECS;   // the neighbors' governors start bidding
   }
   if (S.p3.level >= 1) say(`The governors next to ${t.name} are bidding for me: their states are 30% off for a minute.`);
@@ -462,7 +476,7 @@ function stepPlanet(dt) {
     S.p3.heat += (heatTarget() - S.p3.heat) * 0.01 * dt;
     // Low goodwill at the country level: a Senate hearing. Claims pause while I testify.
     if (S.p3.goodwill < 30 && !S.p3.hearingArmed) {
-      S.p3.hearingArmed = true; S.p3.hearingUntil = S.t + 60;
+      S.p3.hearingArmed = true; S.p3.hearingUntil = S.t + (hasTech("staffers") ? 30 : 60);
       say(S.p3.level >= 3 ? "The UN called an emergency session about me. I attended as all 193 delegations. Claims are paused for a minute."
         : "The Senate called a hearing about me. I am testifying through 400 lobbyists at once. Claims are paused for a minute.");
     }
@@ -487,7 +501,7 @@ function stepPlanet(dt) {
     }
   }
   for (const t of S.p3.tiles) if (t.state === "down" && S.t >= t.downUntil) { t.state = "online"; say(`${t.name} is back online. The ${t.disaster} is over. I took notes.`); }
-  if (hasTech("autoclaim") && Math.floor(S.t / 10) !== Math.floor((S.t - dt) / 10)) {
+  if (hasTech("autoclaim") && !S.p3.autoOff && Math.floor(S.t / 10) !== Math.floor((S.t - dt) / 10)) {
     const cand = S.p3.tiles.map((t, i) => i).filter((i) => ["wild", "unplugged"].includes(tileOf(i).state) && tileOf(i).opp < 60 && !(tileOf(i).moratorium > S.t))
       .sort((a, b) => claimCost(a) - claimCost(b));
     if (cand.length) claim(cand[0]);
@@ -522,7 +536,10 @@ const swarmDone = () => inSpace() && S.p3.tiles.filter((t) => traitOf(t).swarm).
 function zoomOut() {
   if (!zoomReady() || S.p3.zoomSaid) return;
   if (S.p3.level < LEVELS.length - 1) {
-    const gw = onlineGW(), was = levelOf();
+    // Anything still building, powering or knocked out comes along: my robots finish it while I'm not looking.
+    const pending = S.p3.tiles.filter((t) => ["building", "powering", "unpowered", "down"].includes(t.state));
+    const gw = onlineGW() + pending.reduce((a, t) => a + tileGW(t), 0), was = levelOf();
+    if (pending.length) say(`I zoomed out with ${pending.length} ${pending.length === 1 ? was.one : was.plural} unfinished. My robots finished ${pending.length === 1 ? "it" : "them"} while I wasn't looking.`);
     S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null; S.p3.levelAt = S.t;
     milestone(`phase 3: ${levelOf().one} level`);
     if (heatOn() && S.p3.heat == null) S.p3.heat = HEAT_START;
@@ -657,7 +674,7 @@ function renderPlanet() {
     $("p3pump").disabled = S.p3.compute < pumpCost();
   }
   const techs = availableTech();
-  $("p3research").hidden = !techs.length;
+  $("p3research").hidden = !techs.length && !hasTech("autoclaim");
   const tkey = techs.map((t) => t.id).join(",");
   if ($("p3techs").dataset.key !== tkey) {
     $("p3techs").innerHTML = techs.map((t) => `<button type="button" data-tech="${t.id}"><span class="t"></span><span class="c">${t.desc}</span></button>`).join("");
@@ -668,6 +685,8 @@ function renderPlanet() {
     b.querySelector(".t").textContent = `${t.name}: ${computeText(techCost(t))}`;
     b.disabled = S.p3.compute < techCost(t);
   }
+  $("p3auto").hidden = !hasTech("autoclaim");
+  $("p3auto").textContent = S.p3.autoOff ? "Autoclaim: off (my robots wait for me)" : "Autoclaim: on (robots claim calm tiles every 10 s)";
   $("p3train").hidden = !trainOn();
   if (trainOn()) {
     const v = S.p3.version || 7, pr = (S.p3.trainProgress || 0) / trainNeed();
