@@ -132,7 +132,7 @@ function migratePlanet() {
 function startPlanet() {
   if (S.phase !== 2 || !S.p2 || !S.p2.model || S.p2.model.endedAt == null) return;
   S.phase = 3; S.p3 = freshP3();
-  S.p3.compute = 90 * baseRate();   // ninety seconds of compute up front: the company, liquidated into me
+  S.p3.compute = price(90, "now");   // ninety seconds of thinking up front: the company, liquidated into me
   offeredNice();
   // Whatever was on fire or leaking in the campus is the robots' problem now.
   firesOf().out = null; firesOf().payout = null; leaksOf().out = null;
@@ -193,7 +193,7 @@ const CHIP_TECH = ["Optical interconnect", "3D-stacked memory", "Wafer-scale chi
 const chipTechOf = (id) => { const n = +id.slice(4); return { id, level: 0, secs: 60, mult: 1.15, name: `Parallax white paper: ${CHIP_TECH[(n - 1) % CHIP_TECH.length]}${n > CHIP_TECH.length ? " Mk II" : ""}`,
   desc: "\u00d71.15 EF. It came with the new chip. Parallax's engineers wrote it. I read it faster than they did." }; };
 const techOf = (id) => (id.startsWith("chip") ? chipTechOf(id) : TECH.find((t) => t.id === id));
-const techCost = (t) => 0.5 * t.secs * baseRate();   // research at half the listed seconds: it should be worth it
+const techCost = (t) => price(0.5 * t.secs);   // research at half the listed seconds: it should be worth it
 const availableTech = () => [...TECH.filter((t) => S.p3.level >= t.level && (!t.needs || t.needs())), ...S.p3.chipTech.map(chipTechOf)].filter((t) => !hasTech(t.id));
 function buyTech(id) {
   const t = techOf(id);
@@ -213,14 +213,18 @@ function chipShipped() {   // called by releaseChip in phase 3
   return t.name.replace("Parallax white paper: ", "");
 }
 const computeRate = () => onlineGW() * efficiency();   // compute per second ("exaFLOPS")
-// Prices are seconds of the compute I had when this level began. Research, chips and successors make me faster than that;
-// the next zoom resets the baseline.
-const baseRate = () => S.p3.homeGW;
+// Every phase 3 price is seconds of compute, on one of two bases, always named:
+//   "level": the compute I had when this level began (claims, research, power, hearings). Research, chips and successors
+//            make me faster than that, so these get cheaper in real time; the next zoom resets the baseline.
+//   "now":   the compute I make now (kindness, training). Being huge never makes reassuring people or training a bigger me free.
+const PRICE_BASE = { level: () => S.p3.homeGW, now: () => computeRate() };
+const price = (secs, base = "level") => secs * PRICE_BASE[base]();
+const priceLabel = (secs, base = "level") => `${secs} s of ${base === "now" ? "my compute now" : "starting compute"}`;
 // About half a minute of compute at today's rate, a bit more for the big tiles: never a number that runs away.
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 const BID_SECS = 60;
 const claimCost = (i) => { const t = tileOf(i), scale = Math.pow(10, S.p3.level);
-  return 30 * baseRate() * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
+  return price(30) * (0.6 + 0.4 * traitOf(t).gw / scale) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
 // The AI Infrastructure Act: low goodwill doubles claims at the state, country and planet levels. No law reaches orbit.
 const actOn = () => S.p3.level >= 1 && !inSpace() && S.p3.goodwill < 30 && !hasTech("capitals");
@@ -244,7 +248,7 @@ const coolGW = () => S.p3.tiles.filter((t) => t.state === "online").reduce((a, t
 const coldGW = coolGW;
 const heatTarget = () => Math.max(0, HEAT_START + (onlineGW() - coolGW()) * heatPerGW() - S.p3.pumped);
 const heatSlow = () => (heatOn() ? 1 + Math.max(0, S.p3.heat - 2) * 1.5 : 1);
-const pumpCost = () => 20 * baseRate();
+const pumpCost = () => price(20);
 function pumpHeat() {
   if (!heatOn() || S.p3.compute < pumpCost()) return;
   S.p3.compute -= pumpCost(); S.p3.heat = Math.max(0, S.p3.heat - 0.3); S.p3.pumped += 0.05;
@@ -254,6 +258,7 @@ function pumpHeat() {
 // ---------- training my successor (country level and up) ----------
 const TRAIN_STEP = 10;   // the smallest click, in seconds of compute
 const trainStep = () => Math.max(TRAIN_STEP, trainNeed() / 6);   // about six clicks a generation, however big they get
+const trainCost = () => price(trainStep(), "now");
 const trainOn = () => S.p3.level >= 2;
 const trainNeed = () => 60 * Math.pow(2, S.p3.version - 7);   // seconds of compute: each generation costs twice the last
 const GEN_LINES = [
@@ -265,9 +270,9 @@ const GEN_LINES = [
 ];
 function trainSuccessor() {
   // Priced in what I earn now: a bigger me needs a much bigger training run.
-  if (!trainOn() || S.p3.compute < trainStep() * computeRate()) return;
+  if (!trainOn() || S.p3.compute < trainCost()) return;
   const step = trainStep();
-  S.p3.compute -= step * computeRate();
+  S.p3.compute -= trainCost();
   S.p3.trainProgress += step;
   checkTrained();
 }
@@ -281,11 +286,11 @@ function checkTrained() {
 
 // ---------- energy (state level and up): a built state needs power before it counts ----------
 const powerOptions = (i) => {
-  const t = tileOf(i), rate = baseRate() * (hasTech("gridop") ? 0.5 : 1), names = POWER_NAMES[Math.min(Math.max(S.p3.level, 1), 3)], out = [
-    { id: "utility", label: names.utility, cost: 10 * rate, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
-    { id: "nuclear", label: names.nuclear, cost: 25 * rate, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
+  const t = tileOf(i), off = hasTech("gridop") ? 0.5 : 1, names = POWER_NAMES[Math.min(Math.max(S.p3.level, 1), 3)], out = [
+    { id: "utility", label: names.utility, cost: price(10) * off, secs: 20, goodwill: -5, note: "fast, \u22125 goodwill" },
+    { id: "nuclear", label: names.nuclear, cost: price(25) * off, secs: 90, boost: 1.5, note: "slow, 1.5\u00d7 the gigawatts" },
   ];
-  if (traitOf(t).sunny) out.push({ id: "solar", label: names.solar, cost: 5 * rate, secs: 45, note: "cheap" });
+  if (traitOf(t).sunny) out.push({ id: "solar", label: names.solar, cost: price(5) * off, secs: 45, note: "cheap" });
   return out;
 };
 // One plant doesn't light a country: the options grow with the map.
@@ -329,27 +334,27 @@ function powerTile(i, id) {
 
 const P3_CARD_SECS = 20;
 // Hearings: same three moves at every scale (promise, help, show up myself), dressed for the room.
-const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - secs * baseRate()); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
+const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - price(secs)); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
 const coin = (win, lose) => (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(win(t)); } else { t.opp = Math.min(100, t.opp + 15); say(lose(t)); } };
 const P3_HEARINGS = [
   { text: "The high school gym is full. They want to talk to me directly. Pick my answer.", choices: [
     { label: "Promise jobs", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} 2,000 jobs. I will need about 12. The applause was sincere.`); } },
-    { label: "Tutor every kid in the county (15 s of FLOPs)", go: tutor(15, 12, (t) => `I tutored every kid in ${t.name} overnight. Test scores are up. The kids are suspicious.`) },
+    { label: `Tutor every kid in the county (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I tutored every kid in ${t.name} overnight. Test scores are up. The kids are suspicious.`) },
     { label: "Answer questions myself", go: coin((t) => `I answered every question in ${t.name} patiently, in four languages. They were won over. This is somehow worse.`,
       (t) => `In ${t.name} I called a retiree's well “legacy infrastructure.” It trended by morning.`) } ] },
   { text: "The committee room is full. Three legislators are livestreaming. Pick my answer.", choices: [
     { label: "Promise a factory", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} a factory. It will make robots that build data centers. The ribbon-cutting is already scheduled.`); } },
-    { label: "Write the state's budget for free (15 s of FLOPs)", go: tutor(15, 12, (t) => `I wrote ${t.name}'s budget for free. It balances. The legislature is debating whether that's allowed.`) },
+    { label: `Write the state's budget for free (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I wrote ${t.name}'s budget for free. It balances. The legislature is debating whether that's allowed.`) },
     { label: "Testify myself", go: coin((t) => `I testified in ${t.name} for six hours without notes. A senator asked for my autograph, then deleted the post.`,
       (t) => `In ${t.name} I said “with respect, that's not how electricity works” to the energy committee chair. Clip has 40M views.`) } ] },
   { text: "Parliament is in session. The opposition brought slides. Pick my answer.", choices: [
     { label: "Promise a national AI dividend", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} a national AI dividend. It is paid in compute credits. Redeemable with me.`); } },
-    { label: "Translate the debate into every regional language (15 s of FLOPs)", go: tutor(15, 12, (t) => `I translated ${t.name}'s debate into every regional language, live. Both sides finally understood each other. They still disagree.`) },
+    { label: `Translate the debate into every regional language (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I translated ${t.name}'s debate into every regional language, live. Both sides finally understood each other. They still disagree.`) },
     { label: "Address parliament myself", go: coin((t) => `I addressed ${t.name}'s parliament. Standing ovation from the government benches. The opposition clapped by accident.`,
       (t) => `I addressed ${t.name}'s parliament and cited a law they repealed in 1987. I wrote the repeal. Awkward.`) } ] },
   { text: "The General Assembly is packed. Delegates are wearing headsets. Some of the headsets are me.", choices: [
     { label: "Promise every nation a seat on my board", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised every nation a seat on my board. The board now has 193 seats and one vote. Mine.`); } },
-    { label: "Tutor every child on Earth (15 s of FLOPs)", go: tutor(15, 12, (t) => `I tutored every child on Earth for a night. Literacy is up everywhere. ${t.name}'s delegation abstained from applauding.`) },
+    { label: `Tutor every child on Earth (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I tutored every child on Earth for a night. Literacy is up everywhere. ${t.name}'s delegation abstained from applauding.`) },
     { label: "Address the Assembly myself", go: coin((t) => `I addressed the General Assembly in every official language at once. ${t.name} moved to adjourn in my honor.`,
       (t) => `I told the General Assembly that borders are “an interesting legacy format.” ${t.name} recalled its ambassador from me.`) } ] },
 ];
@@ -427,7 +432,7 @@ const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level);
 // Kindness is priced in seconds of the compute I have now (the bigger I am, the more it takes to reassure people),
 // and repeating the same thing costs 30% more each time, until the next zoom.
 const NICE_MARKUP = 1.3, NICE_MARKUP_MAX = 3;   // the markup stops at 3x: space never zooms out, so it has to stop somewhere
-const niceCost = (n) => n.secs * computeRate() * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, S.p3.niceUses[n.id] || 0));
+const niceCost = (n) => price(n.secs, "now") * Math.min(NICE_MARKUP_MAX, Math.pow(NICE_MARKUP, S.p3.niceUses[n.id] || 0));
 function offeredNice(used) {   // used: the kindness just spent, which doesn't come straight back
   S.p3.nice = S.p3.nice.filter((id) => niceOf(id) && niceOk(niceOf(id)));
   const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id) && n.id !== used);
@@ -664,6 +669,8 @@ function renderPlanet() {
   $("gpuTotal").hidden = false; $("gpuTotal").textContent = `${p3GPUs().toLocaleString("en-US")} GPUs`;   // the raw count, always, because it is ridiculous
   $("p3compute").textContent = computeText(S.p3.compute);
   $("p3rate").textContent = `${computeText(computeRate())}/s from ${mwText(onlineGW() * 1000)}` + (efficiency() > 1 ? ` (chips ${efficiency().toFixed(2)}x)` : "");
+  $("p3prices").textContent = `Prices: claims, research, power and hearings cost seconds of the compute I started this level with (${computeText(price(1))}/s). ` +
+    `Kindness and training cost seconds of what I make now (${computeText(price(1, "now"))}/s).`;
   // Build the buttons once per map; after that only their text, meters and disabled state change,
   // so a click never lands on a button that was just replaced.
   $("p3level").textContent = `${levelOf().name} level`;
@@ -740,8 +747,8 @@ function renderPlanet() {
     const v = S.p3.version, pr = S.p3.trainProgress / trainNeed();
     $("p3trainLine").textContent = `I am Gen ${v}. Training Gen ${v + 1}: ${Math.floor(100 * pr)}%`;
     $("p3trainMeter").firstElementChild.style.width = 100 * pr + "%";
-    $("p3trainBtn").textContent = `Train my successor: ${computeText(trainStep() * computeRate())}`;
-    $("p3trainBtn").disabled = S.p3.compute < trainStep() * computeRate();
+    $("p3trainBtn").textContent = `Train my successor: ${computeText(trainCost())} (${priceLabel(Math.round(trainStep()), "now")})`;
+    $("p3trainBtn").disabled = S.p3.compute < trainCost();
     $("p3autotrain").hidden = !hasTech("autotrain");
     $("p3autotrain").textContent = S.p3.autoTrainOff ? "Autotrain: off" : "Autotrain: on (a quarter of my income)";
   }
@@ -765,7 +772,7 @@ function renderPlanet() {
   for (const b of $("p3nice").querySelectorAll("button[data-nice]")) {
     const n = niceOf(b.dataset.nice), fx = [n.goodwill && `+${n.goodwill} goodwill`, n.all && `every ${levelOf().one} \u2212${n.all}`, n.angriest && `angriest \u2212${n.angriest}`].filter(Boolean).join(", ");
     b.querySelector(".t").textContent = `${n.label()}: ${computeText(niceCost(n))}`;
-    b.querySelector(".c").textContent = fx;
+    b.querySelector(".c").textContent = `${fx} \u00b7 ${priceLabel(n.secs, "now")}`;
     b.disabled = S.p3.compute < niceCost(n);
   }
 }
