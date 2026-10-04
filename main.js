@@ -2,7 +2,7 @@
 // and the debug surface (window.game). It is the page's only script: every other module is imported from here.
 import { $, $all, $q, chip, CHIP_EVERY, CHIP_EVERY_P2, COOLING, countAnswer, countAutoSwaps, ensureRun, FIRST_CHIP_AT, flush, fmt, fresh, GROUND_KW, hit, HYPE_TO_RAISE, KW_PER_GPU, kwText, load, milestone, MODEL_LINES, money, moneyFull, mwText, rebuildOn, RENT_EXP, RENT_K, ROUNDS, S, save, SAVE_VERSION, say, setState, snap, time, track, TYPES, unMojibake } from "./globals.js";
 import { PROJECTS, projectCost } from "./projects.js";
-import { COLO_MW, COLO_RACKS, P2_RATE, campusDealSize, campusDrawSize, campusKWAt, campusRevenue, campusRound, campusSpotPay, freeKWByGen, migrateCampus, raiseCampus, renderCampusPhase, renderRaiseCampus, renderVendors, roundNoteCampus, spotLineCampus, startCampus, stepCampus, uncontractedGPUs, vendorOf, wireCampus } from "./campus.js";
+import { campusDealSize, campusDrawSize, campusKWAt, campusRevenue, campusRound, campusSpotPay, COLO_MW, COLO_RACKS, freeKWByGen, migrateCampus, P2_RATE, raiseCampus, renderCampusPhase, renderRaiseCampus, renderVendors, roundNoteCampus, spotLineCampus, startCampus, stepCampus, uncontractedGPUs, vendorOf, waitingOnCounty, wireCampus } from "./campus.js";
 import { campusGo, gpuDiscount } from "./model.js";
 import { DILUTION, deriveCap, dilute, publicRaise, renderMarket } from "./market.js";
 import { stepFires, stepLeaks } from "./fires.js";
@@ -828,7 +828,7 @@ export function wire() {
   $("resetYes").addEventListener("click", () => { track("reset"); flush(); setState(fresh()); ensureRun(); $("resetYes").hidden = true; clearCaches(); render(); });
 }
 
-export const running = () => clockOn && !S.paused;
+export const running = () => clockOn && !S.paused && !waitingOnCounty();   // the county choice holds the clock too
 
 // Anything rendered from cached keys has to forget them when the game starts over.
 export function clearCaches() {

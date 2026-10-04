@@ -1,6 +1,6 @@
 // campus.js: phase 2, "The Campus". You are an infrastructure company now: sell capacity to labs,
 // then scramble to build it. Phase 2 state lives in S.p2; phase 1 state is read only at handoff.
-import { $, chip, fmt, hit, HYPE_TO_RAISE, kwText, milestone, money, mwText, rebuildOn, S, say, setHtml, time, track } from "./globals.js";
+import { $, $q, chip, fmt, hit, HYPE_TO_RAISE, kwText, milestone, money, mwText, rebuildOn, S, say, setHtml, time, track } from "./globals.js";
 import { PROJECTS, projectCost } from "./projects.js";
 import { GOAL_MW, extraAcres, freshModel, modelDone, renderModel, stepModel, wireModel } from "./model.js";
 import { DILUTION, dilute, isPublic, renderPublicRaise, stepMarket, wireMarket } from "./market.js";
@@ -412,6 +412,9 @@ export function startCampus() {
   if (S.debt > 0) say(`Lenders love infrastructure. Your ${money(S.debt)} was refinanced as project finance at a quarter of the rate.`);
 }
 
+// Phase 2 opens on one question: which county. Nothing runs until it's answered.
+export const waitingOnCounty = () => S.phase === 2 && !!S.p2 && !S.p2.county;
+
 export function chooseCounty(id) {
   const c = COUNTIES.find((x) => x.id === id);
   if (!c || S.p2.county) return;
@@ -735,7 +738,7 @@ export function wireCampus() {
   $("cardBtns").addEventListener("click", (e) => { const b = hit(e, "button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
   $("counties").addEventListener("click", (e) => {
     const b = hit(e, "button[data-county]");
-    if (b) { chooseCounty(b.dataset.county); render(); }
+    if (b) { chooseCounty(b.dataset.county); $q(".cols").classList.add("reveal"); render(); }
   });
   $("buildHall").addEventListener("click", () => { build("hall"); render(); });
   $("buildTurbine").addEventListener("click", () => { build("turbine"); render(); });

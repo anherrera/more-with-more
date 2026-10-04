@@ -91,6 +91,23 @@
   .btns { margin: 2px 0; }
   .deal .line.good { color: var(--good); } .deal .line.bad { color: var(--bad); }
   .empty { color: var(--muted); font-size: 13px; }
+  /* Phase 2 opens on the county choice alone; the panels rise in once it's made. */
+  body.picking .cols > .col { display: none; }
+  body.picking .cols > #colDeals { display: block; grid-column: 1 / -1; max-width: 960px; margin: 24px auto; width: 100%; }
+  body.picking #colDeals > :not(#countyBox) { display: none; }
+  body.picking #countyBox h3 { font-size: 24px; border: 0; }
+  body.picking #countyBox .sub { font-size: 14px; margin-bottom: 12px; }
+  body.picking .choices { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  body.picking .choices button { padding: 14px 16px; font-size: 15px; min-height: 130px; }
+  body.picking .choices .c { font-size: 13px; margin-top: 6px; }
+  body.picking .choices .t { font-size: 18px; }
+  .cols.reveal > .col { animation: rise .6s ease-out both; }
+  .cols.reveal > .col:nth-child(2) { animation-delay: .12s; }
+  .cols.reveal > .col:nth-child(3) { animation-delay: .24s; }
+  .cols.reveal > .col:nth-child(4) { animation-delay: .36s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  @media (prefers-reduced-motion: reduce) { .cols.reveal > .col { animation: none; } }
+  @media (max-width: 760px) { body.picking .choices { grid-template-columns: 1fr; } }
   .hudtop { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
   #pause { font-size: 15px; padding: 4px 14px; border: 2px solid var(--accent); color: var(--accent); background: var(--btn); font-weight: bold; }
   #pause.on { background: var(--accent); color: var(--accent-ink); }
@@ -217,7 +234,8 @@
         <div class="btns" id="cardBtns"></div>
       </div>
       <div id="countyBox" hidden>
-        <h3>Pick a county</h3>
+        <h3>Choose a county</h3>
+        <div class="line sub">Your campus goes here. Each county trades something for something else. The clock waits.</div>
         <div class="choices" id="counties"></div>
       </div>
       <div id="modelBox" hidden>

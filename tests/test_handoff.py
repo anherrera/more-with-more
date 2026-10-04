@@ -58,6 +58,7 @@ def test_break_ground_starts_campus(game):
     break_ground(pg)
     assert pg.evaluate("() => [S.phase, S.gpus]") == [2, 40000]
     assert pg.is_visible("#countyBox")
+    pg.click("button[data-county='strong']")                            # the panels appear once a county is chosen
     for hidden in ["#trainingLive", "#p1biz", "#ending", "#answer"]:      # the Training panel stays, its controls go
         assert not pg.is_visible(hidden), hidden
     for shown in ["#computeBox", "#facilitiesBox", "#hypeNum", "#funds"]:
@@ -82,6 +83,7 @@ def test_plan1_save_loads(game):
 def test_training_panel_explains_itself_in_phase2(game):
     pg = game(READY)
     break_ground(pg)
+    pg.click("button[data-county='strong']")
     assert pg.is_visible("#trainingBox")
     assert "Training is over" in pg.inner_text("#trainingBox")
     assert not pg.is_visible("#split")

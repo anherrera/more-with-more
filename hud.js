@@ -1,7 +1,7 @@
 // hud.js: the sticky strip at the top of every phase: pause, the ticker, the phase bar, the alert line, the console.
 // Reads state only (render is read-only everywhere); the pause button and the phase bar's big button are wired here.
 import { $, S, money, mwText, rebuildOn, save, time, track } from "./globals.js";
-import { DROUGHT_CUT, droughtOn, energizedAt } from "./campus.js";
+import { DROUGHT_CUT, droughtOn, energizedAt, waitingOnCounty } from "./campus.js";
 import { FINAL, GOAL_MW, modelOf } from "./model.js";
 import { isPublic } from "./market.js";
 import { firesOf, leaksOf } from "./fires.js";
@@ -27,6 +27,7 @@ export function renderPause() {
   $("pause").classList.toggle("on", !!S.paused);
   $("pausedBanner").hidden = !S.paused;
   document.body.classList.toggle("paused", !!S.paused);
+  document.body.classList.toggle("picking", waitingOnCounty());
 }
 
 // The alert line under the title: things happening right now that the console would scroll away.
@@ -64,7 +65,7 @@ export function renderPhaseBar() {
     text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."
       : `Phase 1 of 3 · Goal: reach Gen 6 (now Gen ${S.gen}), then break ground on your own campus.`;
   } else if (!S.p2 || !S.p2.county) {
-    text = "Phase 2 of 3 · Pick a county for the campus.";
+    text = "Phase 2 of 3 \u00b7 Choose a county for the campus. Nothing starts until you do.";
   } else {
     const m = modelOf(), en = energizedAt();
     if (m.endedAt != null) { ask = true; text = "Phase 2 complete. The model built the next one, and it has a map."; go.textContent = "Zoom out: begin phase 3"; go.disabled = false; }
