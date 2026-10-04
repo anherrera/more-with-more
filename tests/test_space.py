@@ -151,3 +151,12 @@ def test_no_promising_to_leave_the_near_side_alone_after_taking_it(game):
     assert pg.evaluate("() => niceOk(niceOf('nearside'))")
     pg.evaluate("() => { S.p3.tiles.find((t) => t.name === 'The Moon (near side)').state = 'building'; }")
     assert not pg.evaluate("() => niceOk(niceOf('nearside'))")
+
+
+def test_the_world_stops_once_the_last_question_is_asked(game):
+    pg = to_space(game)
+    finish(pg)
+    n, t = pg.evaluate("() => [S.log.length, S.t]")
+    pg.evaluate("() => { S.nextChip = S.t; S.rival.next = S.t; for (let i = 0; i < 600; i++) step(1); }")
+    assert pg.evaluate("() => [S.log.length, S.t]") == [n, t]
+    assert pg.evaluate("() => running()") is False

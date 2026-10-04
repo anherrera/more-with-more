@@ -417,8 +417,11 @@ export function raise() {
 
 // ---------- tick ----------
 export let lastSnapT = -1e9;
+// Once the last question is asked, the universe holds its breath: nothing ships, burns or erodes until More or Enough.
+export const gameOver = () => S.phase === 3 && !!S.p3 && S.p3.lastQ != null;
 export function step(dt) {
-  S.t += dt;                                   // keeps running after the ending: the empire hums on
+  if (gameOver()) return;
+  S.t += dt;                                   // phases 1-2 keep running after their endings: the empire hums on
   S.fatigue = Math.max(0, S.fatigue - dt / (S.done.keynote ? 30 : 60));
   if (S.t >= S.nextChip) releaseChip();
   S.spotWalk = Math.max(-0.4, Math.min(0.4, S.spotWalk + (Math.random() - 0.5) * 0.08 * dt));
@@ -832,7 +835,7 @@ export function wire() {
   $("resetYes").addEventListener("click", () => { track("reset"); flush(); setState(fresh()); ensureRun(); $("resetYes").hidden = true; clearCaches(); render(); });
 }
 
-export const running = () => clockOn && !S.paused && !waitingOnCounty();   // the county choice holds the clock too
+export const running = () => clockOn && !S.paused && !waitingOnCounty() && !gameOver();   // the county choice holds the clock too
 
 // Anything rendered from cached keys has to forget them when the game starts over.
 export function clearCaches() {
