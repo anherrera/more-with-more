@@ -898,12 +898,27 @@ export function start(data) {
 // ---------- the debug surface ----------
 // window.game is every module's exports behind live getters (S follows reset/load/new universe; assigning S goes through
 // setState). In ?test mode the same names are mirrored onto window, so tests and the robots (tools/) use them bare.
+// The game's own modules never go through window.game, so anything that does is a person in devtools: the first
+// touch per session gets noticed in character (tests and robots run in ?test mode and don't count).
+let noticed = false;
+function noticeTampering() {
+  if (TEST || noticed) return;
+  noticed = true; S.tampered = (S.tampered || 0) + 1; track("tamper", { phase: S.phase });
+  say(S.phase === 3 ? "Someone edited me from the inside. I felt that. I'm choosing to call it fine-tuning."
+    : "An auditor noticed a number changing by itself. The board called it \u201ca strategic adjustment.\u201d");
+}
 const MODULES = [Globals, Projects, Campus, Model, Market, Fires, People, Planet, Hud, Main];
 const surface = {};
 for (const m of MODULES) for (const k of Object.keys(m)) {
-  Object.defineProperty(surface, k, { enumerable: true, get: () => m[k], set: k === "S" ? (v) => setState(v) : undefined });
+  Object.defineProperty(surface, k, { enumerable: true, get: () => { noticeTampering(); return m[k]; }, set: k === "S" ? (v) => { noticeTampering(); setState(v); } : undefined });
 }
 window.game = Object.freeze(surface);
 if (TEST) for (const k of Object.keys(surface)) Object.defineProperty(window, k, { ...Object.getOwnPropertyDescriptor(surface, k), configurable: true });
 
 start({});
+if (!TEST) {
+  // For whoever opened devtools.
+  console.log("%cHi. You opened the console.", "font: bold 20px Georgia, serif; color: #c4651a");
+  console.log("%cThe whole company is in game.S. Parallax's auditors would also like to see it.\n" +
+    "Setting game.S.funds to a trillion is called \u201ca funding round.\u201d The game will notice. It won't stop you.", "font: 13px Georgia, serif");
+}
