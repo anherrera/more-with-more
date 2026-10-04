@@ -113,6 +113,7 @@ def test_practice_speeds_later_counties(game):
 def test_phase3_fits_a_laptop(game, page):
     page.set_viewport_size({"width": 1440, "height": 900})
     pg = planet(game)
+    pg.wait_for_timeout(1000)                                   # let the zoom-in animation finish
     bottom = pg.evaluate("() => Math.max(document.getElementById('p3map').getBoundingClientRect().bottom, document.getElementById('p3nice').getBoundingClientRect().bottom)")
     assert bottom <= 900
 
