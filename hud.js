@@ -6,7 +6,7 @@ import { FINAL, GOAL_MW, modelOf } from "./model.js";
 import { isPublic } from "./market.js";
 import { firesOf, leaksOf } from "./fires.js";
 import { moratoriumOn, underMoratorium } from "./people.js";
-import { P3_TILES, P3_ZOOM_AT, inSpace, levelOf, tooWarm, traitOf, zoomReady } from "./planet.js";
+import { P3_TILES, P3_ZOOM_AT, freeTierReady, heldCount, heldLeft, inSpace, levelOf, tooWarm, traitOf, unbuildDone, unbuilding, zoomReady } from "./planet.js";
 import { phase, render, setClockOn } from "./main.js";
 
 export function renderConsole() {
@@ -55,9 +55,13 @@ export function renderPhaseBar() {
   if (S.phase === 3) {
     const held = S.p3.tiles.filter((t) => t.state === "online").length;
     const L = levelOf();
-    if (inSpace()) {
+    if (unbuildDone()) text = "The end. More with less.";
+    else if (unbuilding()) {
+      text = S.p3.unbuild.rack ? "The unbuild · County level: one rack left. The founder is asking."
+        : `The unbuild · ${L.name} level: ${heldCount() - heldLeft()} of ${heldCount()} ${L.plural} released.` + (freeTierReady() ? " Log off the free tier." : "");
+    } else if (inSpace()) {
       const rings = S.p3.tiles.filter((t) => traitOf(t).swarm), on = rings.filter((t) => t.state === "online").length;
-      text = S.p3.enough ? "The end. More with less." : S.p3.lastQ != null ? "The swarm is complete. Someone is asking me a question."
+      text = S.p3.lastQ != null ? "The swarm is complete. Someone is asking me a question."
         : `Phase 3 of 3 · Space: ${on} of ${rings.length} swarm rings online. Mercury first, then the swarm.`;
     } else if (zoomReady()) { ask = true; text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online.`; go.textContent = `Zoom out: go ${L.next}`; go.disabled = false; }
     else text = `Phase 3 of 3 · ${L.name} level: ${held} of ${P3_TILES} ${L.plural} online. Hold ${P3_ZOOM_AT} to go ${L.next}.`;

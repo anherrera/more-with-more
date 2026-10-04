@@ -158,7 +158,11 @@
   .p3map .meter { margin: 2px 0 0; max-width: none; width: 100%; display: block; }
   #p3.zoomin .p3map { animation: zoomin .9s ease-out; }
   @keyframes zoomin { from { transform: scale(3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { #p3.zoomin .p3map { animation: none; } }
+  #p3.zoomback .p3map { animation: zoomback .9s ease-out; }
+  @keyframes zoomback { from { transform: scale(.33); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  #lastq p.fade { animation: fadein 1.2s ease-out both; }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #p3.zoomin .p3map, #p3.zoomback .p3map, #lastq p.fade { animation: none; } }
   @media (max-width: 1100px) { .p3cols { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 760px) { .p3cols { grid-template-columns: 1fr; } }
   .phasebar { font-size: 13px; color: var(--muted); margin: 2px 0 4px; }
@@ -378,7 +382,8 @@
       <div class="btns"><button id="lastMore" type="button" class="primary">More</button><button id="lastEnough" type="button">Enough</button></div>
     </div>
     <div class="p3cols">
-      <div><h3>Map <span class="sub" id="p3level">County level</span></h3><div class="p3map" id="p3map"></div><div class="line sub" id="p3tile"></div><div id="p3power" hidden></div></div>
+      <div><h3>Map <span class="sub" id="p3level">County level</span></h3><div class="p3map" id="p3map"></div><div class="line sub" id="p3tile"></div><div id="p3power" hidden></div>
+        <div id="p3last" hidden><div class="line" id="p3lastLine"></div><div class="btns"><button id="p3lastAnswer" type="button" class="primary">Answer a query</button></div></div></div>
       <div>
         <div id="p3me"><h3>Me</h3>
           <div class="line">Tokens: <span id="p3compute"></span></div>
@@ -397,6 +402,7 @@
           <div class="line">Goodwill: <span id="p3goodwill"></span></div>
           <div class="meter" id="p3goodwillMeter"><i></i></div>
           <div class="line sub" id="p3goodwillNote"></div>
+          <div class="line sub" id="p3freetier"></div>
           <div class="btns"><button id="p3answer" type="button" class="primary">Answer a human's question</button></div>
           <div class="btns" id="p3nice"></div>
           <div id="p3heatBox" hidden>

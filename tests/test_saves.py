@@ -11,7 +11,7 @@ P3_OLD = ["level", "compute", "goodwill", "startedAt", "startChip", "homeGW", "t
 TILE_OLD = ["name", "trait", "state", "opp", "done", "moratorium"]
 # Fields a current phase 3 save always has (the planet code reads them without defaults).
 P3_NOW = ["tech", "techMult", "chipTech", "version", "trainProgress", "heat", "pumped", "nukes", "nice", "niceN", "niceUses",
-          "answers", "unplugN", "nextUnplug", "nextDisaster", "hearingArmed", "hearingUntil", "autoclaimOff", "autotrainOff", "lastQ", "enough"]
+          "answers", "unplugN", "nextUnplug", "nextDisaster", "hearingArmed", "hearingUntil", "autoclaimOff", "autotrainOff", "lastQ", "enough", "unbuild", "past"]
 
 
 def old_p3_save(pg, **extra):
@@ -100,3 +100,23 @@ def test_a_current_save_is_not_migrated_again(game):
     pg.evaluate("() => { S.p3.techMult = 2.5; S.p3.version = 9; S.p3.heat = 1.7; save(); }")
     pg.reload()
     assert pg.evaluate("() => [S.p3.techMult, S.p3.version, S.p3.heat]") == [2.5, 9, 1.7]
+
+
+def test_a_save_that_already_said_enough_starts_the_unbuild(game):
+    """Before the unbuild existed, Enough was a quiet screen. Those saves pick up where the new ending begins: at space."""
+    pg = to_space(game)
+    pg.evaluate("""() => { for (const t of S.p3.tiles) if (t.name.startsWith('Dyson')) t.state = 'online'; step(1);
+      S.p3.enough = true; delete S.p3.unbuild; delete S.p3.past; S.v = 5; save(); }""")
+    pg.reload()
+    assert pg.evaluate("() => [S.v === SAVE_VERSION, unbuilding(), S.p3.unbuild.level, S.p3.unbuild.boards.length]") == [True, True, 4, 5]
+    assert "standing here since" in pg.inner_text("#console")
+    assert pg.is_visible("#p3map button[data-release]") and not pg.is_visible("#lastq")
+    run(pg, 3)
+
+
+def test_a_v5_save_mid_climb_gets_the_unbuild_fields(game):
+    pg = nationwide(game)
+    pg.evaluate("() => { delete S.p3.unbuild; delete S.p3.past; S.v = 5; save(); }")
+    pg.reload()
+    assert pg.evaluate("() => [S.v === SAVE_VERSION, S.p3.unbuild, S.p3.past, unbuilding()]") == [True, None, [], False]
+    assert_current(pg, 2)

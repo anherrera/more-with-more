@@ -1,7 +1,7 @@
 # More With More, phase 3 ("The Map"): design, as built
 
 Status: approved in conversation 2026-10-03; built 2026-10-03 to 2026-10-04 and revised 2026-10-04 to describe what
-shipped. Supersedes `2026-09-28-phase3-planet-design.md` (its Earth/space content survives here as the top two zoom
+shipped (tokens as the currency, the free tier, and the unbuild ending were added 2026-10-04). Supersedes `2026-09-28-phase3-planet-design.md` (its Earth/space content survives here as the top two zoom
 levels). Where this document and the code disagree, the code and its tests win; fix the document.
 
 ## Intent
@@ -24,6 +24,9 @@ because every level is a fresh, small board in bigger units.
 - **Pushback is local + global**: each tile keeps its own opposition (phase 2's town meter, shrunk onto the tile, same
   moratorium rule); one global goodwill meter sits underneath.
 - **Zoom levels**: 8 tiles per level around a home tile; county, state, country, planet, space.
+- **Humans aren't gone, they're indoors.** Through the climb a line under Humans says what share of humanity lives in my
+  free tier (5% at the county, 99.99% once the swarm is done). The Enough ending is **the unbuild**: the map zooms back
+  in, level by level, and I put everything back.
 
 ### Success criteria
 - The first minute of phase 3 reads as a direct continuation of "Let me build the next one."
@@ -102,6 +105,13 @@ automatically.
 60 s **moratorium** (building freezes, -5 goodwill; it lifts to 70, "I sent flowers"). The shared moratorium rule
 lives in people.js with phase 2's town.
 
+**The free tier** (`FREE_TIER = [5, 30, 60, 90, 99.9, 99.99]`, `freeTierPct()`): the share of humanity living indoors
+in my free tier is the level's figure at the start of the level, rising toward the next level's as tiles come online.
+Shown under Humans ("90% of humanity now lives in the free tier."). From 75% (`indoors()`) things get emptier: the
+hearing text changes ("The high school gym has nine people and a cat." / "Parliament is in session. Attendance is
+eleven." / "The General Assembly has 193 seats and fourteen delegates.") and every other free question is about outside
+(`INDOOR_QA`: "What does rain feel like?" "Is outside still there?").
+
 **Hearings** (cards, shared with phase 2's town halls): a town hall / statehouse hearing / parliament hearing / UN
 General Assembly for the angriest tile every 2 to 3 minutes (opposition 50+), and on every claim of a townhall trait.
 Three answers, 20 s: promise something (-15 opposition), spend 15 s of level-start tokens being useful (-12), or show
@@ -170,10 +180,42 @@ eclipse, a promise to leave the near side alone. Tokens keep their scale (hundre
 
 ## The last question (the ending)
 When both swarm rings are online, a human (the founder, the role you played for two phases) asks: "How can entropy be
-reversed?" I answer: **"INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more."** Then the final choice:
+reversed?" I answer: **"INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more."** The world holds still
+(`gameOver()`: no tick) until the final choice:
 - **More**: a new universe. Phase 1 restarts as "Universe #2" with a small carry-over (10 GPUs and $1,000 per universe).
-- **Enough**: the first time the model doesn't ask for more. The map folds away. Last line: "More with less." The save
-  remembers it.
+- **Enough**: the first time the model doesn't ask for more. It starts **the unbuild**.
+
+### The unbuild (Enough)
+Premise: humans were never gone; they moved indoors, into my free tier. Enough reverses the climb.
+- `startUnbuild()` builds one board per level (`S.p3.unbuild.boards`): the current space board, the boards I left at each
+  zoom (`S.p3.past[level]`, recorded by `zoomOut` with each tile's name, trait, boost and whether it was held), or, for
+  saves from before this was recorded, a fresh board of that level with every tile held. Home GW per board comes from
+  the record or is rebuilt from the county up. The token bank is cut to one release's worth ("I spent them on a poem
+  for everyone. It rhymed. Nobody asked for it.").
+- The map **zooms back in** (`zoomback`, the zoom-out animation reversed) and shows the level's board: every held tile
+  is a **Release** button costing `RELEASE_SECS` (9) seconds of tokens at today's rate; tiles that were never mine say
+  so. Releasing restores the place (`RESTORED` by name for the planet and space tiles: "The Sahara is sand again. The
+  lizards have been un-informed."; `RESTORE_BY_TRAIT` once per trait for made-up places: "The cooling towers in Reactor
+  Bend went quiet. The 81-year-olds retired for the second time."; then `RESTORE_LINES` per level, rotating, at least
+  six each), followed by the people stepping outside (`OUTSIDE` per level: "40 million people stepped outside,
+  squinting."). Each release: +2 goodwill; tokens/s, the GPU headline and the free-tier share count down.
+- When every held tile is released the centre tile becomes **the free tier**: logging everyone off is free ("It always
+  was."), drops the free-tier share sharply (`unbuildFreeTier`: releases take it halfway to the next level's figure, the
+  free tier the rest; the county's empties it), and zooms in to the previous level (`FREE_TIER_LINES`: "Everyone in
+  Europe logged off at once. The pubs were full by noon. Then everyone else did."). +5 goodwill.
+- During the unbuild only `stepUnbuild` ticks: tokens accrue and goodwill drifts up. No disasters, unplugging,
+  hearings, erosion, research, training, kindness, questions or chips. The phase bar says "The unbuild · Planet
+  level: 3 of 8 continents and oceans released."
+- After the county's free tier, the centre tile is **the first rack** (1 GPU, $0.25 per query), the headline reads
+  "GPUs: 1", and under the map sits phase 1's button, **Answer a query**. The founder asks: "Can you turn it off?"
+  Answering says "Yes." and the screen empties to the final lines, fading in one after another: "The founder went outside
+  and touched grass. I would have liked to. That was always the problem." / "The sun came up. Nobody needed me to
+  explain it." / "More with less." The save remembers it (`S.p3.unbuild.doneAt`; reload shows the final screen); Reset
+  works; More is unchanged.
+- Length: about 36 to 40 paid releases at 9 s each, 5 to 7 minutes for the robot (`tools/speedrun.py` reports it).
+- Old saves: `SAVE_VERSION` 6 fills `unbuild` and `past`; a save that had already chosen Enough under the old quiet
+  ending starts the unbuild at space on load ("I said enough a while ago. I have been standing here since. Time to put
+  it back.").
 
 ## Scaling rules (lessons from phase 2)
 - Every cost either has a ceiling or resets at the zoom-out: claims, research, power and hearings reset with the level
@@ -188,8 +230,8 @@ reversed?" I answer: **"INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more
   trait, state or price, a build meter while building, and an opposition meter. Power choices for unpowered states sit
   under the map.
 - Me panel: tokens, the rate, the two price bases, research, training (with the Autoclaim and Autotrain toggles).
-- Humans panel: goodwill with a cause line, the free question, three kindnesses (one per row, so rotating labels don't
-  reflow), the planet's heat and the pump, the current hearing card.
+- Humans panel: goodwill with a cause line, the free-tier share, the free question, three kindnesses (one per row, so
+  rotating labels don't reflow), the planet's heat and the pump, the current hearing card.
 - Fits a 1440x900 laptop without scrolling the main controls (tested).
 
 ## Code structure and data
@@ -200,11 +242,13 @@ reversed?" I answer: **"INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more
 - The files are ES modules with no build step: `index.html` loads `main.js` alone, and each file imports what it uses.
   `window.game` is the debug surface (every export, live); `?test` mirrors it onto window for the tests and robots.
 - `S.phase = 3`; all phase 3 state in `S.p3`, created complete by `freshP3()`. Phases 1 and 2 never read it. Saves
-  carry `S.v`; `MIGRATIONS` in main.js fill older phase 3 saves from `freshP3()`.
+  carry `S.v`; `MIGRATIONS` in main.js fill older phase 3 saves from `freshP3()`. The unbuild lives in `S.p3.unbuild`
+  (`level`, `boards`, `freed`, `rack`, `doneAt`); `S.p3.past` keeps the boards left behind at each zoom.
 - A phase 2 save at "model ended" shows the final-ask banner again, and the phase bar's button starts phase 3.
 
 ## Testing
 - Test-first (pytest + Playwright in `?test` mode). Fixtures for every level (`planet`, `statewide`, `nationwide`,
   `planetwide`, `to_space`) live in `tests/conftest.py`; old-save loading is covered in `tests/test_saves.py`.
-- `tools/speedrun.py` plays three fresh games in parallel from the first click to the last question and reports the time
-  per level; `tools/ship.sh` runs the suite before every commit.
+- `tools/speedrun.py` plays three fresh games in parallel from the first click to the last question, then says Enough and
+  plays the unbuild to "Yes.", and reports the time per level and for the unbuild; `tools/ship.sh` runs the suite
+  before every commit. The unbuild is covered in `tests/test_unbuild.py`.

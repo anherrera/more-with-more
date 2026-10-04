@@ -7,7 +7,7 @@ import { campusGo, gpuDiscount } from "./model.js";
 import { DILUTION, deriveCap, dilute, publicRaise, renderMarket } from "./market.js";
 import { stepFires, stepLeaks } from "./fires.js";
 import { renderCeo, renderPeople } from "./people.js";
-import { chipShipped, migratePlanet, planetGo, renderPlanet, stepPlanet, wirePlanet } from "./planet.js";
+import { chipShipped, migratePlanet, planetGo, renderPlanet, startUnbuild, stepPlanet, unbuilding, wirePlanet } from "./planet.js";
 import { renderHud, wireHud } from "./hud.js";
 import * as Globals from "./globals.js"; import * as Projects from "./projects.js"; import * as Campus from "./campus.js";
 import * as Model from "./model.js"; import * as Market from "./market.js"; import * as Fires from "./fires.js"; import * as People from "./people.js";
@@ -418,7 +418,8 @@ export function raise() {
 // ---------- tick ----------
 export let lastSnapT = -1e9;
 // Once the last question is asked, the universe holds its breath: nothing ships, burns or erodes until More or Enough.
-export const gameOver = () => S.phase === 3 && !!S.p3 && S.p3.lastQ != null;
+// Enough starts the unbuild, which runs its own quiet clock (stepUnbuild) until the last answer; then it holds still again.
+export const gameOver = () => S.phase === 3 && !!S.p3 && S.p3.lastQ != null && !unbuilding();
 export function step(dt) {
   if (gameOver()) return;
   S.t += dt;                                   // phases 1-2 keep running after their endings: the empire hums on
@@ -840,7 +841,7 @@ export const running = () => clockOn && !S.paused && !waitingOnCounty() && !game
 // Anything rendered from cached keys has to forget them when the game starts over.
 export function clearCaches() {
   for (const el of $all("[data-key]")) delete el.dataset.key;
-  $("split").value = S.split; clockOn = false; $("p3").classList.remove("zoomin");
+  $("split").value = S.split; clockOn = false; $("p3").classList.remove("zoomin", "zoomback");
 }
 // "More": a new universe, from the first question again, with a small head start.
 export function newUniverse(u) {
@@ -868,6 +869,11 @@ export const MIGRATIONS = [
     if (!S.p3) return;
     for (const [old, now] of [["autoOff", "autoclaimOff"], ["autoTrainOff", "autotrainOff"]]) if (old in S.p3) { S.p3[now] = !!S.p3[old]; delete S.p3[old]; }
     delete S.p3.zoomSaid; delete S.p3.levelAt;
+  } },
+  { v: 6, up: () => {   // the unbuild: Enough puts it all back. A save that had already said Enough starts the unbuild on load.
+    if (!S.p3) return;
+    migratePlanet();
+    if (S.p3.enough && !S.p3.unbuild) startUnbuild(true);
   } },
 ];
 export function migrate(saved) {

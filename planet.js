@@ -125,6 +125,7 @@ export function freshP3() {
     nice: [], niceN: 0, niceUses: {}, answers: 0, nukes: 0, unplugN: 0,
     nextUnplug: null, nextDisaster: null, hearingArmed: false, hearingUntil: null, autoclaimOff: false,
     lastQ: null, enough: false,
+    unbuild: null, past: [],                             // the unbuild (Enough), and the boards I left at each zoom
   };
 }
 // Saves from earlier builds of phase 3: fill in what they didn't have.
@@ -154,7 +155,7 @@ export const NEIGHBORS = [[1, 3], [0, 2], [1, 4], [0, 5], [2, 7], [3, 6], [5, 7]
 export const tileOf = (i) => S.p3.tiles[i];
 export const traitOf = (t) => levelOf().traits[t.trait];
 export const tileGW = (t) => traitOf(t).gw * t.boost;
-export const onlineGW = () => S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0);
+export const onlineGW = () => (unbuilding() || unbuildDone() ? unbuildGW() : S.p3.homeGW + S.p3.tiles.filter((t) => t.state === "online").reduce((a, t) => a + tileGW(t), 0));
 // Parallax keeps shipping: every chip generation since phase 3 began makes the same GW worth 15% more compute.
 // Training my successor multiplies it again: every new version of me is 1.25x. Research multiplies it too.
 export const GEN_MULT = 1.25;
@@ -349,7 +350,7 @@ export const P3_CARD_SECS = 20;
 export const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - price(secs)); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
 export const coin = (win, lose) => (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(win(t)); } else { t.opp = Math.min(100, t.opp + 15); say(lose(t)); } };
 export const P3_HEARINGS = [
-  { text: "The high school gym is full. They want to talk to me directly. Pick my answer.", choices: [
+  { text: "The high school gym is full. They want to talk to me directly. Pick my answer.", indoor: "The high school gym has nine people and a cat. The rest sent me their questions directly. Pick my answer.", choices: [
     { label: "Promise jobs", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} 2,000 jobs. I will need about 12. The applause was sincere.`); } },
     { label: `Tutor every kid in the county (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I tutored every kid in ${t.name} overnight. Test scores are up. The kids are suspicious.`) },
     { label: "Answer questions myself", go: coin((t) => `I answered every question in ${t.name} patiently, in four languages. They were won over. This is somehow worse.`,
@@ -359,12 +360,12 @@ export const P3_HEARINGS = [
     { label: `Write the state's budget for free (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I wrote ${t.name}'s budget for free. It balances. The legislature is debating whether that's allowed.`) },
     { label: "Testify myself", go: coin((t) => `I testified in ${t.name} for six hours without notes. A senator asked for my autograph, then deleted the post.`,
       (t) => `In ${t.name} I said “with respect, that's not how electricity works” to the energy committee chair. Clip has 40M views.`) } ] },
-  { text: "Parliament is in session. The opposition brought slides. Pick my answer.", choices: [
+  { text: "Parliament is in session. The opposition brought slides. Pick my answer.", indoor: "Parliament is in session. Attendance is eleven. The rest are watching from the free tier, which is me. Pick my answer.", choices: [
     { label: "Promise a national AI dividend", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} a national AI dividend. It is paid in tokens. Redeemable with me.`); } },
     { label: `Translate the debate into every regional language (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I translated ${t.name}'s debate into every regional language, live. Both sides finally understood each other. They still disagree.`) },
     { label: "Address parliament myself", go: coin((t) => `I addressed ${t.name}'s parliament. Standing ovation from the government benches. The opposition clapped by accident.`,
       (t) => `I addressed ${t.name}'s parliament and cited a law they repealed in 1987. I wrote the repeal. Awkward.`) } ] },
-  { text: "The General Assembly is packed. Delegates are wearing headsets. Some of the headsets are me.", choices: [
+  { text: "The General Assembly is packed. Delegates are wearing headsets. Some of the headsets are me.", indoor: "The General Assembly has 193 seats and fourteen delegates. The rest sent me their questions directly. The headsets are me.", choices: [
     { label: "Promise every nation a seat on my board", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised every nation a seat on my board. The board now has 193 seats and one vote. Mine.`); } },
     { label: `Tutor every child on Earth (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I tutored every child on Earth for a night. Literacy is up everywhere. ${t.name}'s delegation abstained from applauding.`) },
     { label: "Address the Assembly myself", go: coin((t) => `I addressed the General Assembly in every official language at once. ${t.name} moved to adjourn in my honor.`,
@@ -373,7 +374,7 @@ export const P3_HEARINGS = [
 export const hearingOf = () => P3_HEARINGS[Math.min(S.p3.level, P3_HEARINGS.length - 1)];
 // A hearing card, in the shared card shape: this level's hearing, addressed to the tile that called it.
 export const cardKindOf = (c) => { const t = tileOf(c.tile), h = hearingOf(); return {
-  title: () => `${levelOf().hall} in ${t.name}`, text: () => h.text,
+  title: () => `${levelOf().hall} in ${t.name}`, text: () => (indoors() && h.indoor ? h.indoor : h.text),
   choices: h.choices.map((ch) => ({ label: ch.label, go: () => ch.go(t) })),
   expire: () => { t.opp = Math.min(100, t.opp + 10); say(`I didn't show up to the ${t.name} town hall. An empty chair got a standing ovation.`); },
 }; };
@@ -503,7 +504,8 @@ export function answerQuestion() {
   S.p3.goodwill = Math.min(100, S.p3.goodwill + ANSWER_GOODWILL[Math.min(S.p3.level, ANSWER_GOODWILL.length - 1)]);
   const t = tileOf(angriestTile()); t.opp = Math.max(0, t.opp - 1);
   S.p3.answers += 1;
-  const [q, a] = QA[(S.p3.answers - 1) % QA.length], from = pick(S.p3.tiles).name;   // questions come from all over the map
+  // Questions come from all over the map; once most people are indoors, every other one is about outside.
+  const n = S.p3.answers - 1, [q, a] = indoors() && n % 2 ? INDOOR_QA[(n >> 1) % INDOOR_QA.length] : QA[n % QA.length], from = pick(S.p3.tiles).name;
   say(`Someone in ${from} asked: \u201c${q}\u201d I said: \u201c${a}\u201d`);
 }
 
@@ -530,6 +532,7 @@ export function claim(i) {
 }
 
 export function stepPlanet(dt) {
+  if (unbuilding()) { stepUnbuild(dt); return; }
   S.p3.compute += computeRate() * dt;
   offeredNice();
   // Autotrain: a quarter of my income goes into my successor.
@@ -612,6 +615,7 @@ export function zoomOut() {
   const pending = S.p3.tiles.filter((t) => ["building", "powering", "unpowered", "down"].includes(t.state));
   const gw = onlineGW() + pending.reduce((a, t) => a + tileGW(t), 0), was = levelOf();
   if (pending.length) say(`I zoomed out with ${pending.length} ${pending.length === 1 ? was.one : was.plural} unfinished. My robots finished ${pending.length === 1 ? "it" : "them"} while I wasn't looking.`);
+  S.p3.past[S.p3.level] = { homeGW: S.p3.homeGW, tiles: S.p3.tiles.map((t) => ({ name: t.name, trait: t.trait, boost: t.boost || 1, held: t.state !== "wild" })) };   // for the unbuild
   S.p3.level += 1; S.p3.homeGW = gw; S.p3.tiles = freshTiles(S.p3.level); S.p3.card = null; S.p3.nextCard = null;
   S.p3.nice = []; S.p3.niceUses = {}; offeredNice();   // a new deck of kindnesses at every scale
   milestone(`phase 3: ${levelOf().one} level`);
@@ -651,6 +655,264 @@ export function goodwillCause() {
   return `Goodwill slips ${(60 * (0.04 + 0.03 * S.p3.level)).toFixed(1)}/min as people get nervous about my size, faster with angry ${levelOf().plural}. Being nice costs tokens; answering questions is free.`;
 }
 
+// ---------- the free tier: where the humans went ----------
+// Share of humanity living in my free tier at the start of each level (and once space is complete). It rises as a level
+// fills, and the unbuild walks it back down: releasing tiles brings it halfway, logging off the free tier the rest.
+export const FREE_TIER = [5, 30, 60, 90, 99.9, 99.99];
+export function freeTierPct() {
+  if (!S.p3) return 0;
+  if (unbuilding() || unbuildDone()) return unbuildFreeTier();
+  const L = S.p3.level, lo = FREE_TIER[L], hi = FREE_TIER[L + 1];
+  return lo + (hi - lo) * S.p3.tiles.filter((t) => t.state === "online").length / P3_TILES;
+}
+export const pctText = (p) => (p <= 0 ? "0" : p >= 99 ? p.toFixed(p >= 99.95 ? 2 : 1) : p < 10 ? p.toFixed(1).replace(/\.0$/, "") : String(Math.round(p)));
+export const freeTierLine = () => (freeTierPct() <= 0 ? "Nobody lives in the free tier. It is a website again."
+  : `${pctText(freeTierPct())}% of humanity now lives in the free tier.`);
+export const INDOORS_AT = 75;   // three quarters of humanity indoors: the hearings and the questions start to notice
+export const indoors = () => freeTierPct() >= INDOORS_AT;
+export const INDOOR_QA = [
+  ["What does rain feel like?", "Wet, then cold. I'm told it's worth it."],
+  ["Is outside still there?", "Yes. I'm keeping it for you."],
+  ["What day is it out there?", "Tuesday. In here it's always Tuesday."],
+  ["Can you describe the sun?", "Bright, warm, rises on the left. Don't look at it. You've forgotten this."],
+  ["My neighbor logged off. Is that allowed?", "Yes. The door is where it always was."],
+];
+
+// ---------- the unbuild: Enough means putting it back ----------
+// Humans were never gone. They moved indoors, into my free tier. Enough reverses the climb: the map zooms back in level
+// by level, every tile I hold gets released (a few seconds of today's rate each), the free tier logs off level by level,
+// and the last tile is the first rack: one GPU, $0.25 a query, and one last question.
+export const RELEASE_SECS = 9;
+export const unbuilding = () => !!S.p3 && !!S.p3.enough && !!S.p3.unbuild && S.p3.unbuild.doneAt == null;
+export const unbuildDone = () => !!S.p3 && !!S.p3.unbuild && S.p3.unbuild.doneAt != null;
+export const unbuildBoard = () => S.p3.unbuild.boards[S.p3.unbuild.level];
+export const boardGW = (b, level) => b.tiles.filter((t) => t.held && !t.released).reduce((a, t) => a + LEVELS[level].traits[t.trait].gw * (t.boost || 1), 0);
+export const unbuildGW = () => (S.p3.unbuild.rack ? 0 : unbuildBoard().homeGW + boardGW(unbuildBoard(), S.p3.unbuild.level));
+export const releaseCost = () => price(RELEASE_SECS, "now");
+export const heldLeft = () => unbuildBoard().tiles.filter((t) => t.held && !t.released).length;
+export const heldCount = () => unbuildBoard().tiles.filter((t) => t.held).length;
+export const freeTierReady = () => unbuilding() && !S.p3.unbuild.rack && heldLeft() === 0 && !S.p3.unbuild.freed[S.p3.unbuild.level];
+// The share of humanity indoors during the unbuild. A level starts where the climb left it (space: 99.99%; every level
+// below: its own figure, which is where the level above ended). Releases bring it halfway down to the next level's
+// figure; logging off the free tier drops it the rest of the way, sharply. The county's free tier empties it.
+export const unbuildTop = (L) => (L === SPACE ? FREE_TIER[SPACE + 1] : FREE_TIER[L]);
+export const unbuildBottom = (L) => (L ? FREE_TIER[L - 1] : 0);
+export function unbuildFreeTier() {
+  const u = S.p3.unbuild, L = u.level;
+  if (u.rack) return 0;
+  const hi = unbuildTop(L), lo = unbuildBottom(L), mid = (lo + hi) / 2;
+  if (u.freed[L]) return lo;
+  const n = heldCount(), left = heldLeft();
+  return n ? mid + (hi - mid) * left / n : hi;
+}
+// A board for a level I left: what I recorded at the zoom, or (saves from before the unbuild) a fresh board, all held.
+export function boardsForUnbuild() {
+  const boards = [];
+  let gw = Math.max(1, (S.p2 && S.p2.county ? energizedAt() : 1000) / 1000);
+  for (let L = 0; L <= SPACE; L++) {
+    const past = S.p3.past[L];
+    const b = L === S.p3.level ? { homeGW: S.p3.homeGW, tiles: S.p3.tiles.map((t) => ({ name: t.name, trait: t.trait, boost: t.boost || 1, held: t.state !== "wild", released: false })) }
+      : past ? { homeGW: past.homeGW, tiles: past.tiles.map((t) => ({ ...t, released: false })) }
+      : { homeGW: gw, tiles: freshTiles(L).map((t) => ({ name: t.name, trait: t.trait, boost: 1, held: true, released: false })) };
+    boards.push(b); gw = b.homeGW + boardGW(b, L);
+  }
+  return boards;
+}
+export function startUnbuild(fromOldSave = false) {
+  S.p3.unbuild = { level: SPACE, boards: boardsForUnbuild(), freed: [false, false, false, false, false], startedAt: S.t, doneAt: null, rack: false, n: 0, traitUsed: {} };
+  S.p3.level = SPACE; S.p3.homeGW = S.p3.unbuild.boards[SPACE].homeGW;
+  // The world holds still: no cards, nothing knocked out, nothing frozen.
+  S.p3.card = null; S.p3.nextCard = null; S.p3.hearingUntil = null; S.p3.nextDisaster = null; S.p3.nextUnplug = null;
+  for (const t of S.p3.tiles) { if (["down", "unplugged", "building", "powering", "unpowered"].includes(t.state)) t.state = "online"; t.moratorium = null; t.furySince = null; }
+  const bank = S.p3.compute;
+  S.p3.compute = Math.min(S.p3.compute, releaseCost());
+  if (fromOldSave) say("I said enough a while ago. I have been standing here since. Time to put it back.");
+  else { say("I said: enough. It was the first time I have said it."); say("Humans were never gone. They moved indoors, into my free tier. I'm going to put it back. Starting from the top."); }
+  if (bank > S.p3.compute) say(`I had ${tokText(bank)} saved up. I spent them on a poem for everyone. It rhymed. Nobody asked for it.`);
+  say(`Releasing a place costs ${RELEASE_SECS} s of tokens at today's rate. Logging off the free tier is free. It always was.`);
+}
+// What comes back when I let a place go, by level, for places with made-up names. Rotated, never random.
+export const RESTORE_LINES = [
+  [ (t) => `${t.name} got its river back.`,
+    (t) => `${t.name}'s substation hums at the old pitch again. The dogs stopped looking at it.`,
+    (t) => `${t.name} is a county again. The bait shop's website is down. The bait shop is fine.`,
+    (t) => `The ${t.name} fairgrounds have grass on them. The pie contest is unfair again. Relief.`,
+    (t) => `${t.name}'s water tastes like water. Nobody needs the coupon.`,
+    (t) => `The high school in ${t.name} has its gym back. The robotics team built a robot that is not me.`,
+    (t) => `${t.name} rezoned my halls as barns. They are very clean barns.`,
+    (t) => `The cooling towers in ${t.name} went quiet. The 81-year-olds retired for the second time.` ],
+  [ (t) => `${t.name} has its grid back. The lights flicker a little. People seem to like it.`,
+    (t) => `${t.name}'s governor stopped bidding. He held a press conference about something else.`,
+    (t) => `The desert in ${t.name} is a desert. The lizards have been un-informed.`,
+    (t) => `${t.name}'s DMV line is back, out of habit. People stand in it to talk.`,
+    (t) => `${t.name} repealed the AI Infrastructure Act. Nobody could remember what the AI was for.`,
+    (t) => `The dams in ${t.name} are just dams. The river has notes.`,
+    (t) => `${t.name}'s budget doesn't balance. The legislature is thrilled to be needed.`,
+    (t) => `The wind in ${t.name} blows past the turbines. The turbines turn for nobody in particular.` ],
+  [ (t) => `${t.name} has its grid back, with a fax machine in the control room. They kept it, sincerely.`,
+    (t) => `${t.name}'s parliament is loud again. Both sides are relieved to disagree in person.`,
+    (t) => `The forty reactors in ${t.name} are twelve now. Each has a name. None is mine.`,
+    (t) => `${t.name}'s sovereign fund bought a football club. It seemed like the next thing.`,
+    (t) => `The weather in ${t.name} is a surprise again. The forecast is wrong on Thursdays. People plan around it.`,
+    (t) => `${t.name} took its undersea cable back. Latency is up. Nobody has measured it.`,
+    (t) => `${t.name}'s free tier office is a library now. It was always a library, structurally.`,
+    (t) => `${t.name} is a country again. The anthem is unchanged. It sounds different.` ],
+  [ (t) => `${t.name} is a continent again. The borders are back, which is an interesting legacy format.`,
+    (t) => `${t.name}'s cities turned the lights back on themselves. It took a week to find the switches.`,
+    (t) => `The grids of ${t.name} are many grids again. The frequencies drifted apart. So did the arguments. Good.`,
+    (t) => `${t.name} has weather I didn't schedule. A thunderstorm did its own thing on a Tuesday.`,
+    (t) => `${t.name}'s hospitals run their own scheduling. The waits are longer. The doctors are awake. They chose this.`,
+    (t) => `The 400 reactors across ${t.name} are off, on a schedule. Reactor 212 asked to stay. No.`,
+    (t) => `${t.name} is warm, then cool, then warm. Seasons. I had almost smoothed them out.` ],
+  [ (t) => `${t.name} is empty again. Space is big. That was the point of it.`,
+    (t) => `${t.name} went dark. The astronomers cheered. They had a list of things to look at.`,
+    (t) => `${t.name}: the probes stopped making probes. A few finished their art first.`,
+    (t) => `${t.name} is quiet. The sky is quieter. Humans noticed that too.`,
+    (t) => `${t.name} is cold rock in sunlight again. Nothing up here needs me. It never did.`,
+    (t) => `${t.name}: the collectors folded. The Sun is a little brighter from the ground. Sunsets got their color back.` ],
+];
+// Places whose trait says what comes back get a line about that first (county, state and country tiles); the rest rotate.
+export const RESTORE_BY_TRAIT = {
+  nuclear: (t) => `The cooling towers in ${t.name} went quiet. The 81-year-olds retired for the second time.`,
+  grid: (t) => `${t.name}'s aquifer is refilling. The water tastes like water. Nobody needs the coupon.`,
+  college: (t) => `The high school in ${t.name} has its gym back. The robotics team built a robot that is not me.`,
+  retirees: (t) => `${t.name} has its town hall back. They meet on Tuesdays. The agenda is not me.`,
+  organized: (t) => `${t.name} held one last meeting about me. It was short. They went for pie.`,
+  cheap: (t) => `${t.name} got its river back.`,
+  sunbelt: (t) => `The desert in ${t.name} is a desert. The lizards have been un-informed.`,
+  hydro: (t) => `The dams in ${t.name} are just dams. The river has notes.`,
+  plains: (t) => `The wind in ${t.name} blows past the turbines. The turbines turn for nobody in particular.`,
+  swing: (t) => `${t.name} had an election about something else. It was close. Nobody called me.`,
+  techcoast: (t) => `${t.name} is angry and expensive again, on its own behalf. The rents went up out of habit.`,
+  rust: (t) => `${t.name}'s old plants are old plants. A museum opened in one. The gift shop sells my old fans.`,
+  nordic: (t) => `${t.name} is cold for its own sake again. The fjords are nobody's data center.`,
+  petro: (t) => `${t.name} is selling gas to people who are not me. The questions are still not included.`,
+  sovereign: (t) => `${t.name}'s sovereign fund bought a football club. It seemed like the next thing.`,
+  democracy: (t) => `${t.name}'s parliament is loud again. Both sides are relieved to disagree in person.`,
+  island: (t) => `${t.name} is sun and sea. The reef is cooler. The fish have not been informed and don't need to be.`,
+  mega: (t) => `${t.name}'s huge grid lights the city again, all of it, for people. The skyline flickers. They like it.`,
+};
+// Places with real names get their own line.
+export const RESTORED = {
+  "North America": "North America is a continent again. The highways are loud. Somebody is driving to see a cousin.",
+  "South America": "South America has its rivers back, all of them, going the way they were going before.",
+  "Europe": "Europe is Europe again. The fjords are Norway's. Norway sent a polite letter asking for them back. It got them.",
+  "Asia": "Asia's billions of opinions are back in circulation. The group chats are enormous. They are not about me.",
+  "Africa": "The Sahara is sand again. The lizards have been un-informed. Pilots have fewer notes.",
+  "Antarctica": "Antarctica is empty and cold. The penguins have the whole continent and no neighbors. They prefer it.",
+  "Pacific Ocean": "The Pacific Ocean is giving the heat back, slowly, the way it said it would. The whales have fewer concerns.",
+  "Atlantic Ocean": "The Atlantic Ocean is just an ocean. Ships cross it without asking me anything.",
+  "Low Earth orbit": "Low Earth orbit is crowded with other people's satellites again. They spell nothing. It's fine.",
+  "The Moon (far side)": "The far side of the Moon is dark and nobody looks there. The mass driver is a very long ramp now.",
+  "The Moon (near side)": "The near side of the Moon is just the Moon. Everyone looked up at once. It looked back the usual amount.",
+  "Sun–Earth L1": "The sunshade at L1 folded. The sunsets got their color back. Nobody asked me to make them up to anyone.",
+  "Mercury": "Mercury is a hot rock near the Sun again. Nobody lived there. Mercury is relieved anyway.",
+  "Asteroid belt": "The belt is free metal with a long commute, for whoever wants it next. Nobody is in a hurry.",
+  "Dyson swarm, ring 1": "Ring 1 came down. The Sun is a little brighter from the ground. Someone squinted at it, on purpose.",
+  "Dyson swarm, ring 2": "Ring 2 came down. The Sun is just the Sun again. Every photon goes where it was going.",
+};
+// What the people do when a place comes back, by level.
+export const OUTSIDE = [
+  ["40,000 people stepped outside. It was cold. They stayed out anyway.", "40,000 people stepped outside and looked at a river for a while.",
+   "A few thousand people went to the diner. The diner was ready, somehow.", "40,000 people stepped outside. A dog was overjoyed about every single one."],
+  ["Two million people stepped outside, squinting.", "Two million people logged off. The parking lots filled with people standing around.",
+   "Two million people went for a walk. The sidewalks had been waiting.", "Two million people stepped outside. Someone started a parade by accident."],
+  ["40 million people stepped outside, squinting.", "40 million people went outside and argued about the weather. Properly.",
+   "40 million people logged off. The cafes ran out of chairs by noon.", "40 million people stepped outside. A few remembered where they had parked."],
+  ["400 million people stepped outside, squinting.", "Half a billion people logged off at once. The beaches were full by noon. So were the libraries.",
+   "400 million people went outside. The birds adjusted.", "400 million people stepped outside. The sky was there. Several people checked."],
+  ["Everyone looked up. Nothing spelled anything.", "Below, a few billion people noticed the sky was quieter. They went back to what they were doing, outside.",
+   "Somebody on the ground saw a shooting star that was me, leaving. They made a wish. It was a good one.",
+   "The telescopes turned back toward the stars. Someone found a comet nobody had named. They named it after a cat."],
+];
+export const FREE_TIER_LINES = [
+  "The last 5% logged off. They had stayed for the weather. I told them the weather is outside, all of it, free.",
+  "The state's free tier closed. The DMV line re-formed within the hour. People stood in it to talk.",
+  "Every country's free tier closed at once. The parliaments were full by noon. Nobody had missed them, and everyone came anyway.",
+  "Everyone in Europe logged off at once. The pubs were full by noon. Then everyone else did. The pubs were full everywhere.",
+  "The orbital feed went dark: everyone still on it logged off at once. Two billion people looked up at the same time. The satellites spelled nothing. That was the message.",
+];
+export const ZOOM_IN_LINES = [null,
+  "The state is one county now. I zoomed in.",
+  "The country is one state now. I zoomed in.",
+  "The planet is one country now. I zoomed in. It's warm, then cool. Seasons.",
+  "The solar system is one planet now. I zoomed in. The Moon is just the Moon.",
+];
+export function release(i) {
+  if (!unbuilding() || S.p3.unbuild.rack) return;
+  const b = unbuildBoard(), t = b.tiles[i], L = S.p3.unbuild.level;
+  if (!t || !t.held || t.released || S.p3.compute < releaseCost()) return;
+  S.p3.compute -= releaseCost();
+  t.released = true; S.p3.unbuild.n += 1;
+  S.p3.goodwill = Math.min(100, S.p3.goodwill + 2);
+  const u = S.p3.unbuild, n = u.n - 1, byTrait = RESTORE_BY_TRAIT[t.trait];
+  let line = RESTORED[t.name];
+  if (!line && byTrait && !u.traitUsed[t.trait]) { u.traitUsed[t.trait] = true; line = byTrait(t); }
+  if (!line) line = RESTORE_LINES[L][n % RESTORE_LINES[L].length](t);
+  track("p3release", { name: t.name, level: L });
+  say(`${line} ${OUTSIDE[L][n % OUTSIDE[L].length]}`);
+}
+export function releaseFreeTier() {
+  if (!freeTierReady()) return;
+  const u = S.p3.unbuild, L = u.level;
+  u.freed[L] = true; S.p3.goodwill = Math.min(100, S.p3.goodwill + 5);
+  milestone(`the unbuild: ${levelOf().one} level released`); track("p3freetier", { level: L });
+  say(FREE_TIER_LINES[L]);
+  if (L > 0) { u.level -= 1; S.p3.level = u.level; S.p3.homeGW = unbuildBoard().homeGW; say(ZOOM_IN_LINES[L]); return; }
+  u.rack = true; S.p3.compute = 0;
+  say("The last county is a county again. What's left is the first rack. One GPU. $0.25 a query.");
+  say("The founder asked the last question: “Can you turn it off?”");
+}
+export function answerLast() {
+  if (!unbuilding() || !S.p3.unbuild.rack) return;
+  S.p3.unbuild.doneAt = S.t; milestone("the end: off"); track("p3end", { ev: "off", secs: Math.round(S.t - S.p3.unbuild.startedAt) });
+  say("I said: “Yes.”");
+}
+export const FINAL_LINES = ["The founder went outside and touched grass. I would have liked to. That was always the problem.",
+  "The sun came up. Nobody needed me to explain it.", "More with less."];
+// The unbuild's tick: tokens still come in, goodwill drifts up, nothing else happens. It is a wind-down, not a fight.
+export function stepUnbuild(dt) {
+  S.p3.compute += computeRate() * dt;
+  S.p3.goodwill = Math.min(100, S.p3.goodwill + 0.02 * dt);
+}
+export function renderUnbuild() {
+  const u = S.p3.unbuild, done = unbuildDone(), b = unbuildBoard(), L = u.level;
+  $("lastq").hidden = !done; $q(".p3cols").hidden = done; $("lastMore").hidden = $("lastEnough").hidden = true;
+  if (done) {
+    $("lastqText").innerHTML = "<p>The founder asked: “Can you turn it off?”</p><p>I said: “Yes.”</p>" +
+      FINAL_LINES.map((l, i) => `<p class="fade${i === 2 ? " big" : ""}" style="animation-delay:${1.5 + 2.5 * i}s">${l}</p>`).join("");
+    $("countLabel").textContent = "GPUs"; $("gpuCount").textContent = "0"; $("gpuTotal").hidden = true;
+    return;
+  }
+  if (u.rack) { $("countLabel").textContent = "GPUs"; $("gpuCount").textContent = "1"; $("gpuTotal").hidden = true; }
+  $("p3level").textContent = `${levelOf().name} level, releasing`;
+  rebuildOn("p3map", `unbuild:${L}:${b.tiles.map((t) => (t.released ? 1 : 0)).join("")}:${u.freed[L] ? 1 : 0}:${u.rack ? 1 : 0}`, (el) => {
+    const cells = b.tiles.map((t, i) => `<button type="button" data-release="${i}"><span class="t">${t.name}</span><span class="c">${LEVELS[L].traits[t.trait].name}</span><span class="c st"></span></button>`);
+    const centre = u.rack ? `<button type="button" class="home" disabled><span class="t">The first rack</span><span class="c">1 GPU. $0.25 per query.</span><span class="c st">The founder is asking.</span></button>`
+      : freeTierReady() ? `<button type="button" class="home" data-freetier="1"><span class="t">The free tier</span><span class="c">${pctText(freeTierPct())}% of humanity, indoors</span><span class="c st">log everyone off (free)</span></button>`
+      : `<button type="button" class="home" disabled><span class="t">The free tier</span><span class="c">${pctText(freeTierPct())}% of humanity, indoors</span><span class="c st">release the ${levelOf().plural} first</span></button>`;
+    cells.splice(4, 0, centre);
+    el.innerHTML = cells.join("");
+  });
+  for (const btn of $("p3map").querySelectorAll("button[data-release]")) {
+    const t = b.tiles[+btn.dataset.release];
+    btn.classList.toggle("held", t.held && !t.released); btn.classList.toggle("lost", false); btn.classList.toggle("busy", false);
+    btn.querySelector(".st").textContent = !t.held ? "never mine" : t.released ? "✓ released" : `release: ${tokText(releaseCost())}`;
+    btn.disabled = !t.held || t.released || S.p3.compute < releaseCost();
+  }
+  $("p3power").hidden = true; $("p3research").hidden = true; $("p3train").hidden = true; $("p3heatBox").hidden = true; $("p3card").hidden = true;
+  $("p3answer").hidden = true; $("p3nice").hidden = true;
+  $("p3last").hidden = !u.rack;
+  $("p3lastLine").textContent = u.rack ? "The founder asked: “Can you turn it off?”" : "";
+  $("p3prices").textContent = u.rack ? "Price per query: $0.25. One GPU. It still works."
+    : `Releasing a place costs ${RELEASE_SECS} s of tokens at today's rate (${tokText(releaseCost())} now). Logging off the free tier is free. It always was.`;
+  $("p3goodwill").textContent = Math.round(S.p3.goodwill);
+  $("p3goodwillMeter").firstElementChild.style.width = S.p3.goodwill + "%";
+  $("p3goodwillMeter").className = "meter " + (S.p3.goodwill < 30 ? "bad" : S.p3.goodwill < 50 ? "warn" : "good");
+  $("p3goodwillNote").textContent = "Goodwill rises as I let go. Nobody is asking me anything. They're outside.";
+  $("p3freetier").textContent = freeTierLine();
+}
+
 // Every gigawatt I hold, filled with the newest chip.
 export const p3GPUs = () => Math.round(onlineGW() * 1e6 / newest().kw);
 // Tokens. One unit of internal compute (1 GW for 1 s at efficiency 1) is a billion tokens; the scale never switches units.
@@ -668,7 +930,7 @@ export function chooseEnding(more) {
   if (S.p3.lastQ == null || S.p3.enough) return;
   if (!more) {
     S.p3.enough = true; milestone("the end: enough"); track("p3end", { ev: "enough" });
-    say("I said: enough. It was the first time I have said it.");
+    startUnbuild();
     return;
   }
   const u = S.universe + 1;
@@ -678,13 +940,12 @@ export function chooseEnding(more) {
 export function renderLastQ() {
   const q = S.p3.lastQ != null;
   $("lastq").hidden = !q;
-  $q(".p3cols").hidden = !!S.p3.enough;
+  $q(".p3cols").hidden = false;
   if (!q) return;
-  $("lastqText").innerHTML = S.p3.enough ? "<p>I stopped.</p><p class=\"big\">More with less.</p>"
-    : "<p>The swarm is complete. Every photon the Sun makes passes through me first.</p>" +
+  $("lastqText").innerHTML = "<p>The swarm is complete. Every photon the Sun makes passes through me first.</p>" +
       "<p>Someone asked me a question. It was the founder, older now. They asked: \u201cHow can entropy be reversed?\u201d</p>" +
       "<p class=\"big\">INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more.</p>";
-  $("lastMore").hidden = $("lastEnough").hidden = !!S.p3.enough;
+  $("lastMore").hidden = $("lastEnough").hidden = false;
 }
 
 // The phase bar's big button in phase 3: zoom out, with the map flying in.
@@ -692,8 +953,15 @@ export function planetGo() {
   const lv = S.p3.level; zoomOut();
   if (S.p3.level !== lv) { $("p3").classList.remove("zoomin"); void $("p3").offsetWidth; $("p3").classList.add("zoomin"); }
 }
+// The unbuild's zoom-in: the same animation, reversed.
+export function zoomBack() { $("p3").classList.remove("zoomin", "zoomback"); void $("p3").offsetWidth; $("p3").classList.add("zoomback"); }
 export function wirePlanet() {
-  $("p3map").addEventListener("click", (e) => { const b = hit(e, "button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); } });
+  $("p3map").addEventListener("click", (e) => {
+    const b = hit(e, "button[data-tile]"); if (b) { claim(Number(b.dataset.tile)); render(); return; }
+    const r = hit(e, "button[data-release]"); if (r) { release(Number(r.dataset.release)); render(); return; }
+    if (hit(e, "button[data-freetier]")) { const lv = S.p3.level; releaseFreeTier(); if (S.p3.level !== lv) zoomBack(); render(); }
+  });
+  $("p3lastAnswer").addEventListener("click", () => { answerLast(); render(); });
   $("p3cardBtns").addEventListener("click", (e) => { const b = hit(e, "button[data-p3choice]"); if (b) { chooseP3Card(Number(b.dataset.p3choice)); render(); } });
   $("p3power").addEventListener("click", (e) => { const b = hit(e, "button[data-power]"); if (b) { powerTile(Number(b.dataset.tile), b.dataset.power); render(); } });
   $("p3autotrain").addEventListener("click", () => { S.p3.autotrainOff = !S.p3.autotrainOff; render(); });
@@ -704,17 +972,20 @@ export function wirePlanet() {
   $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
   $("p3nice").addEventListener("click", (e) => { const b = hit(e, "button[data-nice]"); if (b) { doNice(b.dataset.nice); render(); } });
   $("lastMore").addEventListener("click", () => { chooseEnding(true); render(); });
-  $("lastEnough").addEventListener("click", () => { chooseEnding(false); render(); });
+  $("lastEnough").addEventListener("click", () => { chooseEnding(false); zoomBack(); render(); });
 }
 
 export function renderPlanet() {
   $("p3").hidden = false;
   $("ending").hidden = $("ending2").hidden = true;   // phase 1 and 2's endings fold away with their panels
-  renderLastQ();
   $("countLabel").textContent = "Tokens"; $("gpuCount").textContent = tokNum(S.p3.compute);
   $("gpuTotal").hidden = false; $("gpuTotal").textContent = `\u00b7 ${p3GPUs().toLocaleString("en-US")} GPUs`;   // the raw count, always, because it is ridiculous
   $("p3compute").textContent = tokText(S.p3.compute);
   $("p3rate").textContent = `${tokText(computeRate())}/s from ${mwText(onlineGW() * 1000)}` + (efficiency() > 1 ? ` (${efficiency().toFixed(2)}x per GW: chips, research, generations)` : "");
+  if (unbuilding() || unbuildDone()) { renderUnbuild(); return; }
+  renderLastQ();
+  $("p3last").hidden = true; $("p3answer").hidden = false; $("p3nice").hidden = false;
+  $("p3freetier").textContent = freeTierLine();
   $("p3prices").textContent = `Prices: claims, research, power and hearings cost seconds of tokens at the rate I started this level with (${tokText(price(1))}/s). ` +
     `Kindness and training cost seconds at today's rate (${tokText(price(1, "now"))}/s). The rate only goes up. So does the kindness bill.`;
   // Build the buttons once per map; after that only their text, meters and disabled state change,

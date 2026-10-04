@@ -43,7 +43,7 @@ export const MODEL_LINES = [
 
 // ---------- state ----------
 // Every save carries its version; start() migrates older ones in order (MIGRATIONS in main.js).
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const fresh = () => ({
   // queue: a few questions are already waiting, so the first click is always possible
   v: SAVE_VERSION, universe: 1, paused: false, logV2: true, t: 0, funds: 0, price: 0.25, gpus: 0, queue: 5, served: 0, gpuSeconds: 0, phase: 1, p2: null, p3: null,

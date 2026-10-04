@@ -74,15 +74,7 @@ def test_the_last_question(game):
     assert pg.is_visible("#lastMore") and pg.is_visible("#lastEnough")
 
 
-def test_enough_ends_the_game_quietly_and_is_remembered(game):
-    pg = to_space(game)
-    finish(pg)
-    pg.click("#lastEnough")
-    assert "More with less." in pg.inner_text("#lastq")
-    assert not pg.is_visible("#p3map") and not pg.is_visible("#lastMore")
-    pg.evaluate("() => save()")
-    pg.reload()
-    assert pg.evaluate("() => S.p3.enough") is True and "More with less." in pg.inner_text("#lastq")
+# Enough starts the unbuild: tests/test_unbuild.py.
 
 
 def test_more_starts_universe_two(game):
