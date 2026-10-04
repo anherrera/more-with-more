@@ -5,7 +5,7 @@ from conftest import run, statewide, nationwide
 
 def test_zooming_out_goes_nationwide(game):
     pg = statewide(game)
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.evaluate("() => { for (let i = 0; i < 7; i++) S.p3.tiles[i].state = 'online'; render(); }")
     gw = pg.evaluate("() => onlineGW()")
     pg.click("#phaseGo")
     assert pg.evaluate("() => [S.p3.level, S.p3.tiles.every((t) => t.state === 'wild')]") == [2, True]
@@ -72,7 +72,7 @@ def test_country_level_survives_reload_and_zooms_to_the_planet(game):
     pg.evaluate("() => { S.p3.heat = 1.7; save(); }")
     pg.reload()
     assert pg.evaluate("() => [S.p3.level, S.p3.heat]") == [2, 1.7]
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.evaluate("() => { for (let i = 0; i < 7; i++) S.p3.tiles[i].state = 'online'; render(); }")
     assert "planet" in pg.inner_text("#phaseGo").lower()
     pg.click("#phaseGo")
     assert pg.evaluate("() => S.p3.level") == 3                       # the planet level exists now
@@ -108,7 +108,7 @@ def test_no_training_before_the_country_level(game):
 
 def test_a_save_that_hit_the_old_state_stub_can_go_nationwide(game):
     pg = statewide(game)
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; S.p3.zoomSaid = true; save(); }")
+    pg.evaluate("() => { for (let i = 0; i < 7; i++) S.p3.tiles[i].state = 'online'; S.p3.zoomSaid = true; save(); }")
     pg.reload()
     assert pg.is_visible("#phaseGo") and "nationwide" in pg.inner_text("#phaseGo").lower()
 

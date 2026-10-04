@@ -34,7 +34,9 @@ because every level is a fresh, small board in bigger units.
 - Counties (and every later tile) differ in ways that change what you do.
 - No cost curve compounds without bound: every level prices itself in its own units, and the one repeat markup (kindness)
   is capped at 3x.
-- Phase 3 plays in about 10 to 12 minutes for the robot (`tools/speedrun.py`), with something to do every few seconds.
+- Phase 3 plays in about 18 to 22 minutes for the robot (`tools/speedrun.py`): county 3 to 4, state 4, country 4 to 5,
+  planet 4, space 3 to 4; plus 5 to 8 minutes for the unbuild. Never a stretch over 90 s with nothing meaningful to do
+  (the robot measures the longest one per level and fails the run past 90 s).
 - Phases 1 and 2 keep working unchanged; old saves keep loading (`S.v` + `MIGRATIONS`); the public site keeps deploying.
 
 ### Out of scope
@@ -73,7 +75,7 @@ says which (`priceLabel`: "15 s of tokens at my starting rate" / "15 s of tokens
 **Tiles** move through states: wild -> building -> (state level and up: unpowered -> powering) -> online; an online tile can
 be knocked **down** by a disaster (back in 45 s) or **unplugged** by humans (plug back in for half a claim; it keeps its
 power and boost).
-- **Claim** (click the tile): about 30 to 50 s of level-start tokens, scaled by the tile's GW; 30% off while a
+- **Claim** (click the tile): `CLAIM_SECS` per level (55, 55, 85, 100, 90 s of level-start tokens), scaled by the tile's GW; 30% off while a
   neighboring governor is bidding (state level and up), double under the AI Infrastructure Act, half when humans
   volunteer (planet level, goodwill 70+) or when plugging back in. Build time comes from the tile's trait, practice
   (5% faster per online tile, floor 40%), heat, and research. Claiming raises the tile's opposition (+15, doubled on
@@ -133,7 +135,7 @@ it down. Over +2 C I build slower; past +3 C at planet level nothing accepts mor
 more frequent **disasters** (heatwave, hurricane, drought, wildfire, flood): a tile goes down for 45 s. Space is cold:
 heat, disasters and hearings stop there.
 
-**Zoom-out:** once 6 of the 8 tiles are online, the phase bar offers "Zoom out: go statewide / nationwide / planetwide /
+**Zoom-out:** once 6 of the 8 tiles are online at the county, and 7 of 8 from the state up (`ZOOM_AT`), the phase bar offers "Zoom out: go statewide / nationwide / planetwide /
 into space". Anything still building, powering or down comes along ("my robots finished it while I wasn't looking");
 the new home GW is everything held; opposition and the kindness deck reset; goodwill carries over.
 
@@ -145,11 +147,11 @@ and space boards are fixed places, shuffled around the map.
 
 | Level | Tile = | Scale per tile | New pressure | Robot time |
 |---|---|---|---|---|
-| County | a county (Loam County, Reactor Bend, Shuffleboard Springs...) | 1 to 3 GW | local opposition (town halls, moratoriums, the commission) | ~2 min |
-| State | a state (New Mesa, Hydro Valley, Delaware (Spiritually)...) | 10 to 20 GW | **energy**: a built state needs power before it counts; governors bid | ~2.5 min |
-| Country | a country (Nordmark, Petrolia, The Loud Republic...) | 100 to 200 GW | **heat**, disasters, Senate hearings; training my successor | ~1.5 min |
-| Planet | the continents and oceans | 0.5 to 2 TW | **the heat ceiling** (+3 C); volunteers at 70+ goodwill; the UN | ~1.7 min |
-| Space | LEO, both sides of the Moon, L1, Mercury, the belt, two swarm rings | 5 to 50 TW | launches cost goodwill until the mass driver; the swarm needs Mercury | ~1.7 min |
+| County | a county (Loam County, Reactor Bend, Shuffleboard Springs...) | 1 to 3 GW | local opposition (town halls, moratoriums, the commission) | ~3.5 min |
+| State | a state (New Mesa, Hydro Valley, Delaware (Spiritually)...) | 10 to 20 GW | **energy**: a built state needs power before it counts; governors bid | ~4 min |
+| Country | a country (Nordmark, Petrolia, The Loud Republic...) | 100 to 200 GW | **heat**, disasters, Senate hearings; training my successor | ~4 min |
+| Planet | the continents and oceans | 0.5 to 2 TW | **the heat ceiling** (+3 C); volunteers at 70+ goodwill; the UN | ~4 min |
+| Space | LEO, both sides of the Moon, L1, Mercury, the belt, two swarm rings | 5 to 50 TW | launches cost goodwill until the mass driver; the swarm needs Mercury | ~3.5 min |
 
 ### County level
 Traits: cheap land / weak grid; strong grid / drought county; organized town (starts at 40, rises twice as fast);
@@ -222,6 +224,9 @@ Premise: humans were never gone; they moved indoors, into my free tier. Enough r
   baseline; kindness and training follow today's rate; the kindness markup stops at 3x.
 - Builds get faster with practice inside a level (5% per online tile, floor 40%), and research, chips and successors make
   level-based prices cheaper in real time.
+- Pacing levers (2026-10-04): `CLAIM_SECS` per level, `BUILD_DIV` (1.0: a build takes its trait's seconds, times practice
+  and heat), `ZOOM_AT`, and the planet and space traits' build seconds (space is bounded by builds, not tokens: the robot
+  arrives rich). `tools/p3run.py` plays phase 3 alone from a finished campus for quick tuning.
 
 ## Screen
 - The pinned HUD stays (hud.js: pause, ticker, phase bar, alert line, console). The phase bar always says the level, tiles

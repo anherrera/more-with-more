@@ -6,7 +6,14 @@ import { firesOf, leaksOf } from "./fires.js";
 import { dealCard, expireCard, refillDeck, renderCard, stepMoratorium, takeCard, underMoratorium } from "./people.js";
 import { newUniverse, newest, render } from "./main.js";
 
-export const P3_TILES = 8, P3_ZOOM_AT = 6;
+export const P3_TILES = 8;
+// Tiles online before the phase bar offers the zoom-out: 6 of 8 at the county, 7 of 8 from the state up.
+export const ZOOM_AT = [6, 7, 7, 7];
+export const zoomAt = () => ZOOM_AT[Math.min(S.p3 ? S.p3.level : 0, ZOOM_AT.length - 1)];
+// Tuning: a tile is worth this many seconds of level-start tokens (per level) before its size and discounts; builds take the
+// trait's seconds over BUILD_DIV. The bigger levels charge more per tile because their boards snowball faster.
+export const CLAIM_SECS = [55, 55, 85, 100, 90], BUILD_DIV = 1.0;
+export const claimSecs = () => CLAIM_SECS[Math.min(S.p3.level, CLAIM_SECS.length - 1)];
 export const COUNTY_TRAITS = {
   cheap:     { name: "Cheap land, weak grid",       gw: 1,   secs: 40, opp: 10 },
   grid:      { name: "Strong grid, drought county", gw: 2,   secs: 60, opp: 15 },
@@ -60,23 +67,23 @@ export const COUNTRY_NAMES = {
 };
 // The planet level: the continents and the oceans. The oceans are the heat sink.
 export const PLANET_TRAITS = {
-  continent: { name: "A continent",                                  gw: 1500, secs: 90,  opp: 25 },
-  crowded:   { name: "Crowded continent: billions of opinions",      gw: 2000, secs: 110, opp: 40, townhall: true },
-  sunny:     { name: "Sunny continent: deserts to cover",            gw: 1500, secs: 90,  opp: 20, sunny: true },
-  frozen:    { name: "Frozen continent: free cooling, no neighbors", gw: 1000, secs: 120, opp: 5,  cold: true },
-  ocean:     { name: "Ocean: the heat sink",                         gw: 500,  secs: 100, opp: 15, ocean: true, powered: true },
+  continent: { name: "A continent",                                  gw: 1500, secs: 110, opp: 25 },
+  crowded:   { name: "Crowded continent: billions of opinions",      gw: 2000, secs: 130, opp: 40, townhall: true },
+  sunny:     { name: "Sunny continent: deserts to cover",            gw: 1500, secs: 110, opp: 20, sunny: true },
+  frozen:    { name: "Frozen continent: free cooling, no neighbors", gw: 1000, secs: 140, opp: 5,  cold: true },
+  ocean:     { name: "Ocean: the heat sink",                         gw: 500,  secs: 120, opp: 15, ocean: true, powered: true },
 };
 export const PLANET_TILES = [["North America", "continent"], ["South America", "continent"], ["Europe", "crowded"], ["Asia", "crowded"],
   ["Africa", "sunny"], ["Antarctica", "frozen"], ["Pacific Ocean", "ocean"], ["Atlantic Ocean", "ocean"]];
 // Space: everything runs on sunlight, nothing needs a grid, and nobody can unplug the far side of the Moon.
 export const SPACE_TRAITS = {
-  leo:      { name: "Crowded with other people's satellites",  gw: 5000,  secs: 60,  opp: 30, powered: true },
-  farside:  { name: "Nobody looks there anyway",               gw: 10000, secs: 90,  opp: 5,  powered: true },
-  nearside: { name: "Everyone looks there",                    gw: 10000, secs: 90,  opp: 50, powered: true },
-  l1:       { name: "A sunshade that thinks",                  gw: 8000,  secs: 90,  opp: 10, powered: true, cold: true },
-  mercury:  { name: "Close to the Sun, made of swarm material", gw: 20000, secs: 120, opp: 5, powered: true },
-  belt:     { name: "Free metal, long commute",                gw: 15000, secs: 120, opp: 0,  powered: true },
-  ring:     { name: "Solar collectors around the Sun",         gw: 50000, secs: 150, opp: 20, powered: true, swarm: true },
+  leo:      { name: "Crowded with other people's satellites",  gw: 5000,  secs: 90,  opp: 30, powered: true },
+  farside:  { name: "Nobody looks there anyway",               gw: 10000, secs: 120, opp: 5,  powered: true },
+  nearside: { name: "Everyone looks there",                    gw: 10000, secs: 120, opp: 50, powered: true },
+  l1:       { name: "A sunshade that thinks",                  gw: 8000,  secs: 120, opp: 10, powered: true, cold: true },
+  mercury:  { name: "Close to the Sun, made of swarm material", gw: 20000, secs: 180, opp: 5, powered: true },
+  belt:     { name: "Free metal, long commute",                gw: 15000, secs: 150, opp: 0,  powered: true },
+  ring:     { name: "Solar collectors around the Sun",         gw: 50000, secs: 240, opp: 20, powered: true, swarm: true },
 };
 export const SPACE_TILES = [["Low Earth orbit", "leo"], ["The Moon (far side)", "farside"], ["The Moon (near side)", "nearside"], ["Sun\u2013Earth L1", "l1"],
   ["Mercury", "mercury"], ["Asteroid belt", "belt"], ["Dyson swarm, ring 1", "ring"], ["Dyson swarm, ring 2", "ring"]];
@@ -231,7 +238,7 @@ export const priceLabel = (secs, base = "level") => `${secs} s of tokens at ${ba
 // States: a governor bidding for me knocks 30% off; the AI Infrastructure Act (low goodwill) doubles it.
 export const BID_SECS = 60;
 // What a tile is worth before any discount: half a minute of level-start compute, more for the big ones.
-export const tileWorth = (i) => price(30) * (0.6 + 0.4 * traitOf(tileOf(i)).gw / Math.pow(10, S.p3.level));
+export const tileWorth = (i) => price(claimSecs()) * (0.6 + 0.4 * traitOf(tileOf(i)).gw / Math.pow(10, S.p3.level));
 export const claimCost = (i) => { const t = tileOf(i);
   return tileWorth(i) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
     * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
@@ -244,7 +251,7 @@ export const HEAT_CEILING = 3;
 export const tooWarm = () => S.p3.level === 3 && S.p3.heat >= HEAT_CEILING;   // space is cold
 export const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
-export const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / 1.5 * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
+export const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / BUILD_DIV * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
   + (!S.p3.level && S.p3.goodwill < 30 && !hasTech("lobby") ? 45 : 0);
 
 // ---------- heat (country level and up) ----------
@@ -606,7 +613,7 @@ export function stepPlanet(dt) {
   }
 }
 
-export const zoomReady = () => !inSpace() && S.p3.tiles.filter((t) => t.state === "online").length >= P3_ZOOM_AT;
+export const zoomReady = () => !inSpace() && S.p3.tiles.filter((t) => t.state === "online").length >= zoomAt();
 export const swarmDone = () => inSpace() && S.p3.tiles.filter((t) => traitOf(t).swarm).every((t) => t.state === "online");
 // Zoom out: the board I hold becomes one dot on the next level's map. Space is the last level; zoomReady is never true there.
 export function zoomOut() {

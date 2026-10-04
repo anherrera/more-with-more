@@ -59,11 +59,11 @@ def test_compute_accrues_from_online_gigawatts(game):
     assert pg.evaluate("() => S.p3.compute") == pytest.approx(c0 + 10 * rate, rel=0.01)
 
 
-def test_claim_costs_about_a_minute_of_compute_and_builds(game):
+def test_claim_costs_a_minute_or_two_of_tokens_and_builds(game):
     pg = planet(game)
     pg.evaluate("() => { S.p3.compute = 1e9; render(); }")
     cost = pg.evaluate("() => claimCost(0)")
-    assert 25 * pg.evaluate("() => computeRate()") <= cost <= 60 * pg.evaluate("() => computeRate()")
+    assert 50 * pg.evaluate("() => computeRate()") <= cost <= 140 * pg.evaluate("() => computeRate()")
     pg.click("#p3map button[data-tile='0']")
     assert pg.evaluate("() => S.p3.tiles[0].state") == "building"
     secs = pg.evaluate("() => S.p3.tiles[0].done - S.t")

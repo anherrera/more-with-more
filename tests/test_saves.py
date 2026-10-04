@@ -85,7 +85,7 @@ def test_an_old_planet_level_save_with_the_space_placeholder_can_go_to_space(gam
     pg = old_p3_save(planetwide(game), zoomSaid=True)                  # saved when "space arrives in the next build"
     assert_current(pg, 3)
     assert pg.evaluate("() => 'zoomSaid' in S.p3") is False
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.evaluate("() => { for (let i = 0; i < 7; i++) S.p3.tiles[i].state = 'online'; render(); }")
     assert "into space" in pg.inner_text("#phaseGo").lower()
 
 

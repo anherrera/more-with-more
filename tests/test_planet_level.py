@@ -62,7 +62,7 @@ def test_planet_survives_reload_and_zooms_to_space(game):
     pg.evaluate("() => { save(); }")
     pg.reload()
     assert pg.evaluate("() => S.p3.level") == 3
-    pg.evaluate("() => { for (let i = 0; i < 6; i++) S.p3.tiles[i].state = 'online'; render(); }")
+    pg.evaluate("() => { for (let i = 0; i < 7; i++) S.p3.tiles[i].state = 'online'; render(); }")
     assert "space" in pg.inner_text("#phaseGo").lower()
     pg.click("#phaseGo")
     assert pg.evaluate("() => S.p3.level") == 4                      # space exists now

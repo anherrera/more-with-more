@@ -43,17 +43,25 @@ PHASE1 = """(secs) => {
 }"""
 
 
-# Phase 3 (county level): keep goodwill up, answer town halls, claim the cheapest county whenever affordable.
+# Phase 3: keep goodwill up, answer town halls, claim the cheapest tile whenever affordable, power states, research, train.
+# Every second, before acting, it notes whether anything meaningful is available beyond the free question (a claim, power,
+# research, training or the pump I can afford, an open hearing, a zoom) and keeps the longest quiet stretch per level.
 PHASE3 = """(secs) => {
+  const open = () => S.p3.tiles.map((t, j) => j).filter((j) => ['wild', 'unplugged'].includes(S.p3.tiles[j].state) && !(S.p3.tiles[j].moratorium > S.t) && !spaceBlock(S.p3.tiles[j]));
+  const avail = () => zoomReady() || !!S.p3.card || (!tooWarm() && !(S.p3.hearingUntil > S.t) && open().some((j) => S.p3.compute >= claimCost(j)))
+    || availableTech().some((t) => S.p3.compute >= techCost(t)) || (trainOn() && S.p3.compute >= trainCost()) || (heatOn() && S.p3.heat > 2 && S.p3.compute >= pumpCost())
+    || S.p3.tiles.some((t, j) => t.state === 'unpowered' && powerOptions(j).some((o) => S.p3.compute >= o.cost));
+  if (!S.p3.quiet) S.p3.quiet = { cur: 0, max: [0, 0, 0, 0, 0], at: [0, 0, 0, 0, 0] };
   for (let i = 0; i < secs && S.phase === 3 && S.p3.lastQ == null; i++) {
+    { const q = S.p3.quiet; if (avail()) q.cur = 0; else { q.cur += 1; if (q.cur > q.max[S.p3.level]) { q.max[S.p3.level] = q.cur; q.at[S.p3.level] = Math.round(S.t - S.p3.startedAt); } } }
     if (S.p3.level === 0 && zoomReady()) { S.p3.countyAt = S.t; zoomOut(); }
     if (S.p3.level === 1 && zoomReady()) { S.p3.stateAt = S.t; zoomOut(); }
     if (S.p3.level === 2 && zoomReady()) { S.p3.countryAt = S.t; zoomOut(); }
     if (S.p3.level === 3 && zoomReady()) { S.p3.planetAt = S.t; zoomOut(); }
+    if (zoomReady()) S.p3.quiet.cur = 0;
     if (inSpace()) { for (const id of ['rocket', 'massdriver']) buyTech(id); }
     if (heatOn() && S.p3.heat > 2.2 && S.p3.compute >= pumpCost()) pumpHeat();
-    { const open = S.p3.tiles.map((t, j) => j).filter((j) => ['wild', 'unplugged'].includes(S.p3.tiles[j].state) && !spaceBlock(S.p3.tiles[j]));
-      const next = open.length ? Math.max(...open.map((j) => claimCost(j))) : 0;
+    { const next = open().length ? Math.max(...open().map((j) => claimCost(j))) : 0;
       if (trainOn() && S.p3.goodwill >= 50 && S.p3.compute >= next + trainStep() * computeRate()) trainSuccessor(); }
     for (let j = 0; j < S.p3.tiles.length; j++) if (S.p3.tiles[j].state === 'unpowered') {
       const o = powerOptions(j).sort((a, b) => a.cost - b.cost).find((o) => S.p3.compute >= o.cost); if (o) powerTile(j, o.id); }
@@ -61,9 +69,7 @@ PHASE3 = """(secs) => {
     if (S.p3.goodwill < 40 || S.p3.tiles[angriestTile()].opp >= 80) { const n = offeredNice().map(niceOf).filter((n) => S.p3.compute >= niceCost(n)).sort((a, b) => a.secs - b.secs)[0]; if (n) doNice(n.id); }
     if (S.p3.card) chooseP3Card(0);
     { const tech = availableTech().sort((a, b) => a.secs - b.secs)[0]; if (tech && S.p3.compute >= 2 * techCost(tech)) buyTech(tech.id); }
-    const wild = S.p3.tiles.map((t, i) => i).filter((i) => ['wild', 'unplugged'].includes(S.p3.tiles[i].state) && !(S.p3.tiles[i].moratorium > S.t))
-      .filter((i) => !spaceBlock(S.p3.tiles[i]))
-      .sort((a, b) => (inSpace() ? (S.p3.tiles[b].name === 'Mercury' ? 1 : 0) - (S.p3.tiles[a].name === 'Mercury' ? 1 : 0) : 0) || (heatOn() && S.p3.heat > 2.4 ? (traitOf(S.p3.tiles[b]).ocean || traitOf(S.p3.tiles[b]).cold ? 1 : 0) - (traitOf(S.p3.tiles[a]).ocean || traitOf(S.p3.tiles[a]).cold ? 1 : 0) : 0) || claimCost(a) - claimCost(b));
+    const wild = open().sort((a, b) => (inSpace() ? (S.p3.tiles[b].name === 'Mercury' ? 1 : 0) - (S.p3.tiles[a].name === 'Mercury' ? 1 : 0) : 0) || (heatOn() && S.p3.heat > 2.4 ? (traitOf(S.p3.tiles[b]).ocean || traitOf(S.p3.tiles[b]).cold ? 1 : 0) - (traitOf(S.p3.tiles[a]).ocean || traitOf(S.p3.tiles[a]).cold ? 1 : 0) : 0) || claimCost(a) - claimCost(b));
     if (wild.length && S.p3.compute >= claimCost(wild[0])) claim(wild[0]);
     step(1);
   }
@@ -95,6 +101,7 @@ def mmss(x):
 
 
 headless_full = True
+QUIET_MAX = 90         # the spec: no stretch over 90 s per level with nothing meaningful to do
 WATCH = False          # --watch: ~30 s of real time per game, small steps, so a person can follow it
 
 
@@ -121,7 +128,7 @@ def run_once(browser, base, seed, county):
         for _ in range(9000 // chunk):
             done = pg.evaluate(PHASE3, chunk); pg.evaluate("() => render()")
             if pause: pg.wait_for_timeout(pause)
-            if done: p3 = pg.evaluate("() => [S.p3.countyAt - S.p3.startedAt, S.p3.stateAt - S.p3.countyAt, S.p3.countryAt - S.p3.stateAt, S.p3.planetAt - S.p3.countryAt, S.t - S.p3.planetAt, S.p3.version || 7]"); break
+            if done: p3 = pg.evaluate("() => [S.p3.countyAt - S.p3.startedAt, S.p3.stateAt - S.p3.countyAt, S.p3.countryAt - S.p3.stateAt, S.p3.planetAt - S.p3.countryAt, S.t - S.p3.planetAt, S.p3.version || 7, S.p3.quiet.max]"); break
     unbuild = None
     if p3 is not None:                                 # the unbuild: Enough, then put it all back
         for _ in range(3000 // chunk):
@@ -173,8 +180,9 @@ def main():
             ground, s, errs = run_once(b, base, r + 1, county)
             p2 = (s["ended"] - ground) if s["ended"] and ground else None
             print(f"run {r + 1} ({county}): phase 1 {mmss(ground)}, phase 2 {mmss(p2)}, IPO at {mmss(s['ipo'])}, "
-                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, county level {mmss(s['p3'] and s['p3'][0])}, state level {mmss(s['p3'] and s['p3'][1])}, country level {mmss(s['p3'] and s['p3'][2])}, planet level {mmss(s['p3'] and s['p3'][3])}, space {mmss(s['p3'] and s['p3'][4])} (Gen {s['p3'] and s['p3'][5]}), unbuild {mmss(s['unbuild'] and s['unbuild'][0])} ({' '.join(mmss(x) for x in s['unbuild'][1]) if s['unbuild'] else 'never'}), you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
-            ok = ok and not errs and s["ended"] is not None and s["p3"] is not None and s["unbuild"] is not None
+                  f"campus {s['en']:.0f} MW, fires {s['fires']}, leaks {s['leaks']}, morale {s['morale']} ({s['pizzas']} perks), town {s['town']} ({s['jobs']} jobs promised), CEOs {s['ceos']}, county level {mmss(s['p3'] and s['p3'][0])}, state level {mmss(s['p3'] and s['p3'][1])}, country level {mmss(s['p3'] and s['p3'][2])}, planet level {mmss(s['p3'] and s['p3'][3])}, space {mmss(s['p3'] and s['p3'][4])} (Gen {s['p3'] and s['p3'][5]}), unbuild {mmss(s['unbuild'] and s['unbuild'][0])} ({' '.join(mmss(x) for x in s['unbuild'][1]) if s['unbuild'] else 'never'}), longest quiet {' '.join(f'{q}s' for q in s['p3'][6]) if s['p3'] else '?'}, you own {100 * s['own']:.1f}%, page errors: {errs[:2] or 'none'}")
+            if s["p3"] and max(s["p3"][6]) > QUIET_MAX: print(f"QUIET: a stretch over {QUIET_MAX} s with nothing to do: {s['p3'][6]}", file=sys.stderr)
+            ok = ok and not errs and s["ended"] is not None and s["p3"] is not None and s["unbuild"] is not None and max(s["p3"][6]) <= QUIET_MAX
         b.close()
     httpd.shutdown()
     print("ALL CLEAN" if ok else "PROBLEMS FOUND")
