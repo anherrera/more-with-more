@@ -50,17 +50,52 @@ def test_low_morale_slows_new_builds(game):
     assert slow > fast * 1.5
 
 
-def test_pizza_party_is_cheap_with_a_cooldown(game):
+def test_three_perks_on_offer_and_using_one_swaps_it_out(game):
     pg = campus(game, funds=1e10)
     pg.evaluate("() => { moraleOf().v = 30; render(); }")
-    pg.click("#pizza")
+    btns = pg.query_selector_all("#perks button")
+    assert len(btns) == 3
+    first = btns[0].get_attribute("data-perk")
+    btns[0].click()
     assert pg.evaluate("() => moraleOf().v") > 30
     pg.evaluate("() => render()")
-    assert pg.is_disabled("#pizza")
-    run(pg, 61)
-    for _ in range(12):
-        pg.evaluate("() => { moraleOf().pizzaAt = -1e9; moraleOf().v = 30; pizzaParty(); }")
-    assert pg.evaluate("() => pizzaCost()") <= 2e6
+    offered = [b.get_attribute("data-perk") for b in pg.query_selector_all("#perks button")]
+    assert first not in offered and len(offered) == 3
+    assert all(b.is_disabled() for b in pg.query_selector_all("#perks button"))   # one perk at a time
+    run(pg, 46)
+    pg.evaluate("() => render()")
+    assert any(b.is_enabled() for b in pg.query_selector_all("#perks button"))
+
+
+def test_repeating_a_perk_helps_less(game):
+    pg = campus(game, funds=1e10)
+    gains = []
+    for _ in range(3):
+        pg.evaluate("() => { moraleOf().v = 10; moraleOf().perkAt = -1e9; usePerk('pizza'); }")
+        gains.append(pg.evaluate("() => moraleOf().v") - 10)
+    assert gains[0] > gains[1] > gains[2] > 0
+
+
+def test_offsite_delays_builds(game):
+    pg = campus(game, funds=1e10)
+    pg.evaluate("() => { moraleOf().v = 30; build('hall'); }")
+    done = pg.evaluate("() => S.p2.builds.at(-1).done")
+    pg.evaluate("() => usePerk('offsite')")
+    assert pg.evaluate("() => S.p2.builds.at(-1).done") > done
+    assert pg.evaluate("() => moraleOf().v") > 45
+
+
+def test_rsu_refresh_only_once_public(game):
+    pg = campus(game, funds=1e10)
+    assert not pg.evaluate("() => PERKS.find((p) => p.id === 'rsu').when()")
+    pg.evaluate("() => { S.p2.ipo = {at: S.t}; }")
+    assert pg.evaluate("() => PERKS.find((p) => p.id === 'rsu').when()")
+
+
+def test_crunch_levels_off_with_many_builds(game):
+    pg = campus(game, funds=1e10)
+    pg.evaluate("() => { for (let i = 0; i < 12; i++) S.p2.builds.push({kind: 'hall', done: S.t + 100}); }")
+    assert pg.evaluate("() => moraleDrain()") < 0.15
 
 
 def test_tender_offer_card_appears_when_morale_sags_and_lifts_it(game):

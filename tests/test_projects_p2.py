@@ -176,3 +176,30 @@ def test_robots_build_water_when_water_is_short(game):
     robots_on(pg, **{"S.p2.grid": 5000, "S.p2.extraWater": 0})
     pg.evaluate("() => { for (let i = 0; i < 40; i++) S.p2.builds.push({kind: 'hall', done: 0, announced: true}); }")
     assert pg.evaluate("() => robotPlan().kind") == "reclaimed"
+
+
+def due(pg, mw, secs):
+    pg.evaluate(f"""() => {{ S.p2.contracts.push({{id: 'cz', n: 99, who: 'A lab you have never heard of', mw: {mw}, minGen: 0,
+      start: S.t + {secs}, end: S.t + {secs} + 1000, fee: 1, upfront: 1, status: 'waiting'}}); }}""")
+
+
+def test_robots_lease_colo_when_a_contract_is_due_before_a_hall_could_finish(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.funds": 1e10, "S.p2.market": 200})
+    due(pg, 300, 45)
+    colo = pg.evaluate("() => S.p2.colo || 0")
+    run(pg, 11)
+    assert pg.evaluate("() => S.p2.colo || 0") > colo
+    pg.evaluate("() => render()")
+    assert "A lab you have never heard of" in pg.inner_text("#robotLine")
+
+
+def test_robots_spend_their_reserve_when_something_is_due(game):
+    pg = campus(game)
+    robots_on(pg, **{"S.p2.market": 0, "S.p2.grid": 5000})
+    pg.evaluate("() => { S.funds = buildCost('hall') + 5e6; }")
+    due(pg, 300, 240)
+    assert pg.evaluate("() => robotPlan().blocked") is None
+    n = pg.evaluate("() => S.p2.builds.length")
+    run(pg, 11)
+    assert pg.evaluate("() => S.p2.builds.length") == n + 1

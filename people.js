@@ -1,4 +1,4 @@
-// people.js: the humans of phase 2. Morale (crunch drains it, calm restores it, pizza helps less every time) and
+// people.js: the humans of phase 2. Morale (crunch drains it, calm restores it, perks help, less each time) and
 // temporary cards: decisions that show up, wait a few seconds, and go away (the tender offer, town halls). Also the
 // town: community opposition rises with every build, slows construction, prices land up, and can stop halls cold.
 
@@ -10,27 +10,52 @@ const QUIT_LINES = [
   "The construction lead left to farm alpacas. He sent a photo. The alpacas look rested.",
 ];
 
-const moraleOf = () => S.p2.people || (S.p2.people = { v: MORALE_START, pizzas: 0, nextQuit: null, lastTender: -1e9 });
+const moraleOf = () => S.p2.people || (S.p2.people = { v: MORALE_START, nextQuit: null, lastTender: -1e9 });
 const buildsInFlight = () => S.p2.builds.filter((b) => b.done > S.t).length;
 const lateContracts = () => S.p2.contracts.filter((c) => c.status === "late").length;
 const incidents = () => (firesOf().out ? 1 : 0) + (leaksOf().out ? 1 : 0);
 // Points per second lost to crunch. A second shift halves what construction costs people.
-const moraleDrain = () => (0.03 * buildsInFlight() * (S.done.secondshift ? 0.5 : 1) + 0.12 * lateContracts() + 0.2 * incidents()) * ceoDrain();
+// Crunch levels off: the twelfth build in flight hurts less than the second.
+const moraleDrain = () => (0.04 * Math.sqrt(buildsInFlight()) * (S.done.secondshift ? 0.5 : 1) + 0.12 * lateContracts() + 0.2 * incidents()) * ceoDrain();
 // Builds started below 50 morale take longer, up to twice as long at zero.
 const moraleSlow = () => 1 + Math.max(0, 50 - (S.p2 && S.p2.people ? S.p2.people.v : MORALE_START)) / 50;
-// Flat prices, one at a time: the limit is how often, not how much.
-const COOLDOWN = 60;
-const pizzaCost = () => 1e6;
-const pizzaGain = () => 8;
-const pizzaWait = () => Math.max(0, (moraleOf().pizzaAt ?? -1e9) + COOLDOWN - S.t);
-
-function pizzaParty() {
+// Perks: three on offer at a time; using one swaps it for another. One perk per 45 s, and each helps
+// less every time you repeat it (the third offsite is a Zoom call).
+const PERK_COOLDOWN = 45, PERK_FADE = 0.7;
+const PERKS = [
+  { id: "pizza", name: "Pizza party", cost: 1e6, gain: 8, line: "Pizza party. People were genuinely happy, which surprised everyone." },
+  { id: "dogs", name: "Bring your dog to the data center", cost: 0, gain: 6, line: "Dog day at the campus. One dog is now on the badge system." },
+  { id: "standup", name: "Cancel the 7 a.m. standup", cost: 0, gain: 8, line: "You cancelled the 7 a.m. standup. Nobody noticed it was gone, which was the point." },
+  { id: "vests", name: "Branded fleece vests", cost: 3e6, gain: 6, hype: 2, line: "Everyone got a vest with the logo on it. The vests are on LinkedIn now." },
+  { id: "ramen", name: "Nap pods and a ramen bar", cost: 10e6, gain: 12, line: "Nap pods and a ramen bar. Productivity is down 3%. Retention is up. Someone lives in pod 4." },
+  { id: "spot", name: "Spot bonuses", cost: 20e6, gain: 15, line: "Spot bonuses. Everyone checked their bank app at the same moment." },
+  { id: "offsite", name: "Offsite in Tahoe", cost: 15e6, gain: 25, slip: 30,
+    line: "Offsite in Tahoe: trust falls, a hot tub, one sprained ankle. Everything under construction slipped 30 s." },
+  { id: "pto", name: "Unlimited PTO", cost: 0, gain: 4, line: "You announced unlimited PTO. Nobody has taken a day since." },
+  { id: "happiness", name: "Hire a chief happiness officer", cost: 5e6, gain: 3, line: "The chief happiness officer scheduled a mandatory joy workshop. It's on Saturday." },
+  { id: "rsu", name: "RSU refresh", cost: 100e6, gain: 30, when: () => isPublic(), line: "RSU refresh. The golden handcuffs got a fresh polish. Morale is up and so is the vesting schedule." },
+];
+const perkOf = (id) => PERKS.find((p) => p.id === id);
+const perkWait = () => Math.max(0, (moraleOf().perkAt ?? -1e9) + PERK_COOLDOWN - S.t);
+const perkGain = (p) => p.gain * Math.pow(PERK_FADE, (moraleOf().perkUses || {})[p.id] || 0);
+function offeredPerks() {
   const m = moraleOf();
-  if (S.funds < pizzaCost() || pizzaWait() > 0) return;
-  S.funds -= pizzaCost();
-  m.v = Math.min(100, m.v + pizzaGain()); m.pizzas += 1; m.pizzaAt = S.t;
-  say(m.pizzas === 1 ? "Pizza party. People were genuinely happy, which surprised everyone."
-    : `Pizza party number ${m.pizzas}. Someone asked whether the pizza counts as compensation. It does, legally.`);
+  m.perks = (m.perks || []).filter((id) => perkOf(id) && (!perkOf(id).when || perkOf(id).when()));
+  const pool = PERKS.filter((p) => !m.perks.includes(p.id) && (!p.when || p.when()));
+  while (m.perks.length < 3 && pool.length) m.perks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+  return m.perks;
+}
+function usePerk(id) {
+  const m = moraleOf(), p = perkOf(id);
+  if (!p || (p.when && !p.when()) || S.funds < p.cost || perkWait() > 0) return;
+  S.funds -= p.cost;
+  m.v = Math.min(100, m.v + perkGain(p));
+  m.perkUses = m.perkUses || {}; m.perkUses[id] = (m.perkUses[id] || 0) + 1; m.perkN = (m.perkN || 0) + 1; m.perkAt = S.t;
+  if (p.hype) S.hype += p.hype;
+  if (p.slip) for (const b of S.p2.builds) if (b.done > S.t) b.done += p.slip;
+  m.perks = (m.perks || []).filter((x) => x !== id); offeredPerks();
+  track("perk", { id });
+  say(p.line);
 }
 
 function moraleCause() {
@@ -82,6 +107,7 @@ function townBuilt(kind) {
   t.v = Math.min(100, t.v + (TOWN_RISE[kind] || 0) * countyOf().rise * (S.done.cba2 ? 0.5 : 1));
 }
 // Sponsorships: press any time; each costs double the last and helps a bit less. Late-game money still buys goodwill.
+const COOLDOWN = 60;   // sponsorships: one a minute, flat prices
 const SPONSORED = [["the county fair", 3e6], ["the Little League team", 1e6], ["a new fire truck", 2e6], ["the library's 3D printer", 1e6],
   ["the Fourth of July fireworks", 2e6], ["a splash pad", 3e6], ["the high school's prom", 1e6], ["a mural of the model, which the model designed", 5e6]];
 const sponsorNext = () => SPONSORED[(townOf().sponsors || 0) % SPONSORED.length];
@@ -169,8 +195,12 @@ function renderPeople() {
   $("moraleMeter").firstElementChild.style.width = m.v + "%";
   $("moraleMeter").className = "meter " + (m.v < 25 ? "bad" : m.v < 50 ? "warn" : "good");
   $("moraleCause").textContent = moraleCause();
-  $("pizza").textContent = pizzaWait() > 0 ? `Pizza party: again in ${Math.ceil(pizzaWait())}s` : `Pizza party (+${pizzaGain()} morale): ${money(pizzaCost())}`;
-  $("pizza").disabled = S.funds < pizzaCost() || m.v >= 100 || pizzaWait() > 0;
+  const wait = perkWait();
+  const html = offeredPerks().map((id) => { const p = perkOf(id);
+    return `<button type="button" data-perk="${id}">${p.name} (+${Math.round(perkGain(p))}): ${p.cost ? money(p.cost) : "free"}</button>`; }).join("")
+    + (wait > 0 ? `<span class="sub"> next perk in ${Math.ceil(wait)}s</span>` : "");
+  if ($("perks").dataset.html !== html) { $("perks").innerHTML = html; $("perks").dataset.html = html; }
+  for (const btn of $("perks").querySelectorAll("button")) btn.disabled = wait > 0 || m.v >= 100 || S.funds < perkOf(btn.dataset.perk).cost;
   const t = townOf();
   $("town").textContent = Math.round(t.v);
   $("townMeter").firstElementChild.style.width = t.v + "%";

@@ -29,7 +29,7 @@ POLICY = """(args) => {
     if (postReady()) { vaguePost(); }
     if (S.p2.card) { chooseCard(0); acted++; }
     if (S.p2.county && townOf().v >= 60 && S.funds > sponsorCost() + reserve()) { sponsor(); acted++; }
-    if (S.p2.county && moraleOf().v < 35 && S.funds > pizzaCost() + reserve()) { pizzaParty(); acted++; }
+    if (S.p2.county && moraleOf().v < 35) { const p = offeredPerks().map(perkOf).filter((p) => S.funds > p.cost + reserve()).sort((a, b) => perkGain(b) - perkGain(a))[0]; if (p) { usePerk(p.id); acted++; } }
     if (spotReady() && spotMult() > 2) { sellSpot(); acted++; }
     // the model's proposals and projects
     if (m && m.current && S.funds >= proposalCost(m.current) + reserve()) { approveProposal(); acted++; }

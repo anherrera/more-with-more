@@ -283,25 +283,43 @@ function recheckActive() {
 // room: once the town is restless (40+) they put up quiet solar instead of loud turbines, if there's land for it.
 const ROBOT_EVERY = 10, ROBOT_RESERVE = 50e6;
 // What the robots would build next, and whether they can: { kind, blocked } where blocked names the reason.
+// What a contract still needs, after the contracts ahead of it in line take their share.
+const contractNeed = (c) => Math.max(0, c.mw - Math.max(0, eligibleFreeMW(c.minGen || 0) - pendingBefore(c)));
+// The soonest contract (due within 5 minutes) that won't have room for its GPUs in time: { c, short }.
+function urgentRoom() {
+  const due = S.p2.contracts.filter((c) => (c.status === "waiting" || c.status === "late") && c.start - S.t < 300).sort((a, b) => a.start - b.start);
+  let need = 0;
+  for (const c of due) {
+    need += contractNeed(c);
+    const short = need - roomMWAt(Math.max(S.t, c.start));
+    if (short > 0.01) return { c, short };
+  }
+  return null;
+}
 function robotPlan() {
   const halls = S.p2.builds.filter((b) => b.kind === "hall").length * hallSize();
   const power = S.p2.grid + (S.p2.queue ? S.p2.queue.mw : 0) + S.p2.builds.filter((b) => b.kind === "turbine").length * turbineMW()
     + S.p2.builds.filter((b) => b.kind === "solar").length * POWER.solar.mw;
   const water = waterMWAt(1e12);   // everything ordered, once it's built
   const quiet = townOf().v >= 40 && acresFree() >= POWER.solar.acres + HALL.acres;
-  const kind = halls <= Math.min(power, water) ? "hall" : water < power ? "reclaimed" : quiet ? "solar" : "turbine";
+  const u = urgentRoom();
+  // Due before a hall could even finish: lease colo, it's ready today.
+  const rush = u && u.c.start - S.t < HALL.secs * (S.done.prefab ? 0.6 : 1) && S.p2.market >= COLO_MW;
+  const kind = rush ? "colo" : halls <= Math.min(power, water) ? "hall" : water < power ? "reclaimed" : quiet ? "solar" : "turbine";
+  const reserve = u ? 0 : ROBOT_RESERVE;   // a deadline is what the reserve is for
+  const cost = kind === "colo" ? coloCost() : buildCost(kind);
   const blocked = kind === "hall" && acresFree() < HALL.acres ? "out of land: buy a parcel"
-    : S.funds - buildCost(kind) < ROBOT_RESERVE ? `waiting for cash (keeps ${money(ROBOT_RESERVE)} in reserve)` : null;
-  return { kind, blocked };
+    : S.funds - cost < reserve ? (reserve ? `waiting for cash (keeps ${money(reserve)} in reserve)` : `waiting for ${money(cost)}`) : null;
+  return { kind, blocked, u };
 }
 function stepRobots() {
   if (!S.done.robots || S.t < (S.p2.robotsAt || 0)) return;
   S.p2.robotsAt = S.t + ROBOT_EVERY;
   const { kind, blocked } = robotPlan();
   if (blocked) return;
-  const n = S.p2.builds.length;
-  build(kind);
-  if (S.p2.builds.length > n) {
+  const n = S.p2.builds.length, colo = S.p2.colo || 0;
+  if (kind === "colo") leaseColo(); else build(kind);
+  if (S.p2.builds.length > n || (S.p2.colo || 0) > colo) {
     S.p2.robotBuilt = S.p2.robotBuilt || { hall: 0, turbine: 0 };
     S.p2.robotBuilt[kind] = (S.p2.robotBuilt[kind] || 0) + 1;
     if (!S.p2.robotsSaid) { S.p2.robotsSaid = true; say("The robots started building. Nobody told them to stop, so nobody will."); }
@@ -500,9 +518,11 @@ function renderCampus() {
   $("robotLine").hidden = !S.done.robots;
   if (S.done.robots) {
     const rb = p.robotBuilt || { hall: 0, turbine: 0 }, plan = robotPlan();
-    const built = Object.entries(rb).filter(([, n]) => n).map(([k, n]) => `${n} ${k === "solar" ? "solar farm" : k === "reclaimed" ? "water plant" : k}${n === 1 ? "" : "s"}`);
+    const noun = { solar: "solar farm", reclaimed: "water plant", colo: "colo lease" };
+    const built = Object.entries(rb).filter(([, n]) => n).map(([k, n]) => `${n} ${noun[k] || k}${n === 1 ? "" : "s"}`);
+    const why = plan.u ? ` for ${plan.u.c.who.split(" (")[0]} (${mwText(plan.u.short)} short, due ${plan.u.c.start <= S.t ? "now" : "in " + time(plan.u.c.start - S.t)})` : "";
     $("robotLine").textContent = `Robots: built ${built.length ? built.join(", ") : "nothing yet"} \u00b7 ` +
-      (plan.blocked || `next: a ${plan.kind} in ${Math.max(0, Math.ceil((p.robotsAt || 0) - S.t))}s`);
+      (plan.blocked || `next: ${plan.kind === "colo" ? "a colo lease" : "a " + (noun[plan.kind] || plan.kind)} in ${Math.max(0, Math.ceil((p.robotsAt || 0) - S.t))}s`) + why;
   }
   $("underway").textContent = pending.length
     ? "Under construction: " + pending.map((b) => `${b.kind} ${time(b.done - S.t)}`).join(", ") : "";
@@ -551,7 +571,7 @@ function nextMove() {
   const first = (who) => who.split(" (")[0];
   const cap = (x) => x[0].toUpperCase() + x.slice(1);
   // What a contract still needs, after the contracts ahead of it in line take their share.
-  const needOf = (c) => Math.max(0, c.mw - Math.max(0, eligibleFreeMW(c.minGen || 0) - pendingBefore(c)));
+  const needOf = contractNeed;
   const late = S.p2.contracts.find((c) => c.status === "late" && needOf(c) > 0.01);
   const soon = S.p2.contracts.filter((c) => c.status === "waiting" && c.start - S.t < 120).sort((a, b) => a.start - b.start)
     .find((c) => needOf(c) > 0.01);

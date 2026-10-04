@@ -767,7 +767,7 @@ function wire() {
   $("swap").addEventListener("click", () => { swapFailed(); render(); });
   $("vendors").addEventListener("click", (e) => { const b = e.target.closest("button[data-vendor]"); if (b) { pickVendor(b.dataset.vendor); render(); } });
   $("sponsor").addEventListener("click", () => { sponsor(); render(); });
-  $("pizza").addEventListener("click", () => { pizzaParty(); render(); });
+  $("perks").addEventListener("click", (e) => { const b = e.target.closest("button[data-perk]"); if (b) { usePerk(b.dataset.perk); render(); } });
   $("cardBtns").addEventListener("click", (e) => { const b = e.target.closest("button[data-choice]"); if (b) { chooseCard(Number(b.dataset.choice)); render(); } });
   $("tradein").addEventListener("click", () => { tradeIn(); render(); });
   $("post").addEventListener("click", () => { vaguePost(); render(); });
