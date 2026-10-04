@@ -542,7 +542,9 @@ export function renderCampus() {
   $("buildSolar").disabled = S.funds < buildCost("solar") || acresFree() < POWER.solar.acres;
   if (p.queue) buildBtn("requestQueue", modelDone("utility") ? "Energizing from your utility" : "In the interconnection queue", null, `+${mwText(p.queue.mw)} in ${time(p.queue.done - S.t)}`);
   else if (modelDone("utility")) buildBtn("requestQueue", "Energize from your utility", QUEUE_DEPOSIT, `+${mwText(countyOf().queueMW)}, ${time(queueSecs())}`);
-  else buildBtn("requestQueue", "Join the interconnection queue", QUEUE_DEPOSIT, `+${mwText(countyOf().queueMW)} in ~${time(queueSecs())}, deposit`);
+  else buildBtn("requestQueue", "Join the interconnection queue", QUEUE_DEPOSIT, `+${mwText(countyOf().queueMW)} in ~${time(queueSecs())}: the cheapest power, start it early`);
+  // The cheapest power in the game: it stands out whenever you're not already waiting in line.
+  $("requestQueue").classList.toggle("primary", !p.queue);
   $("requestQueue").disabled = !!p.queue || S.funds < QUEUE_DEPOSIT;
   buildBtn("buyLand", "Buy the adjacent parcel", landCost(), `+${LAND.acres} acres`);
   $("buyLand").disabled = S.funds < landCost();

@@ -179,3 +179,12 @@ def test_colo_button_shows_price_per_kw_not_the_rent_multiplier(game):
     pg.evaluate("() => { S.p2.market = 100; render(); }")
     text = pg.inner_text("#leaseColo")
     assert "/kW" in text and "rent" not in text
+
+
+def test_the_queue_stands_out_until_you_join_it(game):
+    pg = campus(game, county="strong")
+    pg.evaluate("() => { S.funds = 1e9; render(); }")
+    assert "primary" in pg.get_attribute("#requestQueue", "class")
+    assert "start it early" in pg.inner_text("#requestQueue").lower()
+    pg.click("#requestQueue")
+    assert "primary" not in (pg.get_attribute("#requestQueue", "class") or "")
