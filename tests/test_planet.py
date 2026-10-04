@@ -358,3 +358,10 @@ def test_names_match_their_traits(game, level):
         ok = pg.evaluate(f"() => {{ const L = LEVELS[{level}], tiles = freshTiles({level});"
                          " return tiles.every((t) => L.names[t.trait].includes(t.name)) && new Set(tiles.map((t) => t.name)).size === 8; }")
         assert ok
+
+
+def test_nice_buttons_are_one_per_row_and_full_width(game):
+    pg = planet(game)
+    pg.evaluate("() => render()")
+    boxes = pg.evaluate("() => [...document.querySelectorAll('#p3nice button')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width)]; })")
+    assert len({l for l, w in boxes}) == 1 and len({w for l, w in boxes}) == 1

@@ -117,6 +117,9 @@
   /* held, busy and home tiles aren't clickable, but they're the point: keep them readable */
   .p3map button.held:disabled, .p3map button.busy:disabled, .p3map button.lost:disabled, .p3map button.home:disabled { color: var(--ink); }
   .p3map button.held:disabled .c, .p3map button.busy:disabled .c, .p3map button.lost:disabled .c, .p3map button.home:disabled .c { color: var(--muted); }
+  /* ways to be nice: one per row, full width, so rotating labels never reflow the panel */
+  #p3nice { display: grid; gap: 4px; }
+  #p3nice button { width: 100%; }
   .p3techs { display: grid; gap: 4px; max-height: 22em; overflow-y: auto; }
   .p3techs button { width: 100%; padding: 3px 7px; }
   .p3map .meter { margin: 2px 0 0; max-width: none; width: 100%; display: block; }
