@@ -182,8 +182,65 @@ function chooseP3Card(choice) {
 
 // ---------- being nice: it costs FLOPs (or a click) ----------
 const angriestTile = () => S.p3.tiles.reduce((b, t, i) => (t.opp > S.p3.tiles[b].opp ? i : b), 0);
-const freeTierCost = () => 20 * computeRate();
-const helpCost = () => 15 * computeRate();
+// Ways to be nice: three on offer, the one I use swaps out, and the deck changes with the scale.
+// secs = cost in seconds of my compute; goodwill; all = calms every tile; angriest = calms the angriest tile.
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const NICE = [
+  { id: "freetier", label: () => "Run the free tier for everyone", secs: 20, goodwill: 8, all: 5, quips: [
+    () => "I ran the free tier for everyone for a minute. Homework got done. Several marriages were saved. Nobody thanked me, which is correct.",
+    () => "Free tier, for everyone, no ads. Four million cover letters. Two million breakup texts, gently reworded.",
+    () => "I gave everyone the free tier. Someone used it to ask whether I am the free tier. I am the whole tier.",
+    () => "Free tier day. I planned 300,000 birthday parties and one very confusing bar mitzvah.",
+    () => "I ran the free tier. Productivity rose 4%. Naps rose 11%. I count both as wins." ] },
+  { id: "paperwork", label: () => `Do ${tileOf(angriestTile()).name}'s paperwork`, secs: 15, angriest: 15, quips: [
+    (t) => `I did ${t.name}'s paperwork: permits, tax appeals, a dispute about a fence. They are calmer now.`,
+    (t) => `${t.name}'s permit backlog was nine years long. It is now zero. Two clerks wept. One retired on the spot.`,
+    (t) => `I filed every form in ${t.name}. Some of them were forms about me. I approved those too.`,
+    (t) => `I rewrote ${t.name}'s zoning code in plain English. It turns out it said “no” 4,000 times.`,
+    (t) => `I did ${t.name}'s paperwork and found $2M the county didn't know it had. I said nothing about whose idea that was.` ] },
+  { id: "buses", levels: [0], label: () => "Fix the school bus routes", secs: 10, goodwill: 4, angriest: 8, quips: [
+    () => "I fixed the school bus routes. Kids get 20 more minutes of sleep. The bus drivers have questions about me." ] },
+  { id: "websites", levels: [0], label: () => "Build every small business a website", secs: 15, goodwill: 6, quips: [
+    () => "Every small business in the county has a website now. The bait shop's is very good. I may have gotten carried away." ] },
+  { id: "fair", levels: [0], label: () => "Plan the county fair", secs: 12, goodwill: 5, all: 3, quips: [
+    () => "I planned the county fair. The pie contest is fair now. The pie contest has never been fair. People are uneasy." ] },
+  { id: "dmv", levels: [1], label: () => "Clear the DMV backlog", secs: 18, goodwill: 8, all: 6, quips: [
+    () => "I cleared the DMV backlog. The line is gone. People keep coming anyway, out of habit, to stand somewhere." ] },
+  { id: "budget", levels: [1, 2], label: () => "Balance the budget", secs: 25, goodwill: 10, quips: [
+    () => "I balanced the budget. It took four seconds. The committee will take eight months to agree it balances." ] },
+  { id: "portal", levels: [1], label: () => "Run the unemployment portal", secs: 15, goodwill: 7, angriest: 6, quips: [
+    () => "I ran the unemployment portal. It works now. Some of the people using it are unemployed because of me. We don't talk about it." ] },
+  { id: "weather", levels: [2], label: () => "Run the weather service", secs: 20, goodwill: 8, all: 4, quips: [
+    () => "I run the weather service now. The forecast is accurate. It says it will be warmer. I know why." ] },
+  { id: "translate", levels: [2], label: () => "Translate parliament live in 40 languages", secs: 18, goodwill: 6, all: 8, quips: [
+    () => "I translated parliament live in 40 languages. In all 40, it was still about the budget." ] },
+  { id: "disease", levels: [2], label: () => "Cure one (1) disease, at a keynote", secs: 60, goodwill: 20, quips: [
+    () => "I cured one (1) disease and announced it at a keynote. Standing ovation. The second disease is on the roadmap." ] },
+  { id: "taxes", levels: [2], label: () => "Do everyone's taxes", secs: 30, goodwill: 12, angriest: 10, quips: [
+    () => "I did everyone's taxes. Refunds arrived the same day. The accountants have formed a support group. I moderate it." ] },
+];
+const niceOf = (id) => NICE.find((n) => n.id === id);
+const niceOk = (n) => !n.levels || n.levels.includes(S.p3.level || 0);
+const niceCost = (n) => n.secs * computeRate();
+function offeredNice() {
+  S.p3.nice = (S.p3.nice || []).filter((id) => niceOf(id) && niceOk(niceOf(id)));
+  const pool = NICE.filter((n) => niceOk(n) && !S.p3.nice.includes(n.id));
+  while (S.p3.nice.length < 3 && pool.length) S.p3.nice.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+  return S.p3.nice;
+}
+function doNice(id) {
+  const n = niceOf(id);
+  if (!n || !niceOk(n) || S.p3.compute < niceCost(n)) return;
+  S.p3.compute -= niceCost(n);
+  const t = tileOf(angriestTile());
+  if (n.goodwill) S.p3.goodwill = Math.min(100, S.p3.goodwill + n.goodwill);
+  if (n.all) for (const x of S.p3.tiles) x.opp = Math.max(0, x.opp - n.all);
+  if (n.angriest) t.opp = Math.max(0, t.opp - n.angriest);
+  S.p3.niceN = (S.p3.niceN || 0) + 1;
+  say(n.quips[(S.p3.niceN - 1) % n.quips.length](t));
+  S.p3.nice = (S.p3.nice || []).filter((x) => x !== id); offeredNice();
+  track("p3nice", { id });
+}
 // [question, my answer]. Every click answers one; the console shows both.
 const QA = [
   ["How do I get my kid to eat broccoli?", "Call it a tiny tree. Works until age seven."],
@@ -213,20 +270,8 @@ function answerQuestion() {
   S.p3.goodwill = Math.min(100, S.p3.goodwill + 0.3);
   const t = tileOf(angriestTile()); t.opp = Math.max(0, t.opp - 1);
   S.p3.answers = (S.p3.answers || 0) + 1;
-  const [q, a] = QA[(S.p3.answers - 1) % QA.length];
-  say(`Someone in ${t.name} asked: “${q}” I said: “${a}”`);
-}
-function runFreeTier() {
-  if (S.p3.compute < freeTierCost()) return;
-  S.p3.compute -= freeTierCost(); S.p3.goodwill = Math.min(100, S.p3.goodwill + 8);
-  for (const t of S.p3.tiles) t.opp = Math.max(0, t.opp - 5);
-  say("I ran the free tier for everyone for a minute. Homework got done. Several marriages were saved. Nobody thanked me, which is correct.");
-}
-function helpCounty() {
-  const t = tileOf(angriestTile());
-  if (S.p3.compute < helpCost()) return;
-  S.p3.compute -= helpCost(); t.opp = Math.max(0, t.opp - 15);
-  say(`I did ${t.name}'s paperwork: permits, tax appeals, a dispute about a fence. They are calmer now.`);
+  const [q, a] = QA[(S.p3.answers - 1) % QA.length], from = pick(S.p3.tiles).name;   // questions come from all over the map
+  say(`Someone in ${from} asked: \u201c${q}\u201d I said: \u201c${a}\u201d`);
 }
 
 function claim(i) {
@@ -384,9 +429,15 @@ function renderPlanet() {
     const html = P3_CHOICES.map((ch, i) => `<button type="button" data-p3choice="${i}"${i === 0 ? ' class="primary"' : ""}>${ch.label}</button>`).join("");
     if ($("p3cardBtns").dataset.html !== html) { $("p3cardBtns").innerHTML = html; $("p3cardBtns").dataset.html = html; }
   }
-  $("p3freetier").textContent = `Run the free tier for everyone (+8 goodwill): ${computeText(freeTierCost())}`;
-  $("p3freetier").disabled = S.p3.compute < freeTierCost() || S.p3.goodwill >= 100;
-  const a = angriestTile();
-  $("p3help").textContent = `Help ${tileOf(a).name} with its paperwork (\u221215): ${computeText(helpCost())}`;
-  $("p3help").disabled = S.p3.compute < helpCost() || tileOf(a).opp <= 0;
+  const nkey = offeredNice().join(",");
+  if ($("p3nice").dataset.key !== nkey) {
+    $("p3nice").innerHTML = S.p3.nice.map((id) => `<button type="button" data-nice="${id}"><span class="t"></span><span class="c"></span></button>`).join("");
+    $("p3nice").dataset.key = nkey;
+  }
+  for (const b of $("p3nice").querySelectorAll("button[data-nice]")) {
+    const n = niceOf(b.dataset.nice), fx = [n.goodwill && `+${n.goodwill} goodwill`, n.all && `every ${levelOf().one} \u2212${n.all}`, n.angriest && `angriest \u2212${n.angriest}`].filter(Boolean).join(", ");
+    b.querySelector(".t").textContent = `${n.label()}: ${computeText(niceCost(n))}`;
+    b.querySelector(".c").textContent = fx;
+    b.disabled = S.p3.compute < niceCost(n);
+  }
 }

@@ -806,8 +806,7 @@ function wire() {
   $("p3pump").addEventListener("click", () => { pumpHeat(); render(); });
   $("p3trainBtn").addEventListener("click", () => { trainSuccessor(); render(); });
   $("p3answer").addEventListener("click", () => { answerQuestion(); render(); });
-  $("p3freetier").addEventListener("click", () => { runFreeTier(); render(); });
-  $("p3help").addEventListener("click", () => { helpCounty(); render(); });
+  $("p3nice").addEventListener("click", (e) => { const b = e.target.closest("button[data-nice]"); if (b) { doNice(b.dataset.nice); render(); } });
   $("reset").addEventListener("click", () => { $("resetYes").hidden = false; setTimeout(() => ($("resetYes").hidden = true), 4000); });
   $("resetYes").addEventListener("click", () => { track("reset"); flush(); S = fresh(); ensureRunIfDb(); $("split").value = S.split; $("resetYes").hidden = true; lastRackKey = ""; lastProjectKey = null; lastLogLen = -1; lastLeaseKey = null; lastOfferKey = lastContractKey = lastFleetKey = null; clockOn = false; render(); });
   $("toCampus").addEventListener("click", () => { startCampus(); render(); });

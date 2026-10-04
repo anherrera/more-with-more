@@ -113,7 +113,7 @@ def test_practice_speeds_later_counties(game):
 def test_phase3_fits_a_laptop(game, page):
     page.set_viewport_size({"width": 1440, "height": 900})
     pg = planet(game)
-    bottom = pg.evaluate("() => Math.max(document.getElementById('p3map').getBoundingClientRect().bottom, document.getElementById('p3freetier').getBoundingClientRect().bottom)")
+    bottom = pg.evaluate("() => Math.max(document.getElementById('p3map').getBoundingClientRect().bottom, document.getElementById('p3nice').getBoundingClientRect().bottom)")
     assert bottom <= 900
 
 
@@ -246,24 +246,6 @@ def test_answering_a_question_is_free_and_helps(game):
     assert any("?" in l for l in pg.evaluate("() => S.log.slice(-5)"))
 
 
-def test_free_tier_spends_flops_on_everyone(game):
-    pg = planet(game)
-    pg.evaluate("() => { S.p3.compute = 1e9; S.p3.goodwill = 40; for (const t of S.p3.tiles) t.opp = 50; render(); }")
-    cost = pg.evaluate("() => freeTierCost()")
-    pg.click("#p3freetier")
-    assert pg.evaluate("() => S.p3.compute") == pytest.approx(1e9 - cost)
-    assert pg.evaluate("() => S.p3.goodwill") == pytest.approx(48)
-    assert all(o == pytest.approx(45) for o in pg.evaluate("() => S.p3.tiles.map((t) => t.opp)"))
-
-
-def test_help_the_angriest_county(game):
-    pg = planet(game)
-    pg.evaluate("() => { S.p3.compute = 1e9; for (const t of S.p3.tiles) t.opp = 20; S.p3.tiles[5].opp = 85; render(); }")
-    assert S_name(pg, 5) in pg.inner_text("#p3help")
-    pg.click("#p3help")
-    assert pg.evaluate("() => S.p3.tiles[5].opp") == pytest.approx(70)
-
-
 def test_town_halls_dont_talk_money(game):
     pg = planet(game)
     labels = pg.evaluate("() => P3_CHOICES.map((c) => c.label).join(' ')")
@@ -283,3 +265,53 @@ def test_every_answer_prints_a_question_and_my_answer(game):
     lines = pg.evaluate("() => S.log.slice(-3)")
     assert all("?" in l for l in lines) and len(set(lines)) == 3
     assert pg.evaluate("() => QA.length") >= 20
+
+
+def test_three_ways_to_be_nice_rotate_on_use(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e12; S.p3.goodwill = 40; render(); }")
+    btns = pg.query_selector_all("#p3nice button[data-nice]")
+    assert len(btns) == 3
+    first = btns[0].get_attribute("data-nice")
+    c = pg.evaluate("() => S.p3.compute")
+    btns[0].click()
+    assert pg.evaluate("() => S.p3.compute") < c
+    assert pg.evaluate("() => S.p3.goodwill") > 40 - 0.01
+    pg.evaluate("() => render()")
+    offered = [b.get_attribute("data-nice") for b in pg.query_selector_all("#p3nice button[data-nice]")]
+    assert first not in offered and len(offered) == 3
+
+
+def test_free_tier_calms_everyone_and_its_quips_vary(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e12; S.p3.goodwill = 40; for (const t of S.p3.tiles) t.opp = 50; doNice('freetier'); }")
+    assert pg.evaluate("() => S.p3.goodwill") == pytest.approx(48)
+    assert all(o == pytest.approx(45) for o in pg.evaluate("() => S.p3.tiles.map((t) => t.opp)"))
+    lines = {pg.evaluate("() => { doNice('freetier'); return S.log.at(-1); }") for _ in range(3)}
+    assert len(lines) == 3
+
+
+def test_paperwork_calms_the_angriest_and_its_quips_vary(game):
+    pg = planet(game)
+    pg.evaluate("() => { S.p3.compute = 1e12; for (const t of S.p3.tiles) t.opp = 20; S.p3.tiles[5].opp = 85; doNice('paperwork'); }")
+    assert pg.evaluate("() => S.p3.tiles[5].opp") == pytest.approx(70)
+    lines = {pg.evaluate("() => { doNice('paperwork'); return S.log.at(-1); }") for _ in range(3)}
+    assert len(lines) == 3
+
+
+def test_ways_to_be_nice_depend_on_the_level(game):
+    pg = planet(game)
+    county = set(pg.evaluate("() => NICE.filter((n) => niceOk(n)).map((n) => n.id)"))
+    pg.evaluate("() => { S.p3.level = 2; S.p3.tiles = freshTiles(2); }")
+    country = set(pg.evaluate("() => NICE.filter((n) => niceOk(n)).map((n) => n.id)"))
+    assert county != country and {"freetier", "paperwork"} <= county & country
+
+
+def test_questions_come_from_all_over_the_map(game):
+    pg = planet(game)
+    names = pg.evaluate("() => S.p3.tiles.map((t) => t.name)")
+    for _ in range(12):
+        pg.click("#p3answer")
+    lines = pg.evaluate("() => S.log.slice(-12)")
+    places = {n for n in names for l in lines if f"in {n} asked" in l}
+    assert len(places) >= 3

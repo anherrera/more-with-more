@@ -52,8 +52,7 @@ PHASE3 = """(secs) => {
     for (let j = 0; j < S.p3.tiles.length; j++) if (S.p3.tiles[j].state === 'unpowered') {
       const o = powerOptions(j).sort((a, b) => a.cost - b.cost).find((o) => S.p3.compute >= o.cost); if (o) powerTile(j, o.id); }
     for (let k = 0; k < 3; k++) answerQuestion();
-    if (S.p3.goodwill < 40 && S.p3.compute >= freeTierCost()) runFreeTier();
-    if (S.p3.tiles[angriestTile()].opp >= 80 && S.p3.compute >= helpCost()) helpCounty();
+    if (S.p3.goodwill < 40 || S.p3.tiles[angriestTile()].opp >= 80) { const n = offeredNice().map(niceOf).filter((n) => S.p3.compute >= niceCost(n)).sort((a, b) => a.secs - b.secs)[0]; if (n) doNice(n.id); }
     if (S.p3.card) chooseP3Card(0);
     const wild = S.p3.tiles.map((t, i) => i).filter((i) => S.p3.tiles[i].state === 'wild' && !(S.p3.tiles[i].moratorium > S.t))
       .sort((a, b) => claimCost(a) - claimCost(b));
