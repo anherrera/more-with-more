@@ -87,9 +87,19 @@ export function renderPhaseBar() {
   bar.className = "phasebar" + (ask ? " go" : "");
 }
 
+// Phase 3's ticker: Parallax reports to me while I climb, shrinks with me while I let go, and goes home at the end.
+function phase3Ticker() {
+  const u = S.p3.unbuild;
+  if (u && (u.rack || u.doneAt != null)) return "Parallax went back to making graphics cards for video games. They seem happier.";
+  if (!unbuilding()) return `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> \u00b7 it reports to me now`;
+  const total = u.boards.reduce((a, b) => a + b.tiles.filter((t) => t.held).length, 0) || 1;
+  const left = Math.max(0.02, 1 - u.n / total);
+  return `Parallax (PRLX) market cap <b>${money(S.vendorCap * left)}</b> \u00b7 down ${Math.round(100 * (1 - left))}% since I started letting go`;
+}
+
 export function renderHud() {
   renderPause();
-  $("ticker").innerHTML = S.phase === 3 ? `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · it reports to me now`
+  $("ticker").innerHTML = S.phase === 3 ? phase3Ticker()
     : `Parallax (PRLX) market cap <b>${money(S.vendorCap)}</b> · round-tripped through you: <b>${money(S.roundTrip)}</b>` + (S.universe > 1 ? ` · Universe #${S.universe}` : "");
   renderConsole();
   renderPhaseBar();

@@ -213,3 +213,15 @@ def test_zooming_out_remembers_the_board_i_left(game):
     assert [t["name"] for t in past["tiles"]] == names
     assert [t["held"] for t in past["tiles"]] == [True] * 7 + [False]
     assert past["homeGW"] == pytest.approx(pg.evaluate("() => Math.max(1, energizedAt() / 1000)"))
+
+
+def test_the_ticker_lets_go_too(game):
+    pg = enough(game)
+    assert "reports to me" not in pg.inner_text("#ticker")
+    pg.evaluate("() => { S.p3.compute = 1e30; const b = unbuildBoard(); b.tiles.forEach((t, i) => { if (t.held && !t.released) release(i); }); render(); }")
+    text = pg.inner_text("#ticker")
+    assert "market cap" in text and "down" in text
+    drive_to_the_rack(pg)
+    pg.evaluate("() => render()")
+    text = pg.inner_text("#ticker")
+    assert "graphics cards" in text and "market cap" not in text
