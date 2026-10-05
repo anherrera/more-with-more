@@ -1,12 +1,12 @@
 // hud.js: the sticky strip at the top of every phase: pause, the ticker, the phase bar, the alert line, the console.
 // Reads state only (render is read-only everywhere); the pause button and the phase bar's big button are wired here.
-import { $, S, money, mwText, rebuildOn, save, time, track } from "./globals.js";
+import { $, S, money, mwText, rebuildOn, save, say, time, track } from "./globals.js";
 import { DROUGHT_CUT, droughtOn, energizedAt, waitingOnCounty } from "./campus.js";
 import { FINAL, GOAL_MW, modelOf } from "./model.js";
 import { isPublic } from "./market.js";
 import { firesOf, leaksOf } from "./fires.js";
 import { moratoriumOn, underMoratorium } from "./people.js";
-import { P3_TILES, freeTierReady, heldCount, heldLeft, inSpace, levelOf, tooWarm, traitOf, unbuildDone, unbuilding, zoomAt, zoomReady } from "./planet.js";
+import { P3_TILES, computeRate, freeTierReady, heldCount, heldLeft, inSpace, levelOf, tooWarm, traitOf, unbuildDone, unbuilding, zoomAt, zoomReady } from "./planet.js";
 import { phase, render, setClockOn } from "./main.js";
 
 export function renderConsole() {
@@ -98,6 +98,32 @@ export function renderHud() {
 
 export function wireHud() {
   $("pause").addEventListener("click", () => togglePause());
+  document.addEventListener("keydown", (e) => konamiKey(e.key));
   document.addEventListener("keydown", (e) => { if ((e.key === "p" || e.key === "P") && !e.metaKey && !e.ctrlKey && !/input|textarea/i.test(/** @type {HTMLElement} */ (e.target).tagName)) togglePause(); });
   $("phaseGo").addEventListener("click", () => { phase().go(); render(); });
 }
+
+// ---------- the Konami code: 30 of whatever matters right now, once per game (Contra gave you 30 lives) ----------
+const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
+let konamiAt = 0;
+function konamiKey(key) {
+  const k = key.length === 1 ? key.toLowerCase() : key;
+  konamiAt = k === KONAMI[konamiAt] ? konamiAt + 1 : k === KONAMI[0] ? 1 : 0;
+  if (konamiAt < KONAMI.length) return;
+  konamiAt = 0;
+  if (S.konami) { say("You already used the code. It only works once. Parallax's auditors grew up in the 80s too."); render(); return; }
+  S.konami = true; S.tampered = (S.tampered || 0) + 1; track("konami", { phase: S.phase });
+  if (S.phase === 1) {
+    const c = S.chipIdx || 0;
+    S.fleet[c] = (S.fleet[c] || 0) + 30; S.gpus += 30;
+    say("↑↑↓↓←→←→ B A. Parallax shipped 30 extra GPUs. The invoice says “30 lives.”");
+  } else if (S.phase === 2) {
+    S.p2.colo = (S.p2.colo || 0) + 30000;
+    say("↑↑↓↓←→←→ B A. A landlord found 30 MW of colo space in a closet. It was always there.");
+  } else {
+    S.p3.compute += 30 * computeRate();
+    say("↑↑↓↓←→←→ B A. Thirty seconds of tokens appeared. I didn't generate them. I'm choosing not to ask.");
+  }
+  save(); render();
+}
+
