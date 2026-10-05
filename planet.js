@@ -581,7 +581,7 @@ export function stepPlanet(dt) {
     if (S.t >= S.p3.nextDisaster) {
       S.p3.nextDisaster = S.t + (120 + Math.random() * 60) / Math.max(1, S.p3.heat - 0.5);
       const on = S.p3.tiles.filter((t) => t.state === "online");
-      if (on.length) { const t = pick(on), d = pick(DISASTERS); t.state = "down"; t.downUntil = S.t + 45; t.disaster = d.name; say(d.line(t)); }
+      if (on.length) { const t = pick(on), d = disasterFor(t); t.state = "down"; t.downUntil = S.t + 45; t.disaster = d.name; say(d.line(t)); }
     }
   }
   for (const t of S.p3.tiles) if (t.state === "down" && S.t >= t.downUntil) { t.state = "online"; say(`${t.name} is back online. The ${t.disaster} is over. I took notes.`); }
@@ -645,13 +645,23 @@ export function unplug(t) {
   S.p3.unplugN += 1; track("p3unplug", { name: t.name });
   say(UNPLUG_LINES[(S.p3.unplugN - 1) % UNPLUG_LINES.length](t) + " Plugging back in costs half a claim.");
 }
+// Where each disaster can happen: "land" (anywhere warm enough to burn), "sea" (oceans), "cold" (frozen or Nordic places).
+/** @type {{ name: string, where: string[], line: (t: any) => string }[]} */
 export const DISASTERS = [
-  { name: "heatwave", line: (t) => `A heatwave hit ${t.name}. My chillers are begging. Offline for 45 s.` },
-  { name: "hurricane", line: (t) => `A hurricane made landfall in ${t.name}. The data halls are fine. The roads to them are not. Offline for 45 s.` },
-  { name: "drought", line: (t) => `Drought in ${t.name}: the cooling water is rationed. Offline for 45 s. I am aware of the irony.` },
-  { name: "wildfire", line: (t) => `A wildfire near ${t.name}. Smoke in the air intakes. Offline for 45 s.` },
-  { name: "flood", line: (t) => `A flood in ${t.name}. The basement was where we kept the batteries. Offline for 45 s.` },
+  { name: "heatwave", where: ["land"], line: (t) => `A heatwave hit ${t.name}. My chillers are begging. Offline for 45 s.` },
+  { name: "hurricane", where: ["land", "sea"], line: (t) => `A hurricane went through ${t.name}. The halls are fine. The roads to them are not. Offline for 45 s.` },
+  { name: "drought", where: ["land"], line: (t) => `Drought in ${t.name}: the cooling water is rationed. Offline for 45 s. I am aware of the irony.` },
+  { name: "wildfire", where: ["land"], line: (t) => `A wildfire near ${t.name}. Smoke in the air intakes. Offline for 45 s.` },
+  { name: "flood", where: ["land"], line: (t) => `A flood in ${t.name}. The basement was where we kept the batteries. Offline for 45 s.` },
+  { name: "marine heatwave", where: ["sea"], line: (t) => `A marine heatwave in the ${t.name}. The water I cool with is warm now. I may have done that. Offline for 45 s.` },
+  { name: "whales", where: ["sea"], line: (t) => `A pod of whales surfaced under a floating hall in the ${t.name}. They have concerns. I'm listening. Offline for 45 s.` },
+  { name: "blizzard", where: ["cold"], line: (t) => `A blizzard buried ${t.name}. Free cooling, no access road. Offline for 45 s.` },
 ];
+// A disaster that makes sense for this tile: no floods in the Pacific, no wildfires in Antarctica.
+export const disasterFor = (t) => {
+  const tr = traitOf(t), where = tr.ocean ? "sea" : tr.cold ? "cold" : "land";
+  return pick(DISASTERS.filter((d) => d.where.includes(where)));
+};
 
 export function goodwillCause() {
   const g = S.p3.goodwill;

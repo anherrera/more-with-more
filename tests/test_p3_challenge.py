@@ -155,3 +155,17 @@ def test_new_project_effects(game):
     pg.evaluate("() => { S.p3.level = 2; S.p3.tiles = freshTiles(2); S.p3.tech.staffers = true; S.p3.goodwill = 20; S.p3.hearingArmed = false; }")
     run(pg, 1)
     assert pg.evaluate("() => S.p3.hearingUntil - S.t") <= 30
+
+
+def test_disasters_fit_the_place(game):
+    from conftest import planetwide
+    pg = planetwide(game)
+    kinds = pg.evaluate("""() => { const out = {};
+      for (const name of ['Pacific Ocean', 'Antarctica', 'Africa']) {
+        const t = S.p3.tiles.find((x) => x.name === name);
+        out[name] = [...new Set(Array.from({length: 200}, () => disasterFor(t).name))]; }
+      return out; }""")
+    assert "flood" not in kinds["Pacific Ocean"] and "wildfire" not in kinds["Pacific Ocean"] and "drought" not in kinds["Pacific Ocean"]
+    assert "whales" in kinds["Pacific Ocean"]
+    assert "wildfire" not in kinds["Antarctica"] and "drought" not in kinds["Antarctica"] and "blizzard" in kinds["Antarctica"]
+    assert "blizzard" not in kinds["Africa"] and "whales" not in kinds["Africa"]
