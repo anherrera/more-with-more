@@ -252,3 +252,14 @@ def test_the_middle_turns_green_when_the_level_is_released(game):
     pg.evaluate("() => { S.p3.compute = 1e30; unbuildBoard().tiles.forEach((t, i) => { if (t.held && !t.released) release(i); }); render(); }")
     cls = pg.get_attribute("#p3map button[data-freetier]", "class")
     assert "ready" in cls
+
+
+def test_release_lines_stay_short_after_the_first(game):
+    pg = enough(game)
+    pg.evaluate("() => { S.p3.compute = 1e30; }")
+    n = pg.evaluate("() => S.log.length")
+    pg.evaluate("() => unbuildBoard().tiles.forEach((t, i) => { if (t.held && !t.released) release(i); })")
+    lines = pg.evaluate(f"() => S.log.slice({n})")
+    openers = pg.evaluate("() => SHUTDOWN[4].map((f) => f({ name: '@@' }).split('@@')[0])")
+    with_opener = [l for l in lines if any(o and l.startswith(o) for o in openers)]
+    assert len(with_opener) <= 1                                   # only the level's first release says how it turned off

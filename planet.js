@@ -993,7 +993,9 @@ export function release(i) {
   if (!line && byTrait && !u.traitUsed[t.trait]) { u.traitUsed[t.trait] = true; line = byTrait(t); }
   if (!line) line = draw(`R${L}`, RESTORE_LINES[L])(t);
   track("p3release", { name: t.name, level: L });
-  say(`${draw(`S${L}`, SHUTDOWN[L])(t)} ${line} ${draw(`O${L}`, OUTSIDE[L])}`);
+  // The first release on a level says how I turned it off; after that, just what came back and who went outside.
+  const first = unbuildBoard().tiles.filter((x) => x.released).length === 1;
+  say(`${first ? draw(`S${L}`, SHUTDOWN[L])(t) + " " : ""}${line} ${draw(`O${L}`, OUTSIDE[L])}`);
 }
 export function releaseFreeTier() {
   if (!freeTierReady()) return;
