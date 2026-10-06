@@ -7,6 +7,7 @@ import { isPublic } from "./market.js";
 import { firesOf, leaksOf } from "./fires.js";
 import { moratoriumOn, underMoratorium } from "./people.js";
 import { P3_TILES, computeRate, freeTierReady, heldCount, heldLeft, inSpace, levelOf, tooWarm, traitOf, unbuildDone, unbuilding, zoomAt, zoomReady } from "./planet.js";
+import { PROJECTS } from "./projects.js";
 import { phase, render, setClockOn } from "./main.js";
 
 export function renderConsole() {
@@ -66,8 +67,11 @@ export function renderPhaseBar() {
     } else if (zoomReady()) { ask = true; text = `${L.name} level done: ${held} of ${P3_TILES} ${L.plural} online.`; go.textContent = `Zoom out: go ${L.next}`; go.disabled = false; }
     else text = `Phase 3 of 3 · ${L.name} level: ${held} of ${P3_TILES} ${L.plural} online. Hold ${zoomAt()} to go ${L.next}.`;
   } else if (S.phase === 1) {
-    text = S.gen >= 6 ? "Phase 1 of 3 · Gen 6 is here. Buy “Break ground” under Projects to start phase 2."
-      : `Phase 1 of 3 · Goal: reach Gen 6 (now Gen ${S.gen}), then break ground on your own campus.`;
+    // From Gen 6 the bar lists what the "Break ground" project itself still asks for (its needs()), until it asks for nothing.
+    const missing = S.gen >= 6 ? PROJECTS.find((p) => p.id === "ground").needs() : null;
+    text = !missing ? `Phase 1 of 3 · Goal: reach Gen 6 (now Gen ${S.gen}), then break ground on your own campus.`
+      : missing.length ? `Phase 1 of 3 · Gen 6 reached. Next: ${missing.join(" and ")}, then break ground on your own campus.`
+      : "Phase 1 of 3 · Ready to break ground: buy “Break ground” under Projects to start phase 2.";
   } else if (!S.p2 || !S.p2.county) {
     text = "Phase 2 of 3 \u00b7 Choose a county for the campus. Nothing starts until you do.";
   } else {

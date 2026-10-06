@@ -1,6 +1,6 @@
 // market.js: the cap table, the IPO (right after Series E), the public stock, follow-ons, lockup and secondaries.
 // Ownership = founder shares / all shares. Every raise mints shares; secondaries move your shares into your pocket.
-import { $, HYPE_TO_RAISE, ROUNDS, S, milestone, money, mwText, say, time, track } from "./globals.js";
+import { $, HYPE_TO_RAISE, ROUNDS, S, milestone, money, moneyShare, mwText, say, time, track } from "./globals.js";
 import { backlogMW, campusRevenue, deliveredMW, energizedAt } from "./campus.js";
 import { render } from "./main.js";
 
@@ -36,7 +36,7 @@ export function dilute(fraction, amount, name) {
   c.lastVal = amount / fraction;
   if (name) {
     const pref = amount / (c.shares - before);
-    say(`New 409A for the ${name}: employee options priced at ${money(pref * 0.1)} a share. The ${name} paid ${money(pref)}. Everyone agrees this is normal.`);
+    say(`New 409A for the ${name}: employee options priced at ${moneyShare(pref * 0.1)} a share. The ${name} paid ${moneyShare(pref)}. Everyone agrees this is normal.`);
   }
 }
 

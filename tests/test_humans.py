@@ -36,7 +36,7 @@ def test_a_hearing_is_a_card_in_the_same_shape(game):
     pg3.evaluate("() => { S.p3.card.until = S.t; }")
     run(pg3, 1)
     assert pg3.evaluate("() => S.p3.card") is None and pg3.evaluate("() => S.p3.tiles[0].opp") == pytest.approx(opp + 10, abs=0.1)
-    assert "empty chair" in pg3.evaluate("() => S.log.at(-1)")
+    assert "didn't show up" in pg3.evaluate("() => S.log.at(-1)")
 
 
 def test_one_moratorium_model_in_both_phases(game):

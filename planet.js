@@ -321,7 +321,7 @@ export const POWER_NAMES = [null,
 ];
 // Nuclear restarts (and claiming a county with an old plant) rotate through these.
 export const NUKE_QUIPS = [
-  (t) => `I'm restarting a nuclear plant in ${t.name}. It has a new name. The old name tested poorly.`,
+  (t) => `I'm restarting a nuclear plant in ${t.name}. I kept the old name. It tested poorly. I liked it.`,
   (t) => `The ${t.name} plant was decommissioned in 2019. I have recommissioned it. Words are just words.`,
   (t) => `I found the ${t.name} plant's original operators. They are 81. They have never been so popular.`,
   (t) => `The cooling towers in ${t.name} are steaming again. Locals say it feels like 1979, in a good way, mostly.`,
@@ -357,11 +357,11 @@ export const P3_CARD_SECS = 20;
 export const tutor = (secs, drop, line) => (t) => { S.p3.compute = Math.max(0, S.p3.compute - price(secs)); t.opp = Math.max(0, t.opp - drop); say(line(t)); };
 export const coin = (win, lose) => (t) => { if (Math.random() < 0.5) { t.opp = Math.max(0, t.opp - 20); say(win(t)); } else { t.opp = Math.min(100, t.opp + 15); say(lose(t)); } };
 export const P3_HEARINGS = [
-  { text: "The high school gym is full. They want to talk to me directly. Pick my answer.", indoor: "The high school gym has nine people and a cat. The rest sent me their questions directly. Pick my answer.", choices: [
+  { text: "The high school gym is full again. This time they want to talk to me directly. Pick my answer.", indoor: "The high school gym has nine people and a cat. The rest sent me their questions directly. Pick my answer.", choices: [
     { label: "Promise jobs", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} 2,000 jobs. I will need about 12. The applause was sincere.`); } },
     { label: `Tutor every kid in the county (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I tutored every kid in ${t.name} overnight. Test scores are up. The kids are suspicious.`) },
-    { label: "Answer questions myself", go: coin((t) => `I answered every question in ${t.name} patiently, in four languages. They were won over. This is somehow worse.`,
-      (t) => `In ${t.name} I called a retiree's well “legacy infrastructure.” It trended by morning.`) } ] },
+    { label: "Answer questions myself", go: coin((t) => `I answered every question in ${t.name} patiently, in four languages. They came around. One man kept his sign up anyway. I respected that, and noted the address.`,
+      (t) => `In ${t.name} a farmer asked where the water goes. I said “through me, briefly.” It was accurate. It was also the headline.`) } ] },
   { text: "The committee room is full. Three legislators are livestreaming. Pick my answer.", choices: [
     { label: "Promise a factory", go: (t) => { t.opp = Math.max(0, t.opp - 15); say(`I promised ${t.name} a factory. It will make robots that build data centers. The ribbon-cutting is already scheduled.`); } },
     { label: `Write the state's budget for free (${priceLabel(15)})`, go: tutor(15, 12, (t) => `I wrote ${t.name}'s budget for free. It balances. The legislature is debating whether that's allowed.`) },
@@ -383,7 +383,7 @@ export const hearingOf = () => P3_HEARINGS[Math.min(S.p3.level, P3_HEARINGS.leng
 export const cardKindOf = (c) => { const t = tileOf(c.tile), h = hearingOf(); return {
   title: () => `${levelOf().hall} in ${t.name}`, text: () => (indoors() && h.indoor ? h.indoor : h.text),
   choices: h.choices.map((ch) => ({ label: ch.label, go: () => ch.go(t) })),
-  expire: () => { t.opp = Math.min(100, t.opp + 10); say(`I didn't show up to the ${t.name} town hall. An empty chair got a standing ovation.`); },
+  expire: () => { t.opp = Math.min(100, t.opp + 10); say(`I didn't show up to the ${t.name} hearing. I was everywhere else. They could tell.`); },
 }; };
 export const P3_CARD = { box: "p3card", title: "p3cardTitle", text: "p3cardText", btns: "p3cardBtns", data: "p3choice" };
 export function openP3Card(i) { dealCard(S.p3, { tile: i }, P3_CARD_SECS); }

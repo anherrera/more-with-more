@@ -113,6 +113,9 @@ export function fmt(x) {
   return x.toFixed(x < 10 ? 2 : x < 100 ? 1 : 0) + u[i];
 }
 export const money = (x) => "$" + fmt(x);
+// A price per share: a billion-share cap table makes early rounds fractions of a cent, so show two significant
+// digits however small ($0.0000027), and the usual cents from a dollar up.
+export const moneyShare = (x) => (x >= 1 || x <= 0 ? money(x) : "$" + x.toFixed(Math.max(2, 1 - Math.floor(Math.log10(x)))));
 // Power: kW, then MW, then GW (no "1.47K MW").
 export const mwText = (mw) => (Math.abs(mw) >= 1000 ? `${fmt(mw / 1000)} GW` : `${fmt(mw)} MW`);
 export const kwText = (kw) => (Math.abs(kw) >= 1000 ? mwText(kw / 1000) : `${fmt(kw)} kW`);
