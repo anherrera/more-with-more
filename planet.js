@@ -539,6 +539,8 @@ export function claim(i) {
 }
 
 export function stepPlanet(dt) {
+  // The fleet is whatever fills the gigawatts I hold: keep S.gpus equal to the headline (devtools readers notice).
+  S.gpus = p3GPUs();
   if (unbuilding()) { stepUnbuild(dt); return; }
   S.p3.compute += computeRate() * dt;
   offeredNice();

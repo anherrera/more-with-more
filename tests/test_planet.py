@@ -377,3 +377,12 @@ def test_one_answer_matters_less_at_every_scale(game):
     pg = planet(game)
     gains = pg.evaluate("""() => [0, 1, 2, 3, 4].map((lv) => { S.p3.level = lv; S.p3.tiles = freshTiles(lv); S.p3.goodwill = 50; answerQuestion(); return S.p3.goodwill - 50; })""")
     assert gains == pytest.approx([0.3, 0.2, 0.12, 0.07, 0.04])
+
+
+def test_s_gpus_matches_the_headline_in_phase3(game):
+    pg = planet(game)
+    run(pg, 1)
+    assert pg.evaluate("() => S.gpus") == pg.evaluate("() => p3GPUs()")
+    pg.evaluate("() => { for (let i = 0; i < 3; i++) S.p3.tiles[i].state = 'online'; }")
+    run(pg, 1)
+    assert pg.evaluate("() => S.gpus") == pg.evaluate("() => p3GPUs()")
