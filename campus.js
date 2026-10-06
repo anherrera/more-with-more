@@ -9,8 +9,8 @@ import { capKW, gpuPrice, leasedKW, newest, render, rentIndex, spotMult, tradeCo
 
 export const COUNTIES = [
   { id: "cheap", name: "Cheap land, weak grid",
-    pitch: "3,000 acres for the price of a parking garage. The grid is two wires and a prayer.",
-    gridMW: 50, acres: 3000, queueMW: 100, queueSecs: 300, cash: 0, water: 12, drought: [600, 900], town: 15, rise: 1 },
+    pitch: "3,000 acres for the price of a parking garage. The grid is two wires and a prayer. Building here costs 25% less: nobody else wants to.",
+    gridMW: 50, build: 0.75, acres: 3000, queueMW: 100, queueSecs: 300, cash: 0, water: 12, drought: [600, 900], town: 15, rise: 1 },
   { id: "strong", name: "Strong grid, drought county",
     pitch: "A 200 MW connection on day one. The reservoir is a rumor.",
     gridMW: 200, acres: 1500, queueMW: 150, queueSecs: 200, cash: 0, water: 5, drought: [240, 360], town: 20, rise: 1 },
@@ -146,7 +146,7 @@ export const queueSecs = () => modelDone("utility") ? 30
 // Each hall, turbine or solar farm costs 3% more than the last: transformers, turbines and crews are backordered,
 // ...until 5x the first one: by then the supply chain has caught up with you.
 export const BUILD_GROWTH = 1.03, BUILD_MAX = 5;
-export const buildCost = (kind) => specOf(kind).cost * Math.min(BUILD_MAX, Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length)) * ceoBuild();
+export const buildCost = (kind) => specOf(kind).cost * Math.min(BUILD_MAX, Math.pow(BUILD_GROWTH, S.p2.builds.filter((b) => b.kind === kind).length)) * ceoBuild() * (countyOf().build || 1);
 
 export function build(kind) {
   const spec = specOf(kind);

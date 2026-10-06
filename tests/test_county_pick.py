@@ -30,3 +30,18 @@ def test_panels_animate_in_after_the_choice(game):
     assert "picking" not in pg.evaluate("() => document.body.className")
     assert "reveal" in pg.get_attribute(".cols", "class")
     assert pg.is_visible("#campusBox") and pg.is_visible("#computeBox")
+
+
+def test_cheap_land_builds_cheap(game):
+    """The weak-grid county makes you build your own power; building there costs a quarter less, so it doesn't stall."""
+    pg = broke_ground(game)
+    pg.click("button[data-county='cheap']")
+    costs = pg.evaluate("""() => Object.fromEntries(['cheap', 'strong'].map((id) => { S.p2.county = id;
+      return [id, {hall: buildCost('hall'), turbine: buildCost('turbine')}]; }))""")
+    assert costs["cheap"]["hall"] == 0.75 * costs["strong"]["hall"]
+    assert costs["cheap"]["turbine"] == 0.75 * costs["strong"]["turbine"]
+
+
+def test_the_cheap_county_says_building_is_cheap(game):
+    pg = broke_ground(game)
+    assert "25% less" in pg.inner_text("button[data-county='cheap']")
