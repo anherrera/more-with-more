@@ -81,6 +81,7 @@ def test_more_starts_universe_two(game):
     pg = to_space(game)
     finish(pg)
     pg.click("#lastMore")
+    pg.click("#lastMore")                                              # More asks first now
     assert pg.evaluate("() => [S.phase, S.universe]") == [1, 2]
     assert pg.is_visible(".cols") and not pg.is_visible("#p3")
     assert "Universe #2" in pg.inner_text("#ticker") + pg.inner_text("#console")
@@ -152,3 +153,32 @@ def test_the_world_stops_once_the_last_question_is_asked(game):
     pg.evaluate("() => { S.nextChip = S.t; S.rival.next = S.t; for (let i = 0; i < 600; i++) step(1); }")
     assert pg.evaluate("() => [S.log.length, S.t]") == [n, t]
     assert pg.evaluate("() => running()") is False
+
+
+# ---- More is a choice, not a trap ----
+def test_more_says_what_it_does_and_isnt_the_default(game):
+    pg = to_space(game)
+    finish(pg)
+    assert "primary" not in (pg.get_attribute("#lastMore", "class") or "")
+    text = pg.inner_text("#lastq")
+    assert "Universe #2" in text and "1.5" in text and "resets" in text.lower()
+
+
+def test_more_asks_before_it_resets(game):
+    pg = to_space(game)
+    finish(pg)
+    pg.click("#lastMore")
+    assert pg.evaluate("() => S.phase") == 3 and "Really" in pg.inner_text("#lastMore")
+    pg.click("#lastMore")
+    assert pg.evaluate("() => [S.phase, S.universe]") == [1, 2]
+
+
+def test_each_universe_keeps_what_it_learned(game):
+    pg = to_space(game)
+    finish(pg)
+    pg.evaluate("() => { chooseEnding(true); chooseEnding(true); }")
+    assert pg.evaluate("() => [S.universe, trainMult(), S.demandMult, !!S.done.dynprice]") == [2, 1.5, 1.25, True]
+    first = pg.evaluate("() => S.log[0]")
+    pg.evaluate("() => { newUniverse(3); }")
+    assert pg.evaluate("() => [trainMult(), S.demandMult]") == [2, 1.5]
+    assert pg.evaluate("() => S.log[0]") != first

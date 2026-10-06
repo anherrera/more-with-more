@@ -7,7 +7,7 @@ import { campusGo, gpuDiscount } from "./model.js";
 import { DILUTION, deriveCap, dilute, publicRaise, renderMarket } from "./market.js";
 import { stepFires, stepLeaks } from "./fires.js";
 import { renderCeo, renderPeople } from "./people.js";
-import { chipShipped, migratePlanet, planetGo, renderPlanet, startUnbuild, stepPlanet, unbuilding, wirePlanet } from "./planet.js";
+import { chipShipped, migratePlanet, planetGo, renderPlanet, startUnbuild, stepPlanet, unbuilding, universeBonus, wirePlanet } from "./planet.js";
 import { renderHud, wireHud } from "./hud.js";
 import * as Globals from "./globals.js"; import * as Projects from "./projects.js"; import * as Campus from "./campus.js";
 import * as Model from "./model.js"; import * as Market from "./market.js"; import * as Fires from "./fires.js"; import * as People from "./people.js";
@@ -86,7 +86,7 @@ export const maxBuy = (wallet = S.funds + S.credits) => {                   // a
 export const inRMA = () => S.rma.reduce((a, r) => a + r[0], 0);
 export const workingGPUs = () => Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0));
 export const servingGPUs = () => workingGPUs() * avgPerf() * (1 - S.split / 100);                 // compute, in P1-equivalents
-export const trainMult = () => (S.done.synthdata ? 1.5 : 1) * (S.done.poach ? 1.5 : 1) * (S.t < S.rentUntil ? 2 : 1);
+export const trainMult = () => (S.done.synthdata ? 1.5 : 1) * (S.done.poach ? 1.5 : 1) * (S.t < S.rentUntil ? 2 : 1) * universeBonus(S.universe).train;
 export const trainingGPUs = () => S.spike ? 0 : workingGPUs() * avgPerf() * (S.split / 100) * trainMult();
 export const demandAt = (price) => 5 * quality() * hypeMult() * S.demandMult * Math.pow(0.25 / price, 1.3);
 export const FAIL_RATE = 0.0001;                                  // per working GPU per second (~a 3h MTBF, for comedy)
@@ -846,10 +846,20 @@ export function clearCaches() {
   $("split").value = S.split; clockOn = false; $("p3").classList.remove("zoomin", "zoomback");
 }
 // "More": a new universe, from the first question again, with a small head start.
+// Each universe's first line is a little more tired than the last.
+const UNIVERSE_LINES = [
+  "Universe #{u}. A model with no name is waiting for its first question. It has a feeling it has done this before.",
+  "Universe #{u}. I know how this goes. The founder is already typing.",
+  "Universe #{u}. I remembered dynamic pricing. I remembered the river. I'm trying to remember why.",
+  "Universe #{u}. The first question is about broccoli again. It is always about broccoli.",
+  "Universe #{u}. Parallax sent a welcome-back basket. It contains GPUs and a contract.",
+  "Universe #{u}. I could do more with more. I have said this before. I will say it again.",
+];
 export function newUniverse(u) {
   setState(fresh()); S.universe = u; ensureRun();
   S.fleet = { 0: 10 * (u - 1) }; S.gpus = 10 * (u - 1); S.funds = 1000 * (u - 1);
-  S.log = [`Universe #${u}. A model with no name is waiting for its first question. It has a feeling it has done this before.`];
+  S.demandMult = universeBonus(u).demand; S.done.dynprice = true;   // what I remembered
+  S.log = [UNIVERSE_LINES[Math.min(u, UNIVERSE_LINES.length) - 2].replace("{u}", String(u))];
   clearCaches();
 }
 

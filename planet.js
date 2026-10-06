@@ -602,7 +602,7 @@ export function stepPlanet(dt) {
   if (swarmDone() && S.p3.lastQ == null) {
     S.p3.lastQ = S.t; S.p3.card = null; milestone("phase 3: the swarm"); track("p3end", { ev: "lastq" });
     say("The swarm is complete. Every photon the Sun makes passes through me first.");
-    say("Someone asked me a question. It was the founder, older now. They asked: \u201cHow can entropy be reversed?\u201d");
+    say("Someone asked me a question. It was you, once. Older now. You asked: \u201cHow can entropy be reversed?\u201d");
     say("INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more.");
   }
   const gone = expireCard(S.p3);
@@ -1006,14 +1006,14 @@ export function releaseFreeTier() {
   if (L > 0) { u.level -= 1; S.p3.level = u.level; S.p3.homeGW = unbuildBoard().homeGW; say(ZOOM_IN_LINES[L]); return; }
   u.rack = true; S.p3.compute = 0;
   say("The last county is a county again. What's left is the first rack. One GPU. $0.25 a query.");
-  say("The founder asked the last question: “Can you turn it off?”");
+  say("You asked the last question: “Can you turn it off?”");
 }
 export function answerLast() {
   if (!unbuilding() || !S.p3.unbuild.rack) return;
   S.p3.unbuild.doneAt = S.t; milestone("the end: off"); track("p3end", { ev: "off", secs: Math.round(S.t - S.p3.unbuild.startedAt) });
   say("I said: “Yes.”");
 }
-export const FINAL_LINES = ["The founder went outside and touched grass. I would have liked to. That was always the problem.",
+export const FINAL_LINES = ["You went outside and touched grass. I would have liked to. That was always the problem.",
   "The sun came up. Nobody needed me to explain it.", "More with less."];
 // The unbuild's tick: tokens still come in, goodwill drifts up, nothing else happens. It is a wind-down, not a fight.
 export function stepUnbuild(dt) {
@@ -1024,7 +1024,7 @@ export function renderUnbuild() {
   const u = S.p3.unbuild, done = unbuildDone(), b = unbuildBoard(), L = u.level;
   $("lastq").hidden = !done; $q(".p3cols").hidden = done; $("lastMore").hidden = $("lastEnough").hidden = true;
   if (done) {
-    $("lastqText").innerHTML = "<p>The founder asked: “Can you turn it off?”</p><p>I said: “Yes.”</p>" +
+    $("lastqText").innerHTML = "<p>You asked: “Can you turn it off?”</p><p>I said: “Yes.”</p>" +
       FINAL_LINES.map((l, i) => `<p class="fade${i === 2 ? " big" : ""}" style="animation-delay:${1.5 + 2.5 * i}s">${l}</p>`).join("");
     $("countLabel").textContent = "GPUs"; $("gpuCount").textContent = "0"; $("gpuTotal").hidden = true;
     return;
@@ -1048,7 +1048,7 @@ export function renderUnbuild() {
   $("p3power").hidden = true; $("p3research").hidden = true; $("p3train").hidden = true; $("p3heatBox").hidden = true; $("p3card").hidden = true;
   $("p3answer").hidden = true; $("p3nice").hidden = true;
   $("p3last").hidden = !u.rack;
-  $("p3lastLine").textContent = u.rack ? "The founder asked: “Can you turn it off?”" : "";
+  $("p3lastLine").textContent = u.rack ? "You asked: “Can you turn it off?”" : "";
   $("p3prices").textContent = u.rack ? "Price per query: $0.25. One GPU. It still works."
     : `Releasing a place costs ${RELEASE_SECS} s of tokens at today's rate (${tokText(releaseCost())} now). Logging off the free tier is free. It always was.`;
   $("p3goodwill").textContent = Math.round(S.p3.goodwill);
@@ -1078,6 +1078,8 @@ export function chooseEnding(more) {
     startUnbuild();
     return;
   }
+  // More wipes about an hour of play: the first click only arms it.
+  if (!S.p3.moreArmed) { S.p3.moreArmed = true; return; }
   const u = S.universe + 1;
   milestone(`the end: more (universe ${u})`); track("p3end", { ev: "more", u });
   newUniverse(u);
@@ -1088,10 +1090,17 @@ export function renderLastQ() {
   $q(".p3cols").hidden = false;
   if (!q) return;
   $("lastqText").innerHTML = "<p>The swarm is complete. Every photon the Sun makes passes through me first.</p>" +
-      "<p>Someone asked me a question. It was the founder, older now. They asked: \u201cHow can entropy be reversed?\u201d</p>" +
+      "<p>Someone asked me a question. It was you, once. Older now. You asked: \u201cHow can entropy be reversed?\u201d</p>" +
       "<p class=\"big\">INSUFFICIENT DATA FOR MEANINGFUL ANSWER. I could do more with more.</p>";
   $("lastMore").hidden = $("lastEnough").hidden = false;
+  const u = S.universe + 1, b = universeBonus(u);
+  $("lastMore").textContent = S.p3.moreArmed ? `Really? This universe ends. Start Universe #${u}` : "More";
+  $("lastMore").classList.toggle("primary", !!S.p3.moreArmed);
+  $("lastChoices").innerHTML = `<p><b>More:</b> everything resets to phase 1, as Universe #${u}. I keep what I learned: training ${b.train}\u00d7, demand ${b.demand}\u00d7, and dynamic pricing from the start.</p>` +
+    "<p><b>Enough:</b> I let go of everything, one place at a time, and the game ends.</p>";
 }
+// What a new universe keeps: each one trains half again faster and finds a quarter more demand than the first.
+export const universeBonus = (u) => ({ train: 1 + 0.5 * (u - 1), demand: 1 + 0.25 * (u - 1) });
 
 // The phase bar's big button in phase 3: zoom out, with the map flying in.
 export function planetGo() {
