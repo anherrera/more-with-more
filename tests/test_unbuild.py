@@ -138,7 +138,7 @@ def test_restoration_lines_cover_every_level_and_every_named_place(game):
                   "Dyson swarm, ring 1", "Dyson swarm, ring 2", "Europe", "Asia", "Low Earth orbit"]:
         assert place in named, place
     assert "sand again" in pg.evaluate("() => RESTORED['Africa']")
-    assert pg.evaluate("() => FREE_TIER_LINES.length") == 5 and "pubs" in pg.evaluate("() => FREE_TIER_LINES[3]")
+    assert pg.evaluate("() => FREE_TIER_LINES.length") == 5 and "pubs" in " ".join(pg.evaluate("() => FREE_TIER_LINES[3]"))
     for lv in range(5):
         tails = pg.evaluate(f"() => OUTSIDE[{lv}].length")
         assert tails >= 3
@@ -150,7 +150,7 @@ def test_the_sahara_is_sand_again(game):
     i = pg.evaluate("() => unbuildBoard().tiles.findIndex((t) => t.name === 'Africa')")
     pg.evaluate(f"() => {{ S.p3.compute = 1e30; release({i}); }}")
     line = pg.evaluate("() => S.log.at(-1)")
-    assert "sand again" in line and "outside" in line and "million" in line
+    assert "sand again" in line and any(line.endswith(o) for o in pg.evaluate("() => OUTSIDE[3]"))   # and people head out
 
 
 def drive_to_the_rack(pg):
@@ -225,3 +225,30 @@ def test_the_ticker_lets_go_too(game):
     pg.evaluate("() => render()")
     text = pg.inner_text("#ticker")
     assert "graphics cards" in text and "market cap" not in text
+
+
+# ---- no repeats in the turning-off ----
+def test_no_line_repeats_anywhere_in_the_unbuild(game):
+    pg = enough(game)
+    n = pg.evaluate("() => S.log.length")
+    for _ in range(5):
+        release_level(pg)
+    lines = [l for l in pg.evaluate(f"() => S.log.slice({n})")]
+    parts = [p.strip() + "." for l in lines for p in l.split(". ") if len(p) > 25]
+    dupes = {p for p in parts if parts.count(p) > 1}
+    assert not dupes, dupes
+
+
+def test_pools_are_bigger_than_any_level_needs(game):
+    pg = enough(game)
+    sizes = pg.evaluate("() => ({ restore: RESTORE_LINES.map((p) => p.length), out: OUTSIDE.map((p) => p.length), shut: SHUTDOWN.map((p) => p.length) })")
+    assert all(n >= 12 for n in sizes["restore"]) and all(n >= 9 for n in sizes["out"]) and all(n >= 9 for n in sizes["shut"])
+
+
+def test_the_middle_turns_green_when_the_level_is_released(game):
+    pg = enough(game)
+    pg.evaluate("() => render()")
+    assert "ready" not in (pg.get_attribute("#p3map button.home", "class") or "")
+    pg.evaluate("() => { S.p3.compute = 1e30; unbuildBoard().tiles.forEach((t, i) => { if (t.held && !t.released) release(i); }); render(); }")
+    cls = pg.get_attribute("#p3map button[data-freetier]", "class")
+    assert "ready" in cls

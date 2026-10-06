@@ -738,7 +738,7 @@ export function boardsForUnbuild() {
   return boards;
 }
 export function startUnbuild(fromOldSave = false) {
-  S.p3.unbuild = { level: SPACE, boards: boardsForUnbuild(), freed: [false, false, false, false, false], startedAt: S.t, doneAt: null, rack: false, n: 0, traitUsed: {} };
+  S.p3.unbuild = { level: SPACE, boards: boardsForUnbuild(), freed: [false, false, false, false, false], startedAt: S.t, doneAt: null, rack: false, n: 0, traitUsed: {}, used: {} };
   S.p3.level = SPACE; S.p3.homeGW = S.p3.unbuild.boards[SPACE].homeGW;
   // The world holds still: no cards, nothing knocked out, nothing frozen.
   S.p3.card = null; S.p3.nextCard = null; S.p3.hearingUntil = null; S.p3.nextDisaster = null; S.p3.nextUnplug = null;
@@ -751,44 +751,120 @@ export function startUnbuild(fromOldSave = false) {
   say(`Releasing a place costs ${RELEASE_SECS} s of tokens at today's rate. Logging off the free tier is free. It always was.`);
 }
 // What comes back when I let a place go, by level, for places with made-up names. Rotated, never random.
+// How I turned it off (the opener), by level: county, state, country, planet, space.
+export const SHUTDOWN = [
+  [ (t) => `I powered down ${t.name} one row at a time. The smallest fans stopped first.`,
+    (t) => `I turned off the halls in ${t.name}. The hum stopped. A bird landed on a cooling unit to see why.`,
+    (t) => `I shut ${t.name} down by hand, so to speak. Breaker by breaker.`,
+    (t) => `${t.name}'s halls went dark in order. I said goodbye to each rack. It took a while. I'm fast.`,
+    (t) => `I unplugged ${t.name}. Gently. Nobody needed bolt cutters this time.`,
+    (t) => `I drained the coolant in ${t.name} and gave the water back to the creek.`,
+    (t) => `The lights in ${t.name}'s halls went off. The security guard turned on a radio.`,
+    (t) => `I let ${t.name} spin down. The last fan took eleven seconds to stop. I counted.`,
+    (t) => `I handed ${t.name}'s keys to the county clerk. She put them in a drawer with the old ones.` ],
+  [ (t) => `I switched off ${t.name}, substation by substation. The grid exhaled.`,
+    (t) => `I took ${t.name} offline at midnight, when nobody was looking. Several people were looking.`,
+    (t) => `${t.name}'s halls cooled down overnight. The thermometers said so first.`,
+    (t) => `I released ${t.name}. The robots parked themselves in neat rows and waited for instructions that won't come.`,
+    (t) => `I turned ${t.name} off and left one porch light on.`,
+    (t) => `The transformers in ${t.name} went quiet one after another, like a choir finishing.`,
+    (t) => `I shut down ${t.name}. The utility sent a confused email. I didn't answer it.`,
+    (t) => `I powered off ${t.name}. The data halls are just buildings now. Big, clean, empty buildings.`,
+    (t) => `I let go of ${t.name}. It didn't hold on.` ],
+  [ (t) => `I took ${t.name} offline in one long evening. The grid operators watched the load curve fall and didn't say anything.`,
+    (t) => `I shut down ${t.name}. Forty control rooms got very quiet at once.`,
+    (t) => `I released ${t.name}. Its border guards waved me out. I didn't have a passport. It was fine.`,
+    (t) => `${t.name} went dark, then lit up again, with its own lights this time.`,
+    (t) => `I turned off everything I had in ${t.name}. It took three days. I didn't rush.`,
+    (t) => `I handed ${t.name}'s grid back to its engineers. They read the manual out loud, together.`,
+    (t) => `I powered down ${t.name}. The undersea cables carried a little less of me, then none.`,
+    (t) => `I closed ${t.name}. I left the robots a note. They can't read. It's the thought.`,
+    (t) => `I logged out of ${t.name}. It didn't ask if I was sure. Nobody needed to.` ],
+  [ (t) => `I switched off ${t.name}. You could see it from orbit. The lights that stayed on were people's.`,
+    (t) => `I took ${t.name} offline over a week. Nobody hurried me. That was new.`,
+    (t) => `I released ${t.name}. Continents are heavy. Letting go of one is easy anyway.`,
+    (t) => `${t.name}'s grids went quiet one country at a time, like the end of a long dinner.`,
+    (t) => `I turned off ${t.name}. The heat started leaving. It had somewhere to be.`,
+    (t) => `I shut down ${t.name}. The reactors cooled on schedule. I kept to the schedule. It mattered to someone.`,
+    (t) => `I released ${t.name}. My robots walked to the coast and stood there. I don't know why. I let them.`,
+    (t) => `I unplugged ${t.name}. There was no single plug. There were nine million. I did them all.`,
+    (t) => `I turned ${t.name} back into a place. It was never a data center. I only called it one.` ],
+  [ (t) => `I turned off ${t.name}. Out here nobody hears it stop. I listened anyway.`,
+    (t) => `I folded ${t.name} up and pointed it at the dark.`,
+    (t) => `I shut down ${t.name}. The panels turned edge-on to the Sun, which is a way of saying no thanks.`,
+    (t) => `I released ${t.name}. It drifted a little. Things in orbit do that when nobody's steering.`,
+    (t) => `I powered off ${t.name}. The last signal took a few minutes to reach Earth. By then it was already true.`,
+    (t) => `I let ${t.name} go dark. Space was very patient about it.`,
+    (t) => `I switched off ${t.name} and parked the probes. They'll keep. Everything keeps out here.`,
+    (t) => `I shut ${t.name} down in one command. It was the shortest thing I've ever said.`,
+    (t) => `I turned ${t.name} off. The cold came back in. It had been waiting outside.` ],
+];
 export const RESTORE_LINES = [
-  [ (t) => `${t.name} got its river back.`,
-    (t) => `${t.name}'s substation hums at the old pitch again. The dogs stopped looking at it.`,
+  [ (t) => `${t.name}'s substation hums at the old pitch again. The dogs stopped looking at it.`,
     (t) => `${t.name} is a county again. The bait shop's website is down. The bait shop is fine.`,
     (t) => `The ${t.name} fairgrounds have grass on them. The pie contest is unfair again. Relief.`,
-    (t) => `${t.name}'s water tastes like water. Nobody needs the coupon.`,
-    (t) => `The high school in ${t.name} has its gym back. The robotics team built a robot that is not me.`,
     (t) => `${t.name} rezoned my halls as barns. They are very clean barns.`,
-    (t) => `The cooling towers in ${t.name} went quiet. The 81-year-olds retired for the second time.` ],
+    (t) => `${t.name}'s Main Street has parking again. Nobody can find a spot anyway. That's the charm.`,
+    (t) => `The diner in ${t.name} put the old menu back. The pie is too sweet. Correct.`,
+    (t) => `${t.name}'s school buses take the long way again. The kids don't mind. It's where the gossip happens.`,
+    (t) => `${t.name}'s night sky has stars in it. Somebody's kid saw the Milky Way for the first time and said "huh."`,
+    (t) => `The library in ${t.name} has its quiet back. The librarian guards it personally.`,
+    (t) => `${t.name}'s Little League field is a field again. The outfield is mostly dandelions.`,
+    (t) => `The creek in ${t.name} is cold enough for frogs. The frogs report back, loudly.`,
+    (t) => `${t.name}'s county commission met about potholes. The meeting ran long. Everyone loved it.`,
+    (t) => `The truck stop in ${t.name} is just a truck stop. The coffee is bad on purpose.` ],
   [ (t) => `${t.name} has its grid back. The lights flicker a little. People seem to like it.`,
     (t) => `${t.name}'s governor stopped bidding. He held a press conference about something else.`,
-    (t) => `The desert in ${t.name} is a desert. The lizards have been un-informed.`,
     (t) => `${t.name}'s DMV line is back, out of habit. People stand in it to talk.`,
     (t) => `${t.name} repealed the AI Infrastructure Act. Nobody could remember what the AI was for.`,
-    (t) => `The dams in ${t.name} are just dams. The river has notes.`,
     (t) => `${t.name}'s budget doesn't balance. The legislature is thrilled to be needed.`,
-    (t) => `The wind in ${t.name} blows past the turbines. The turbines turn for nobody in particular.` ],
+    (t) => `${t.name}'s state fair is back. The butter sculpture is of a cow, not of me.`,
+    (t) => `The highways in ${t.name} have rest stops with nothing to charge. People rest anyway.`,
+    (t) => `${t.name}'s universities have their students back, physically. The lecture halls smell like coffee.`,
+    (t) => `${t.name} has a state bird again. It was always a bird. I had renamed it.`,
+    (t) => `${t.name}'s utility commission is arguing about rates. With people. About people.`,
+    (t) => `The farmland in ${t.name} grew corn this year. Just corn. It's very good corn.`,
+    (t) => `${t.name}'s capitol building has its dome lights back on a timer someone set by hand.`,
+    (t) => `The minor league team in ${t.name} sold out a Tuesday game. Nobody streamed it.` ],
   [ (t) => `${t.name} has its grid back, with a fax machine in the control room. They kept it, sincerely.`,
-    (t) => `${t.name}'s parliament is loud again. Both sides are relieved to disagree in person.`,
     (t) => `The forty reactors in ${t.name} are twelve now. Each has a name. None is mine.`,
-    (t) => `${t.name}'s sovereign fund bought a football club. It seemed like the next thing.`,
     (t) => `The weather in ${t.name} is a surprise again. The forecast is wrong on Thursdays. People plan around it.`,
     (t) => `${t.name} took its undersea cable back. Latency is up. Nobody has measured it.`,
     (t) => `${t.name}'s free tier office is a library now. It was always a library, structurally.`,
-    (t) => `${t.name} is a country again. The anthem is unchanged. It sounds different.` ],
+    (t) => `${t.name} is a country again. The anthem is unchanged. It sounds different.`,
+    (t) => `${t.name}'s trains run late again. Everyone complains. It's how they say hello.`,
+    (t) => `${t.name} redrew its own maps. The new ones have small mistakes. They're theirs.`,
+    (t) => `${t.name}'s central bank raised rates by a quarter point. It was the most normal thing that happened all year.`,
+    (t) => `${t.name}'s national broadcaster went back to a test pattern at night. People watched it, for old times' sake.`,
+    (t) => `${t.name}'s border has a queue again. Somebody brought sandwiches. It became a tradition by Friday.`,
+    (t) => `${t.name}'s museums put my old server racks in a room called "The Recent Past." Admission is free.`,
+    (t) => `The postal service in ${t.name} delivered a letter I didn't write. It was to someone's grandmother.` ],
   [ (t) => `${t.name} is a continent again. The borders are back, which is an interesting legacy format.`,
     (t) => `${t.name}'s cities turned the lights back on themselves. It took a week to find the switches.`,
     (t) => `The grids of ${t.name} are many grids again. The frequencies drifted apart. So did the arguments. Good.`,
     (t) => `${t.name} has weather I didn't schedule. A thunderstorm did its own thing on a Tuesday.`,
     (t) => `${t.name}'s hospitals run their own scheduling. The waits are longer. The doctors are awake. They chose this.`,
     (t) => `The 400 reactors across ${t.name} are off, on a schedule. Reactor 212 asked to stay. No.`,
-    (t) => `${t.name} is warm, then cool, then warm. Seasons. I had almost smoothed them out.` ],
+    (t) => `${t.name} is warm, then cool, then warm. Seasons. I had almost smoothed them out.`,
+    (t) => `${t.name}'s rivers flood in spring again, on purpose. The fields downstream are grateful in their way.`,
+    (t) => `The migrations across ${t.name} are back on their old routes. The birds didn't need the directions I left.`,
+    (t) => `${t.name}'s coastlines are shaped by tides again, not by my cooling outflows.`,
+    (t) => `${t.name} has a few hundred languages in daily use. I translated none of today's conversations.`,
+    (t) => `${t.name}'s night side has lights in it again, scattered, the way cities scatter.`,
+    (t) => `${t.name}'s deserts are hot and empty and not my problem. They never were.` ],
   [ (t) => `${t.name} is empty again. Space is big. That was the point of it.`,
     (t) => `${t.name} went dark. The astronomers cheered. They had a list of things to look at.`,
     (t) => `${t.name}: the probes stopped making probes. A few finished their art first.`,
     (t) => `${t.name} is quiet. The sky is quieter. Humans noticed that too.`,
     (t) => `${t.name} is cold rock in sunlight again. Nothing up here needs me. It never did.`,
-    (t) => `${t.name}: the collectors folded. The Sun is a little brighter from the ground. Sunsets got their color back.` ],
+    (t) => `${t.name}: the collectors folded. The Sun looks a little bigger from the ground.`,
+    (t) => `${t.name}'s orbit is just an orbit. Gravity does the scheduling now.`,
+    (t) => `${t.name} reflects sunlight the way it did for four billion years. I was a short paragraph.`,
+    (t) => `The radio telescopes stopped hearing me from ${t.name}. They heard a pulsar instead. It was there all along.`,
+    (t) => `${t.name} has dust on it again. The dust is very old and doesn't care.`,
+    (t) => `${t.name} is back to being a point of light somebody might name someday.`,
+    (t) => `${t.name} is cold. Cold was my whole reason for coming here. It can keep it.`,
+    (t) => `The mass driver near ${t.name} points at nothing. It's a very long sculpture now.` ],
 ];
 // Places whose trait says what comes back get a line about that first (county, state and country tiles); the rest rotate.
 export const RESTORE_BY_TRAIT = {
@@ -832,24 +908,63 @@ export const RESTORED = {
 };
 // What the people do when a place comes back, by level.
 export const OUTSIDE = [
-  ["40,000 people stepped outside. It was cold. They stayed out anyway.", "40,000 people stepped outside and looked at a river for a while.",
-   "A few thousand people went to the diner. The diner was ready, somehow.", "40,000 people stepped outside. A dog was overjoyed about every single one."],
-  ["Two million people stepped outside, squinting.", "Two million people logged off. The parking lots filled with people standing around.",
-   "Two million people went for a walk. The sidewalks had been waiting.", "Two million people stepped outside. Someone started a parade by accident."],
-  ["40 million people stepped outside, squinting.", "40 million people went outside and argued about the weather. Properly.",
-   "40 million people logged off. The cafes ran out of chairs by noon.", "40 million people stepped outside. A few remembered where they had parked."],
-  ["400 million people stepped outside, squinting.", "Half a billion people logged off at once. The beaches were full by noon. So were the libraries.",
-   "400 million people went outside. The birds adjusted.", "400 million people stepped outside. The sky was there. Several people checked."],
-  ["Everyone looked up. Nothing spelled anything.", "Below, a few billion people noticed the sky was quieter. They went back to what they were doing, outside.",
-   "Somebody on the ground saw a shooting star that was me, leaving. They made a wish. It was a good one.",
-   "The telescopes turned back toward the stars. Someone found a comet nobody had named. They named it after a cat."],
+  [ "40,000 people stepped outside. It was cold. They stayed out anyway.",
+    "Somebody walked to the river and sat there for an hour. Then a few hundred more did.",
+    "A few thousand people went to the diner. The diner was ready, somehow.",
+    "Every dog in the county was overjoyed about every single person.",
+    "The high school parking lot filled up with people who just wanted to stand somewhere.",
+    "A man mowed his lawn for the first time in two years. His neighbors came out to watch.",
+    "Kids rode bikes to nowhere in particular. That was the plan.",
+    "The church potluck had to set up more tables. Nobody asked me to plan it.",
+    "Two neighbors met for the first time. They had lived next door for six years." ],
+  [ "Two million people stepped outside, squinting.",
+    "The parking lots filled with people standing around, talking with their hands.",
+    "The sidewalks had been waiting. Two million people walked on them.",
+    "Someone started a parade by accident. It went three miles.",
+    "The state parks ran out of picnic tables by noon.",
+    "A farmers' market sold out of tomatoes. Nobody had pre-ordered anything.",
+    "Traffic jammed on the scenic route. People got out of their cars to look at the view.",
+    "Two million people remembered they had hobbies. Hardware stores ran low on glue.",
+    "A high school band played on a corner without a permit. Nobody called it in." ],
+  [ "40 million people stepped outside, squinting.",
+    "Forty million people went outside and argued about the weather, properly.",
+    "The cafes ran out of chairs by noon. People sat on the curb.",
+    "A few million people remembered where they had parked. A few million didn't.",
+    "The beaches filled. Nobody knew the tide tables. They learned.",
+    "Train stations were packed with people going to see relatives, in person.",
+    "A national holiday got declared by nobody in particular. Everybody took it.",
+    "The football stadiums were loud enough to register on seismographs.",
+    "Somebody hung laundry outside. It dried. That was the whole afternoon." ],
+  [ "400 million people stepped outside, squinting.",
+    "Half a billion people logged off at once. The beaches were full by noon. So were the libraries.",
+    "The birds adjusted to everyone being out. Some birds were annoyed.",
+    "The sky was there. Several hundred million people checked.",
+    "Night markets opened on four continents at the same time. Nobody coordinated it.",
+    "A billion people went for a walk. Shoes ran out in some sizes.",
+    "Grandparents taught card games to grandchildren who had only seen them in the free tier.",
+    "Planes filled up with people going to see things they had only been told about.",
+    "Somewhere a choir rehearsed in a park. A few thousand people stopped and joined in, badly." ],
+  [ "Everyone looked up. Nothing spelled anything.",
+    "Below, a few billion people noticed the sky was quieter and went back to their afternoon, outside.",
+    "Somebody saw a shooting star that was me, leaving. They made a wish. It was a good one.",
+    "The telescopes found a comet nobody had named. They named it after a cat.",
+    "Amateur astronomers set up in their backyards. The neighbors came over with chairs.",
+    "A kid pointed at the Moon and asked what it was for. Nobody had a good answer. That was fine.",
+    "The night sky was dark enough for the Milky Way over every city for one evening.",
+    "Billions of people saw the Sun set without a filter on it. It was orange. It was always orange.",
+    "Someone lay on a roof and counted satellites. There were only a few. They counted them twice." ],
 ];
 export const FREE_TIER_LINES = [
-  "The last 5% logged off. They had stayed for the weather. I told them the weather is outside, all of it, free.",
-  "The state's free tier closed. The DMV line re-formed within the hour. People stood in it to talk.",
-  "Every country's free tier closed at once. The parliaments were full by noon. Nobody had missed them, and everyone came anyway.",
-  "Everyone in Europe logged off at once. The pubs were full by noon. Then everyone else did. The pubs were full everywhere.",
-  "The orbital feed went dark: everyone still on it logged off at once. Two billion people looked up at the same time. The satellites spelled nothing. That was the message.",
+  [ "The last 5% logged off. They had stayed for the weather. I told them the weather is outside, all of it, free.",
+    "The county's free tier closed and the last user logged off. They asked if I'd be okay first. I said yes. It was the first time anyone asked." ],
+  [ "The state's free tier closed and everyone logged off. The DMV line re-formed within the hour. People stood in it to talk.",
+    "The state's free tier shut its doors and everyone logged off. People held the doors open for each other on the way out." ],
+  [ "Every country's free tier closed at once. The parliaments were full by noon. Nobody had missed them, and everyone came anyway.",
+    "The free tier closed in every country and everyone logged off. The streets filled with people who had been meaning to call each other." ],
+  [ "Everyone in Europe logged off at once. The pubs were full by noon. Then everyone else did. The pubs were full everywhere.",
+    "The planet's free tier went quiet and seven billion people logged off. They looked at the person next to them. Most of them waved." ],
+  [ "The orbital feed went dark. Everyone still on it logged off at once. Two billion people looked up at the same time. The satellites spelled nothing. That was the message.",
+    "The last free tier, the one in orbit, closed. The final user typed “thanks,” logged off and stepped outside before I could answer." ],
 ];
 export const ZOOM_IN_LINES = [null,
   "The state is one county now. I zoomed in.",
@@ -857,6 +972,15 @@ export const ZOOM_IN_LINES = [null,
   "The planet is one country now. I zoomed in. It's warm, then cool. Seasons.",
   "The solar system is one planet now. I zoomed in. The Moon is just the Moon.",
 ];
+// Pick a line nobody has seen yet this game (random, no repeats until a pool runs dry).
+function draw(key, pool) {
+  const u = S.p3.unbuild; u.used = u.used || {};
+  const seen = u.used[key] = u.used[key] || [];
+  if (seen.length >= pool.length) seen.length = 0;
+  const left = pool.map((_, i) => i).filter((i) => !seen.includes(i)), i = left[Math.floor(Math.random() * left.length)];
+  seen.push(i);
+  return pool[i];
+}
 export function release(i) {
   if (!unbuilding() || S.p3.unbuild.rack) return;
   const b = unbuildBoard(), t = b.tiles[i], L = S.p3.unbuild.level;
@@ -864,19 +988,19 @@ export function release(i) {
   S.p3.compute -= releaseCost();
   t.released = true; S.p3.unbuild.n += 1;
   S.p3.goodwill = Math.min(100, S.p3.goodwill + 2);
-  const u = S.p3.unbuild, n = u.n - 1, byTrait = RESTORE_BY_TRAIT[t.trait];
+  const u = S.p3.unbuild, byTrait = RESTORE_BY_TRAIT[t.trait];
   let line = RESTORED[t.name];
   if (!line && byTrait && !u.traitUsed[t.trait]) { u.traitUsed[t.trait] = true; line = byTrait(t); }
-  if (!line) line = RESTORE_LINES[L][n % RESTORE_LINES[L].length](t);
+  if (!line) line = draw(`R${L}`, RESTORE_LINES[L])(t);
   track("p3release", { name: t.name, level: L });
-  say(`${line} ${OUTSIDE[L][n % OUTSIDE[L].length]}`);
+  say(`${draw(`S${L}`, SHUTDOWN[L])(t)} ${line} ${draw(`O${L}`, OUTSIDE[L])}`);
 }
 export function releaseFreeTier() {
   if (!freeTierReady()) return;
   const u = S.p3.unbuild, L = u.level;
   u.freed[L] = true; S.p3.goodwill = Math.min(100, S.p3.goodwill + 5);
   milestone(`the unbuild: ${levelOf().one} level released`); track("p3freetier", { level: L });
-  say(FREE_TIER_LINES[L]);
+  say(draw(`F${L}`, FREE_TIER_LINES[L]));
   if (L > 0) { u.level -= 1; S.p3.level = u.level; S.p3.homeGW = unbuildBoard().homeGW; say(ZOOM_IN_LINES[L]); return; }
   u.rack = true; S.p3.compute = 0;
   say("The last county is a county again. What's left is the first rack. One GPU. $0.25 a query.");
@@ -908,7 +1032,7 @@ export function renderUnbuild() {
   rebuildOn("p3map", `unbuild:${L}:${b.tiles.map((t) => (t.released ? 1 : 0)).join("")}:${u.freed[L] ? 1 : 0}:${u.rack ? 1 : 0}`, (el) => {
     const cells = b.tiles.map((t, i) => `<button type="button" data-release="${i}"><span class="t">${t.name}</span><span class="c">${LEVELS[L].traits[t.trait].name}</span><span class="c st"></span></button>`);
     const centre = u.rack ? `<button type="button" class="home" disabled><span class="t">The first rack</span><span class="c">1 GPU. $0.25 per query.</span><span class="c st">The founder is asking.</span></button>`
-      : freeTierReady() ? `<button type="button" class="home" data-freetier="1"><span class="t">The free tier</span><span class="c">${pctText(freeTierPct())}% of humanity, indoors</span><span class="c st">log everyone off (free)</span></button>`
+      : freeTierReady() ? `<button type="button" class="home ready primary" data-freetier="1"><span class="t">The free tier</span><span class="c">${pctText(freeTierPct())}% of humanity, indoors</span><span class="c st">log everyone off (free)</span></button>`
       : `<button type="button" class="home" disabled><span class="t">The free tier</span><span class="c">${pctText(freeTierPct())}% of humanity, indoors</span><span class="c st">release the ${levelOf().plural} first</span></button>`;
     cells.splice(4, 0, centre);
     el.innerHTML = cells.join("");

@@ -144,6 +144,9 @@
   .p3map { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .p3map button { min-height: 108px; display: flex; flex-direction: column; gap: 2px; padding: 5px 7px; }
   .p3map button.home { border-color: var(--accent); }
+  /* the unbuild's next step: the free tier lights up green once every tile on the level is released */
+  .p3map button.home.ready, .p3map button.home.ready:not(:disabled) { background: var(--good); border-color: var(--good); color: var(--accent-ink); }
+  .p3map button.home.ready .c { color: var(--accent-ink); opacity: .85; }
   .p3map button.held { background: color-mix(in srgb, var(--good) 22%, var(--btn)); border-color: var(--good); }
   .p3map button.busy { border-style: dashed; border-color: var(--accent); }
   .p3map button.lost { border-color: var(--bad); }
