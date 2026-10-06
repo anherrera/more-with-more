@@ -602,9 +602,13 @@ export function renderFleet() {
       // What a swap buys: the same megawatts of the newest chip earn more on-demand (and qualify for new contracts).
       const n = tradeCount(g), mw = n * chip(g).kw / 1000, now = mw * odRate(g) * OD_UTIL, then = mw * odRate(S.chipIdx) * OD_UTIL;
       const refill = Math.max(0, Math.floor(mw * 1000 / newest().kw) * gpuPrice() - tradeValue(g)), gain = then - now;
-      b.innerHTML = `<span class="t">Trade in ${n.toLocaleString("en-US")}: ${money(tradeValue(g))} in credits, frees ${kwText(n * chip(g).kw)}</span>` +
-        `<span class="c">${money(now)}/s now; newest would earn ${money(then)}/s. Refill ${money(refill)}` +
-        (gain > 0 ? `, pays back in ${time(refill / gain)}` : ", never pays back") + `</span>`;
+      const away = S.block && S.block.until > S.t;
+      b.disabled = away || n <= 0;
+      b.innerHTML = away
+        ? `<span class="t">Out on a spot lease: back in ${time(S.block.until - S.t)}</span><span class="c">GPUs on the spot market can't be traded in until they're home.</span>`
+        : `<span class="t">Trade in ${n.toLocaleString("en-US")}: ${money(tradeValue(g))} in credits, frees ${kwText(n * chip(g).kw)}</span>` +
+          `<span class="c">${money(now)}/s now; newest would earn ${money(then)}/s. Refill ${money(refill)}` +
+          (gain > 0 ? `, pays back in ${time(refill / gain)}` : ", never pays back") + `</span>`;
     }
   }
 }

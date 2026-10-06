@@ -25,3 +25,14 @@ def test_phase2_rows_say_what_a_swap_earns_and_when_it_pays_back(game):
     pg.evaluate("() => { S.funds = 1e10; S.chipIdx = 6; S.fleet = {3: 2000, 6: 100}; S.gpus = 2100; render(); }")
     row = pg.inner_text("#fleetRows")
     assert "/s now" in row and "newest would earn" in row and "pays back" in row
+
+
+def test_gpus_out_on_a_spot_lease_cant_be_traded_in(game):
+    pg = campus(game)
+    pg.evaluate("() => { S.funds = 1e10; S.chipIdx = 6; S.fleet = {3: 2000, 6: 100}; S.gpus = 2100; S.block = {n: 2090, until: S.t + 12}; render(); }")
+    assert pg.evaluate("() => tradeCount(3)") <= 10
+    b = pg.query_selector("button[data-tradegen='3']")
+    assert b.is_disabled() and "spot" in b.inner_text().lower()
+    pg.evaluate("() => { S.block = null; render(); }")
+    assert pg.evaluate("() => tradeCount(3)") == 2000
+    assert pg.query_selector("button[data-tradegen='3']").is_enabled()

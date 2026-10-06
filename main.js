@@ -185,7 +185,9 @@ export function sellSpot() {
 // Trade old chips back to Parallax for credits: a secondhand market, so last generation is worth a lot more than
 // two generations ago. Frees power for new chips.
 // Phase 2: GPUs under contract can't be traded in; only the free part of a cohort can go.
-export const tradeCount = (c) => Math.min(S.fleet[c] || 0, S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
+// GPUs that are actually here: not failed, not in RMA, not out on a spot lease.
+export const homeGPUs = () => Math.max(0, S.gpus - S.failed - inRMA() - (S.block ? S.block.n : 0));
+export const tradeCount = (c) => Math.min(S.fleet[c] || 0, homeGPUs(), S.phase === 2 ? Math.floor((freeKWByGen()[c] || 0) / chip(c).kw + 1e-9) : Infinity);
 export const oldestOld = () => { const cs = Object.keys(S.fleet).map(Number).filter((c) => c < S.chipIdx && tradeCount(c) > 0).sort((a, b) => a - b); return cs.length ? cs[0] : null; };
 export const tradeRate = (c) => { const age = S.chipIdx - c;
   return (age <= 1 ? 0.6 : age === 2 ? 0.4 : 0.25) + (S.done.refurb ? 0.15 : 0); };   // your own refurb shop pays better
