@@ -45,3 +45,25 @@ def test_cheap_land_builds_cheap(game):
 def test_the_cheap_county_says_building_is_cheap(game):
     pg = broke_ground(game)
     assert "25% less" in pg.inner_text("button[data-county='cheap']")
+
+
+def test_the_incentive_county_pays_for_every_hall(game):
+    """Big incentives are more than a signing bonus: the county wires money for every hall you finish, so the
+    county with the most turbines to buy isn't broke by the midgame."""
+    pg = broke_ground(game)
+    pg.click("button[data-county='incent']")
+    per = pg.evaluate("() => countyOf().perHall")
+    assert per and per >= 5e6
+    pg.evaluate("() => { S.p2.builds.push({ kind: 'hall', done: S.t }); S.p2.builds.push({ kind: 'turbine', done: S.t }); }")
+    funds = pg.evaluate("() => S.funds")
+    pg.evaluate("() => step(1)")
+    assert abs(pg.evaluate("() => S.funds") - funds - per) < 1e6, "one hall paid once, turbines don't count"
+    assert "wired" in pg.evaluate("() => S.log.join(' ')")
+    pg.evaluate("() => step(1)")
+    assert abs(pg.evaluate("() => S.funds") - funds - per) < 1e6, "not paid twice"
+
+
+def test_the_incentive_county_says_it_pays_per_hall(game):
+    pg = broke_ground(game)
+    assert "per hall" in pg.inner_text("button[data-county='incent']")
+    assert "per hall" not in pg.inner_text("button[data-county='strong']")

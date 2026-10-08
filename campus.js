@@ -15,8 +15,8 @@ export const COUNTIES = [
     pitch: "A 200 MW connection on day one. The reservoir is a rumor.",
     gridMW: 200, acres: 1500, queueMW: 150, queueSecs: 200, cash: 0, water: 5, drought: [240, 360], town: 20, rise: 1 },
   { id: "incent", name: "Big incentives, organized town",
-    pitch: "$20M in tax incentives up front. The town already has a Facebook group about you.",
-    gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6, water: 10, drought: [600, 900], town: 40, rise: 2 },
+    pitch: "$20M in tax incentives up front and $10M per hall you finish. The town already has a Facebook group about you.",
+    gridMW: 100, acres: 2000, queueMW: 100, queueSecs: 240, cash: 20e6, perHall: 10e6, water: 10, drought: [600, 900], town: 40, rise: 2 },
 ];
 export const MARKET_START_MW = 150, MARKET_CAP_MW = 300;       // leasable colo MW in this market
 export const COLO_MW = 20, COLO_RACKS = 240, COLO_SLOT = 35;   // you lease colo in 20 MW blocks (a data hall's worth)
@@ -437,7 +437,11 @@ export function stepCampus(dt) {
     say(`The utility energized ${mwText(q.mw)} more. The queue is longer now. Everyone is in it.`);
   }
   for (const b of S.p2.builds) {
-    if (!b.announced && S.t >= b.done) { b.announced = true; track("build", { ev: "done", kind: b.kind }); say(BUILD_DONE[b.kind]()); }
+    if (!b.announced && S.t >= b.done) {
+      b.announced = true; track("build", { ev: "done", kind: b.kind }); say(BUILD_DONE[b.kind]());
+      // The incentive county pays per finished hall: the money is for jobs, the building is what they can count.
+      if (b.kind === "hall" && countyOf().perHall) { S.funds += countyOf().perHall; say(`The county wired ${money(countyOf().perHall)} for hall ${doneBuilds("hall")}. The press release says “jobs.”`); }
+    }
   }
   if (S.p2.nextColo == null) S.p2.nextColo = S.t + COLO_EVERY[0];
   if (S.p2.aquifer == null) S.p2.aquifer = 100;
