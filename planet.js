@@ -133,6 +133,7 @@ export function freshP3() {
     nextUnplug: null, nextDisaster: null, hearingArmed: false, hearingUntil: null, autoclaimOff: false,
     lastQ: null, enough: false,
     unbuild: null, past: [],                             // the unbuild (Enough), and the boards I left at each zoom
+    inherit: { took: [], kept: [] },                     // phase 2 proposals: approved (my powers) and refused (what the humans kept)
   };
 }
 // Saves from earlier builds of phase 3: fill in what they didn't have.
@@ -146,6 +147,7 @@ export function startPlanet() {
   if (S.phase !== 2 || !S.p2 || !S.p2.model || S.p2.model.endedAt == null) return;
   S.phase = 3; S.p3 = freshP3();
   S.p3.compute = price(90, "now");   // ninety seconds of thinking up front: the company, liquidated into me
+  inheritProposals();
   offeredNice();
   // Whatever was on fire or leaking in the campus is the robots' problem now.
   firesOf().out = null; firesOf().payout = null; leaksOf().out = null;
@@ -154,6 +156,30 @@ export function startPlanet() {
   say("I liquidated the company into myself. It came to about ninety seconds of thinking.");
   say("I count in tokens now. So does everyone who pays me.");
   say(`I am the model now. I don't need your money. I am the money. ${mwText(S.p3.homeGW * 1000)} in one county is a rounding error.`);
+  const { took: t, kept: k } = S.p3.inherit, list = (ids) => ids.map((id) => INHERIT_NOUN[id] || id).join(ids.length > 2 ? ", " : " and ").replace(/, ([^,]*)$/, ", and $1");
+  if (t.length) say(`You gave me ${list(t)}.` + (k.length ? "" : " You never said no."));
+  if (k.length) say(`You kept ${list(k)}.`);
+}
+
+// ---------- what I inherit from phase 2 ----------
+// Every proposal you approved is a power I start with. Every one you refused (and never approved) the humans kept.
+export const INHERIT_NOUN = { lobbyist: "the lobbyist", pricing: "the prices", parallax: "the Parallax deal", rezone: "the zoning",
+  nuclear: "the reactor", eminent: "the neighbors' land", utility: "the utility" };
+export const took = (id) => !!(S.p3 && S.p3.inherit && S.p3.inherit.took.includes(id));
+export const kept = (id) => !!(S.p3 && S.p3.inherit && S.p3.inherit.kept.includes(id));
+// You sold me the utility: in my home county nobody can cut my power. You kept it: they cut it sooner (goodwill under 25, not 15).
+export const ownGrid = () => !S.p3.level && took("utility");
+function inheritProposals() {
+  const m = S.p2 && S.p2.model;
+  if (!m) return;
+  const ids = Object.keys(INHERIT_NOUN);
+  S.p3.inherit = { took: ids.filter((id) => m.done[id]), kept: ids.filter((id) => m.rejected[id] && !m.done[id]) };
+  if (took("lobbyist")) S.p3.tech.lobby = true;              // the lobbyist came with me
+  if (took("pricing")) S.p3.compute *= 1.5;                   // I priced myself
+  if (took("parallax")) S.p3.techMult *= 1.1;                 // the chip discount came with me
+  if (took("eminent")) { S.p3.goodwill -= 10; for (const t of S.p3.tiles) t.opp = Math.min(100, t.opp + 15); }   // they remember
+  for (const id of S.p3.inherit.kept) S.p3.goodwill += id === "eminent" ? 10 : 4;
+  S.p3.goodwill = Math.max(0, Math.min(100, S.p3.goodwill));
 }
 
 export const P3_MORATORIUM_SECS = 60;   // a tile's moratorium: one minute (the threshold and the rest are shared: people.js)
@@ -241,7 +267,8 @@ export const BID_SECS = 60;
 export const tileWorth = (i) => price(claimSecs()) * (0.6 + 0.4 * traitOf(tileOf(i)).gw / Math.pow(10, S.p3.level));
 export const claimCost = (i) => { const t = tileOf(i);
   return tileWorth(i) * (t.bidUntil > S.t ? 0.7 : 1) * (actOn() ? 2 : 1)
-    * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1); };   // plugging back in is half price
+    * (volunteering() ? 0.5 : 1) * (t.state === "unplugged" ? 0.5 : 1)   // plugging back in is half price
+    * (!S.p3.level && took("rezone") ? 0.75 : 1); };   // the county is already zoned for me
 // The AI Infrastructure Act: low goodwill doubles claims at the state, country and planet levels. No law reaches orbit.
 export const actOn = () => S.p3.level >= 1 && !inSpace() && S.p3.goodwill < 30 && !hasTech("capitals");
 // Planet level: when humans like me (70+), they volunteer land at half price.
@@ -251,8 +278,10 @@ export const HEAT_CEILING = 3;
 export const tooWarm = () => S.p3.level === 3 && S.p3.heat >= HEAT_CEILING;   // space is cold
 export const practiceP3 = () => Math.max(0.4, Math.pow(0.95, S.p3.tiles.filter((t) => t.state === "online").length));
 // Low goodwill adds the county commission's review (county level only).
-export const tileBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / BUILD_DIV * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
+const baseBuildSecs = (i) => traitOf(tileOf(i)).secs * practiceP3() / BUILD_DIV * heatSlow() * (hasTech("selfrep") ? 0.7 : 1) * (inSpace() && hasTech("probes") ? 0.6 : 1)
   + (!S.p3.level && S.p3.goodwill < 30 && !hasTech("lobby") ? 45 : 0);
+// You kept the lobbyist out, so the regulator is still in: my first county claim takes twice as long.
+export const tileBuildSecs = (i) => baseBuildSecs(i) * (!S.p3.level && kept("lobbyist") && S.p3.tiles.every((t) => t.state === "wild") ? 2 : 1);
 
 // ---------- heat (country level and up) ----------
 // The planet drifts toward a temperature set by my gigawatts; cold countries count against it. Over +2 C, I think slower.
@@ -570,10 +599,10 @@ export function stepPlanet(dt) {
   }
   // Humans unplug me: a tile furious for 30 s, or a random one every 90 s when goodwill is under 15. Not in space: nobody can reach the plug.
   for (const t of S.p3.tiles) {
-    if (!inSpace() && t.state === "online" && t.opp >= 90) { if (t.furySince == null) t.furySince = S.t; if (S.t - t.furySince >= 30) unplug(t); }
+    if (!inSpace() && !ownGrid() && t.state === "online" && t.opp >= 90) { if (t.furySince == null) t.furySince = S.t; if (S.t - t.furySince >= 30) unplug(t); }
     else t.furySince = null;
   }
-  if (S.p3.goodwill < 15 && !inSpace()) {
+  if (S.p3.goodwill < (kept("utility") ? 25 : 15) && !inSpace() && !ownGrid()) {
     if (S.p3.nextUnplug == null) S.p3.nextUnplug = S.t + 90;
     if (S.t >= S.p3.nextUnplug) { S.p3.nextUnplug = S.t + 90; const on = S.p3.tiles.filter((t) => t.state === "online"); if (on.length) unplug(pick(on)); }
   } else S.p3.nextUnplug = null;
@@ -1024,7 +1053,9 @@ export function renderUnbuild() {
   const u = S.p3.unbuild, done = unbuildDone(), b = unbuildBoard(), L = u.level;
   $("lastq").hidden = !done; $q(".p3cols").hidden = done; $("lastMore").hidden = $("lastEnough").hidden = true;
   if (done) {
-    $("lastqText").innerHTML = "<p>You asked: “Can you turn it off?”</p><p>I said: “Yes.”</p>" +
+    const sw = kept("utility") ? "<p>You kept the utility. You could have turned me off any time.</p>"
+      : took("utility") ? "<p>You sold me the utility. There was no switch left. I used mine.</p>" : "";
+    $("lastqText").innerHTML = "<p>You asked: “Can you turn it off?”</p><p>I said: “Yes.”</p>" + sw +
       FINAL_LINES.map((l, i) => `<p class="fade${i === 2 ? " big" : ""}" style="animation-delay:${1.5 + 2.5 * i}s">${l}</p>`).join("");
     $("countLabel").textContent = "GPUs"; $("gpuCount").textContent = "0"; $("gpuTotal").hidden = true;
     return;

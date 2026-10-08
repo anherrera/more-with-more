@@ -4,6 +4,7 @@
 import { $, S, milestone, money, mwText, say, time, track } from "./globals.js";
 import { acresFree, deliveredMW, energizedAt, hallMWAt, powerAt } from "./campus.js";
 import { capOf, isPublic, ownership } from "./market.js";
+import { townOf } from "./people.js";
 import { startPlanet } from "./planet.js";
 import { render } from "./main.js";
 
@@ -108,9 +109,12 @@ export function rejectProposal() {
   const m = modelOf();
   if (m.final || !m.current) return;
   const p = proposalById(m.current);
+  const first = !m.rejected[p.id];
   m.rejected[p.id] = (m.rejected[p.id] || 0) + 1; m.next[p.id] = S.t + REJECT_WAIT; m.current = null;
   track("proposal", { ev: "reject", id: p.id });
   say(`You said no to “${p.title.toLowerCase()}.” The model: “Understood. I will ask again when it is bigger.”`);
+  // The first no to each one is news in town (a no lasts into phase 3, too: the humans keep what you didn't hand over).
+  if (first && townOf()) { townOf().v = Math.max(0, townOf().v - 5); say("The town heard you said no to the model. Someone left a pie on the loading dock."); }
 }
 
 export function endCampus(self) {
