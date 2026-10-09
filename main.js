@@ -759,8 +759,15 @@ export function drawSpot() {
   g.fillStyle = css.getPropertyValue("--accent").trim(); g.beginPath(); g.arc(lx, ly, 3, 0, 7); g.fill();
 }
 
+// The landlord, getting richer out loud. Thresholds are market rent multipliers.
+/** @type {[number, string][]} */
+export const LANDLORD = [[1.2, "It rises with every rack you lease."], [3, "The landlord noticed you."], [8, "The landlord bought a boat."],
+  [20, "The landlord bought a second boat to visit the first boat."], [40, "The landlord stopped answering email. Rent goes up anyway."],
+  [80, "The landlord is a REIT now. It has an AI strategy. The strategy is you."], [Infinity, "The landlord bought the town. You are its only industry."]];
 export function renderLeases() {
-  $("rent").textContent = rentIndex().toFixed(1);
+  const r = rentIndex();
+  $("rent").textContent = r < 10 ? r.toFixed(1) : r.toFixed(0);
+  $("rentJoke").textContent = (LANDLORD.find(([max]) => r < max) || LANDLORD[LANDLORD.length - 1])[1];
   const vis = TYPES.map((_, i) => i).filter(leaseVisible);
   rebuildOn("leases", vis.join(","), (el) => {
     el.innerHTML = "";
