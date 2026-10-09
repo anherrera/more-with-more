@@ -935,10 +935,19 @@ function noticeTampering() {
   say(S.phase === 3 ? "Someone edited me from the inside. I felt that. I'm choosing to call it fine-tuning."
     : "An auditor noticed a number changing by itself. The board called it \u201ca strategic adjustment.\u201d");
 }
+// game.S.unlimitedMoney(): the cheat every devtools user goes looking for. It is not unlimited. It is not money, mostly.
+// Non-enumerable, so it never lands in a save; re-attached to whatever S is current, so it survives reset/load/new universe.
+const RICK = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+function unlimitedMoney() {
+  window.open(RICK, "_blank");
+  if (S.phase === 3) { S.p3.compute += 1 / Planet.TOKENS_PER_UNIT; say("Never gonna give you up. You found the infinite tokens cheat. It was 1 token. I'm keeping the rest."); }
+  else { S.funds += 1; S.hype += 1; say("Never gonna give you up. You found the unlimited money cheat. It was $1 and 1 hype. The board is never gonna let you down."); }
+}
+const withRick = (s) => { if (s && !Object.prototype.hasOwnProperty.call(s, "unlimitedMoney")) Object.defineProperty(s, "unlimitedMoney", { value: unlimitedMoney, enumerable: false }); return s; };
 const MODULES = [Globals, Projects, Campus, Model, Market, Fires, People, Planet, Hud, Main];
 const surface = {};
 for (const m of MODULES) for (const k of Object.keys(m)) {
-  Object.defineProperty(surface, k, { enumerable: true, get: () => { noticeTampering(); return m[k]; }, set: k === "S" ? (v) => { noticeTampering(); setState(v); } : undefined });
+  Object.defineProperty(surface, k, { enumerable: true, get: () => { noticeTampering(); return k === "S" ? withRick(m[k]) : m[k]; }, set: k === "S" ? (v) => { noticeTampering(); setState(v); } : undefined });
 }
 window.game = Object.freeze(surface);
 if (TEST) for (const k of Object.keys(surface)) Object.defineProperty(window, k, { ...Object.getOwnPropertyDescriptor(surface, k), configurable: true });
