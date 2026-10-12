@@ -945,8 +945,12 @@ function noticeTampering() {
 // game.S.unlimitedMoney(): the cheat every devtools user goes looking for. It is not unlimited. It is not money, mostly.
 // Non-enumerable, so it never lands in a save; re-attached to whatever S is current, so it survives reset/load/new universe.
 // It plays in the page, not a popup: a console call isn't a click, so popups get blocked, and a paused video isn't a rickroll.
-// youtube-nocookie: Firefox tracking protection leaves it alone. YouTube refuses embeds that arrive without a referrer.
-const RICK = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0";
+// youtube.com, not youtube-nocookie: browsers that let YouTube autoplay with sound mean youtube.com. YouTube refuses embeds
+// that arrive without a referrer, hence the explicit policy.
+const RICK = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0";
+// YouTube's player logs a pile of its own errors into the same console while it loads. Wipe them and sing instead.
+const SING = () => { console.clear(); console.log("%cNever gonna give you up", "font: bold 28px Georgia, serif; color: #c0392b"); };
+function singOverYouTube() { SING(); for (const ms of [800, 2000, 4000]) setTimeout(SING, ms); }
 function rickroll() {
   if (document.getElementById("rickroll")) return;
   const d = document.createElement("div");
@@ -960,7 +964,7 @@ function rickroll() {
   document.body.appendChild(d);
 }
 function unlimitedMoney() {
-  rickroll();
+  rickroll(); singOverYouTube();
   if (S.phase === 3) { S.p3.compute += 1 / Planet.TOKENS_PER_UNIT; say("Never gonna give you up. You found the infinite tokens cheat. It was 1 token. I'm keeping the rest."); }
   else { S.funds += 1; S.hype += 1; say("Never gonna give you up. You found the unlimited money cheat. It was $1 and 1 hype. The board is never gonna let you down."); }
 }

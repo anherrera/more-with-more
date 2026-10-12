@@ -30,7 +30,7 @@ def test_tests_and_robots_do_not_count_as_tampering(game):
     assert not any("auditor" in l for l in pg.evaluate("() => S.log"))
 
 
-EMBED = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1"
+EMBED = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
 
 
 def test_unlimited_money_is_a_rickroll(game, page):
@@ -66,3 +66,15 @@ def test_the_model_gets_rickrolled_in_tokens(game, page):
     pg.evaluate("() => game.S.unlimitedMoney()")
     assert pg.evaluate("() => game.S.p3.compute") == c + 1e-9
     assert "1 token" in pg.evaluate("() => game.S.log.at(-1)")
+
+
+def test_the_console_is_wiped_and_sings(game, page):
+    logs = []
+    pg = game({**MID, "paused": True}, test=False)
+    page.on("console", lambda m: logs.append((m.type, m.text)))
+    pg.evaluate("() => game.S.unlimitedMoney()")
+    pg.wait_for_timeout(200)
+    kinds = [k for k, _ in logs]
+    assert "clear" in kinds
+    after = [t for k, t in logs[kinds.index("clear"):]]
+    assert any("Never gonna give you up" in t for t in after)
