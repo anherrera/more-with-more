@@ -34,7 +34,7 @@ EMBED = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1"
 
 
 def test_unlimited_money_is_a_rickroll(game, page):
-    pg = game(MID, test=False)
+    pg = game({**MID, "paused": True}, test=False)   # the real clock runs here: pause it so only the cheat moves money
     funds, hype = pg.evaluate("() => [game.S.funds, game.S.hype]")
     pg.evaluate("() => game.S.unlimitedMoney()")
     frame = pg.query_selector("#rickroll iframe")
@@ -61,7 +61,7 @@ def test_the_rickroll_stays_out_of_saves_and_survives_a_reset(game, page):
 
 def test_the_model_gets_rickrolled_in_tokens(game, page):
     from conftest import READY
-    pg = game({**READY, "phase": 3, "p3": {"level": 0}}, test=False)
+    pg = game({**READY, "phase": 3, "p3": {"level": 0}, "paused": True}, test=False)
     c = pg.evaluate("() => game.S.p3.compute")
     pg.evaluate("() => game.S.unlimitedMoney()")
     assert pg.evaluate("() => game.S.p3.compute") == c + 1e-9
