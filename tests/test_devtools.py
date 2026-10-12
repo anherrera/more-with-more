@@ -35,12 +35,12 @@ EMBED = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
 
 def test_unlimited_money_is_a_rickroll(game, page):
     pg = game({**MID, "paused": True}, test=False)   # the real clock runs here: pause it so only the cheat moves money
-    funds, hype = pg.evaluate("() => [game.S.funds, game.S.hype]")
+    gpus, newest = pg.evaluate("() => [game.S.gpus, game.S.fleet[game.S.chipIdx] || 0]")
     pg.evaluate("() => game.S.unlimitedMoney()")
     frame = pg.query_selector("#rickroll iframe")
     assert frame.get_attribute("src").startswith(EMBED) and "autoplay" in frame.get_attribute("allow")
     assert frame.get_attribute("referrerpolicy") == "strict-origin-when-cross-origin"
-    assert pg.evaluate("() => [game.S.funds, game.S.hype]") == [funds + 1, hype + 1]
+    assert pg.evaluate("() => [game.S.gpus, game.S.fleet[game.S.chipIdx]]") == [gpus + 1, newest + 1]
     assert "Never gonna give you up" in pg.evaluate("() => game.S.log.at(-1)")
 
 
@@ -78,3 +78,4 @@ def test_the_console_is_wiped_and_sings(game, page):
     assert "clear" in kinds
     after = [t for k, t in logs[kinds.index("clear"):]]
     assert any("Never gonna give you up" in t for t in after)
+    assert any("real cheat" in t and "1 GPU" in t for t in after)

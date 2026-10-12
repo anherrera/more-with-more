@@ -949,7 +949,10 @@ function noticeTampering() {
 // that arrive without a referrer, hence the explicit policy.
 const RICK = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0";
 // YouTube's player logs a pile of its own errors into the same console while it loads. Wipe them and sing instead.
-const SING = () => { console.clear(); console.log("%cNever gonna give you up", "font: bold 28px Georgia, serif; color: #c0392b"); };
+const QUIP = () => (S.phase === 3 ? "Oh, you thought that was a real cheat? Here's 1 token. I'm keeping the rest. I'm never gonna give them up."
+  : "Oh, you thought that was a real cheat? Here's 1 GPU. Don't spend it all in one place.");
+const SING = () => { console.clear(); console.log("%cNever gonna give you up", "font: bold 28px Georgia, serif; color: #c0392b");
+  console.log("%c" + QUIP(), "font: 14px Georgia, serif"); };
 function singOverYouTube() { SING(); for (const ms of [800, 2000, 4000]) setTimeout(SING, ms); }
 function rickroll() {
   if (document.getElementById("rickroll")) return;
@@ -966,7 +969,7 @@ function rickroll() {
 function unlimitedMoney() {
   rickroll(); singOverYouTube();
   if (S.phase === 3) { S.p3.compute += 1 / Planet.TOKENS_PER_UNIT; say("Never gonna give you up. You found the infinite tokens cheat. It was 1 token. I'm keeping the rest."); }
-  else { S.funds += 1; S.hype += 1; say("Never gonna give you up. You found the unlimited money cheat. It was $1 and 1 hype. The board is never gonna let you down."); }
+  else { S.gpus += 1; S.fleet[S.chipIdx] = (S.fleet[S.chipIdx] || 0) + 1; say("Never gonna give you up. You found the unlimited money cheat. It was 1 GPU."); }
 }
 const withRick = (s) => { if (s && !Object.prototype.hasOwnProperty.call(s, "unlimitedMoney")) Object.defineProperty(s, "unlimitedMoney", { value: unlimitedMoney, enumerable: false }); return s; };
 const MODULES = [Globals, Projects, Campus, Model, Market, Fires, People, Planet, Hud, Main];
