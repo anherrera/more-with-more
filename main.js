@@ -945,14 +945,15 @@ function noticeTampering() {
 // game.S.unlimitedMoney(): the cheat every devtools user goes looking for. It is not unlimited. It is not money, mostly.
 // Non-enumerable, so it never lands in a save; re-attached to whatever S is current, so it survives reset/load/new universe.
 // It plays in the page, not a popup: a console call isn't a click, so popups get blocked, and a paused video isn't a rickroll.
-const RICK = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=0&rel=0";
+// youtube-nocookie: Firefox tracking protection leaves it alone. YouTube refuses embeds that arrive without a referrer.
+const RICK = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0";
 function rickroll() {
   if (document.getElementById("rickroll")) return;
   const d = document.createElement("div");
   d.id = "rickroll";
   d.style.cssText = "position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center";
   d.innerHTML = '<div style="position:relative;width:min(90vw,800px);aspect-ratio:16/9">' +
-    `<iframe src="${RICK}" allow="autoplay; encrypted-media" style="width:100%;height:100%;border:0" title="Unlimited money"></iframe>` +
+    `<iframe src="${RICK}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" style="width:100%;height:100%;border:0" title="Unlimited money"></iframe>` +
     '<button type="button" class="close" style="position:absolute;top:-40px;right:0">Close</button></div>';
   d.addEventListener("click", (e) => { if (e.target === d || hit(e, ".close")) d.remove(); });
   document.body.appendChild(d);

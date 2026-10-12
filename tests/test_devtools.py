@@ -30,7 +30,7 @@ def test_tests_and_robots_do_not_count_as_tampering(game):
     assert not any("auditor" in l for l in pg.evaluate("() => S.log"))
 
 
-EMBED = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+EMBED = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1"
 
 
 def test_unlimited_money_is_a_rickroll(game, page):
@@ -39,6 +39,7 @@ def test_unlimited_money_is_a_rickroll(game, page):
     pg.evaluate("() => game.S.unlimitedMoney()")
     frame = pg.query_selector("#rickroll iframe")
     assert frame.get_attribute("src").startswith(EMBED) and "autoplay" in frame.get_attribute("allow")
+    assert frame.get_attribute("referrerpolicy") == "strict-origin-when-cross-origin"
     assert pg.evaluate("() => [game.S.funds, game.S.hype]") == [funds + 1, hype + 1]
     assert "Never gonna give you up" in pg.evaluate("() => game.S.log.at(-1)")
 
