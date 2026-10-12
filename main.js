@@ -953,7 +953,8 @@ function rickroll() {
   d.id = "rickroll";
   d.style.cssText = "position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center";
   d.innerHTML = '<div style="position:relative;width:min(90vw,800px);aspect-ratio:16/9">' +
-    `<iframe src="${RICK}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" style="width:100%;height:100%;border:0" title="Unlimited money"></iframe>` +
+    // Chrome needs allow= to autoplay a cross-origin iframe; Firefox doesn't know the names and warns about each one.
+    `<iframe src="${RICK}" ${"featurePolicy" in document ? 'allow="autoplay; encrypted-media" ' : ""}referrerpolicy="strict-origin-when-cross-origin" style="width:100%;height:100%;border:0" title="Unlimited money"></iframe>` +
     '<button type="button" class="close" style="position:absolute;top:-40px;right:0">Close</button></div>';
   d.addEventListener("click", (e) => { if (e.target === d || hit(e, ".close")) d.remove(); });
   document.body.appendChild(d);
