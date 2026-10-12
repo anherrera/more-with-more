@@ -30,18 +30,25 @@ def test_tests_and_robots_do_not_count_as_tampering(game):
     assert not any("auditor" in l for l in pg.evaluate("() => S.log"))
 
 
-def _stub_open(pg):
-    pg.evaluate("() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; }")
+EMBED = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
 
 
 def test_unlimited_money_is_a_rickroll(game, page):
     pg = game(MID, test=False)
-    _stub_open(pg)
     funds, hype = pg.evaluate("() => [game.S.funds, game.S.hype]")
     pg.evaluate("() => game.S.unlimitedMoney()")
-    assert pg.evaluate("() => window.__opened") == ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    frame = pg.query_selector("#rickroll iframe")
+    assert frame.get_attribute("src").startswith(EMBED) and "autoplay" in frame.get_attribute("allow")
     assert pg.evaluate("() => [game.S.funds, game.S.hype]") == [funds + 1, hype + 1]
     assert "Never gonna give you up" in pg.evaluate("() => game.S.log.at(-1)")
+
+
+def test_the_rickroll_plays_once_at_a_time_and_closes(game, page):
+    pg = game(MID, test=False)
+    pg.evaluate("() => { game.S.unlimitedMoney(); game.S.unlimitedMoney(); }")
+    assert len(pg.query_selector_all("#rickroll")) == 1
+    pg.click("#rickroll .close")
+    assert not pg.query_selector("#rickroll")
 
 
 def test_the_rickroll_stays_out_of_saves_and_survives_a_reset(game, page):
@@ -54,7 +61,6 @@ def test_the_rickroll_stays_out_of_saves_and_survives_a_reset(game, page):
 def test_the_model_gets_rickrolled_in_tokens(game, page):
     from conftest import READY
     pg = game({**READY, "phase": 3, "p3": {"level": 0}}, test=False)
-    _stub_open(pg)
     c = pg.evaluate("() => game.S.p3.compute")
     pg.evaluate("() => game.S.unlimitedMoney()")
     assert pg.evaluate("() => game.S.p3.compute") == c + 1e-9
